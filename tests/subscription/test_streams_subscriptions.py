@@ -5,7 +5,7 @@ import sqlalchemy as _sa
 
 import pytest
 
-from depeche_db.tools import DbSubscriptionStateProvider
+from depeche_db.tools import DbSubscriptionStateProvider, DbLockProvider
 from depeche_db import (
     LinkStream,
     MessagePartitioner,
@@ -17,15 +17,14 @@ from depeche_db import (
     SubscriptionMessage,
     SubscriptionState,
 )
-from depeche_db.db_lock_provider import DbLockProvider
 
-from .account import (
+from tests._account_example import (
     Account,
     AccountEvent,
     AccountEventSerializer,
     AccountRepository,
 )
-from .tools import identifier
+from tests._tools import identifier
 
 ACCOUNT1_ID = _uuid.UUID("3cf31a23-5b95-42f3-b7d8-000000000001")
 ACCOUNT2_ID = _uuid.UUID("3cf31a23-5b95-42f3-b7d8-000000000002")
@@ -232,19 +231,6 @@ def test_subscription_in_parallel(db_engine, stream, stream_projector):
         t.join(timeout=2)
 
     assert_subscription_event_order([e for e, _ in sorted(events, key=lambda x: x[-1])])
-
-
-def test_db_lock_provider(pg_db):
-    import sqlalchemy as sa
-
-    name = identifier()
-    alt = DbLockProvider(engine=sa.create_engine(pg_db), name=name)
-    subject = DbLockProvider(engine=sa.create_engine(pg_db), name=name)
-    assert alt.lock("foo")
-    assert not subject.lock("foo")
-    alt.unlock("foo")
-    assert subject.lock("foo")
-    subject.unlock("foo")
 
 
 def test_stream_projector(db_engine, log_queries):
