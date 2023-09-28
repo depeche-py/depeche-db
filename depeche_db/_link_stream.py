@@ -1,0 +1,295 @@
+from psycopg2.errors import LockNotAvailable
+import contextlib as _contextlib
+import dataclasses as _dc
+import datetime as _dt
+import uuid as _uuid
+from typing import Generic, Iterable, Iterator, Protocol, TypeVar
+
+import sqlalchemy as _sa
+import sqlalchemy.orm as _orm
+from sqlalchemy_utils import UUIDType as _UUIDType
+
+from ._interfaces import MessageProtocol, MessagePartitioner, StreamPartitionStatistic
+from ._message_store import MessageStore
+
+E = TypeVar("E", bound=MessageProtocol)
+
+
+class LinkStream(Generic[E]):
+    def __init__(self, name: str, store: MessageStore[E]):
+        # TODO start at "next message"
+        # TODO start at time
+        assert name.isidentifier(), "name must be a valid identifier"
+        self.name = name
+        self._store = store
+        self._metadata = _sa.MetaData()
+        self._table = _sa.Table(
+            f"{name}_projected_stream",
+            self._metadata,
+            _sa.Column("message_id", _UUIDType(), primary_key=True),
+            _sa.Column("origin_stream", _sa.String(255), nullable=False),
+            _sa.Column("origin_stream_version", _sa.Integer, nullable=False),
+            _sa.Column(
+                "partition",
+                _sa.Integer,
+                nullable=False,
+                index=True,
+            ),
+            _sa.Column(
+                "position",
+                _sa.Integer,
+                nullable=False,
+            ),
+            _sa.Column(
+                "message_occurred_at",
+                _sa.DateTime,
+                nullable=False,
+            ),
+            _sa.UniqueConstraint(
+                "partition",
+                "position",
+                name=f"uq_{name}_partition_position",
+            ),
+        )
+        self.notification_channel = f"{name}_notifications"
+        trigger = _sa.DDL(
+            f"""
+            CREATE OR REPLACE FUNCTION {name}_stream_notify_message_inserted()
+              RETURNS trigger AS $$
+            DECLARE
+            BEGIN
+              PERFORM pg_notify(
+                '{self.notification_channel}',
+                json_build_object(
+                    'message_id', NEW.message_id,
+                    'partition', NEW.partition,
+                    'position', NEW.position
+                )::text);
+              RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+
+            CREATE TRIGGER {name}_stream_notify_message_inserted
+              AFTER INSERT ON {name}_projected_stream
+              FOR EACH ROW
+              EXECUTE PROCEDURE {name}_stream_notify_message_inserted();
+            """
+        )
+        _sa.event.listen(
+            self._table, "after_create", trigger.execute_if(dialect="postgresql")
+        )
+        self._metadata.create_all(store.engine, checkfirst=True)
+
+    def has_message(self, conn: _sa.Connection, message_id: _uuid.UUID) -> bool:
+        return conn.execute(
+            _sa.select(_sa.exists().where(self._table.c.message_id == message_id))
+        ).scalar()
+
+    def truncate(self, conn: _sa.Connection):
+        conn.execute(self._table.delete())
+
+    def add(
+        self,
+        conn: _sa.Connection,
+        message_id: _uuid.UUID,
+        stream: str,
+        stream_version: int,
+        partition: int,
+        position: int,
+        message_occurred_at: _dt.datetime,
+    ) -> None:
+        res = conn.execute(
+            self._table.insert().values(
+                message_id=message_id,
+                origin_stream=stream,
+                origin_stream_version=stream_version,
+                partition=partition,
+                position=position,
+                message_occurred_at=message_occurred_at,
+            )
+        )
+
+    def read(self, conn: _sa.Connection, partition: int) -> Iterable[_uuid.UUID]:
+        for row in conn.execute(
+            _sa.select(self._table.c.message_id)
+            .where(self._table.c.partition == partition)
+            .order_by(self._table.c.position)
+        ):
+            yield row.message_id
+
+    @_contextlib.contextmanager
+    def _connection(self):
+        conn = self._store.engine.connect()
+        try:
+            yield conn
+        finally:
+            conn.close()
+
+    def get_partition_statistics(
+        self,
+        position_limits: dict[int, int] = None,
+        result_limit: int | None = None,
+    ) -> Iterable[StreamPartitionStatistic]:
+        with self._connection() as conn:
+            position_limits = position_limits or {-1: -1}
+            tbl = self._table.alias()
+            next_messages_tbl = (
+                _sa.select(
+                    tbl.c.partition,
+                    _sa.func.min(tbl.c.position).label("min_position"),
+                )
+                .where(
+                    _sa.or_(
+                        *[
+                            _sa.and_(
+                                tbl.c.partition == partition, tbl.c.position > limit
+                            )
+                            for partition, limit in position_limits.items()
+                        ],
+                        _sa.not_(tbl.c.partition.in_(list(position_limits))),
+                    )
+                )
+                .group_by(tbl.c.partition)
+                .cte()
+            )
+
+            qry = (
+                _sa.select(tbl)
+                .select_from(
+                    next_messages_tbl.join(
+                        tbl,
+                        _sa.and_(
+                            tbl.c.partition == next_messages_tbl.c.partition,
+                            tbl.c.position == next_messages_tbl.c.min_position,
+                        ),
+                    )
+                )
+                .order_by(tbl.c.message_occurred_at)
+                # TODO randomize order a bit, e.g. order by (hour(occurred_at), random())
+                .limit(result_limit)
+            )
+            result = conn.execute(qry)
+            for row in result.fetchall():
+                yield StreamPartitionStatistic(
+                    partition_number=row.partition,
+                    next_message_id=row.message_id,
+                    next_message_position=row.position,
+                    next_message_occurred_at=row.message_occurred_at,
+                )
+            result.close()
+            del result
+
+
+class StreamProjector(Generic[E]):
+    def __init__(
+        self,
+        stream: LinkStream[E],
+        partitioner: MessagePartitioner[E],
+        stream_wildcards: list[str],
+    ):
+        self.stream = stream
+        self.stream_wildcards = stream_wildcards
+        self.partitioner = partitioner
+        self.batch_size = 100
+
+    def update_full(self) -> int:
+        result = 0
+        with self.stream._store.engine.connect() as conn:
+            try:
+                res = conn.execute(
+                    _sa.text(
+                        f"LOCK TABLE {self.stream._table.name} IN SHARE MODE NOWAIT"
+                    )
+                )
+            except _sa.exc.OperationalError as exc:
+                if isinstance(exc.orig, LockNotAvailable):
+                    raise RuntimeError(
+                        "Cannot update stream projection, because another process is already updating it."
+                    )
+                raise
+            while True:
+                batch_num = self._update_batch(conn)
+                if batch_num == 0:
+                    break
+                result += batch_num
+            conn.commit()
+        return result
+
+    def _update_batch(self, conn):
+        tbl = self.stream._table.alias()
+        message_table = self.stream._store._storage.message_table
+        last_seen = (
+            _sa.select(
+                tbl.c.origin_stream,
+                _sa.func.max(tbl.c.origin_stream_version).label("max_version"),
+            )
+            .group_by(tbl.c.origin_stream)
+            .cte()
+        )
+        q = (
+            _sa.select(
+                message_table.c.message_id,
+                message_table.c.stream,
+                message_table.c.version,
+            )
+            .select_from(
+                message_table.join(
+                    last_seen,
+                    message_table.c.stream == last_seen.c.origin_stream,
+                    isouter=True,
+                )
+            )
+            .where(
+                _sa.and_(
+                    _sa.or_(
+                        *[
+                            message_table.c.stream.like(wildcard)
+                            for wildcard in self.stream_wildcards
+                        ]
+                    ),
+                    _sa.or_(
+                        message_table.c.version > last_seen.c.max_version,
+                        last_seen.c.max_version.is_(None),
+                    ),
+                )
+            )
+            .order_by(message_table.c.global_position)
+            .limit(self.batch_size)
+        )
+        messages = list(conn.execute(q))
+        self.add(conn, messages)
+        return len(messages)
+
+    def add(self, conn, messages):
+        positions = {
+            row.partition: row.position
+            for row in conn.execute(
+                _sa.select(
+                    self.stream._table.c.partition,
+                    self.stream._table.c.position,
+                )
+            )
+        }
+
+        with self.stream._store.reader(conn) as reader:
+            stored_messages = {
+                message.message_id: message
+                for message in reader.get_messages_by_ids(
+                    [message_id for message_id, *_ in messages]
+                )
+            }
+
+        for message_id, stream, version in messages:
+            message = stored_messages[message_id]
+            partition = self.partitioner.get_partition(message)
+            position = positions.get(partition, -1) + 1
+            self.stream.add(
+                conn=conn,
+                message_id=message_id,
+                stream=stream,
+                stream_version=version,
+                partition=partition,
+                position=position,
+                message_occurred_at=message.message.get_message_time(),
+            )
+            positions[partition] = position

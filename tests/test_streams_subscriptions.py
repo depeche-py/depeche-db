@@ -5,8 +5,8 @@ import sqlalchemy as _sa
 
 import pytest
 
+from depeche_db.tools import DbSubscriptionStateProvider
 from depeche_db import (
-    DbSubscriptionStateProvider,
     LinkStream,
     MessagePartitioner,
     MessageStore,

@@ -1,3 +1,4 @@
+import datetime as _dt
 import dataclasses as _dc
 import uuid as _uuid
 from typing import TypeVar
@@ -62,6 +63,9 @@ class MyEvent(MessageProtocol):
 
     def get_message_id(self) -> _uuid.UUID:
         return self.event_id
+
+    def get_message_time(self) -> _dt.datetime:
+        raise NotImplementedError
 
 
 class MyEventSerializer(MessageSerializer[MyEvent]):
