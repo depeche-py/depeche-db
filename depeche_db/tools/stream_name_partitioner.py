@@ -1,4 +1,5 @@
 from typing import TypeVar
+
 from .._interfaces import MessagePartitioner, MessageProtocol, StoredMessage
 
 E = TypeVar("E", bound=MessageProtocol)

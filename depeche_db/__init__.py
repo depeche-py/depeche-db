@@ -1,13 +1,13 @@
-from ._interfaces import (
+from ._interfaces import (  # noqa: F401
+    MessagePartitioner,
     MessageProtocol,
     MessageSerializer,
-    SubscriptionStateProvider,
-    SubscriptionState,
-    MessagePartitioner,
     StoredMessage,
     StreamPartitionStatistic,
+    SubscriptionState,
+    SubscriptionStateProvider,
 )
-from ._message_store import MessageStore, MessageStoreReader
-from ._subscription import Subscription, SubscriptionMessage
-from ._link_stream import LinkStream, StreamProjector
-from ._storage import Storage
+from ._link_stream import LinkStream, StreamProjector  # noqa: F401
+from ._message_store import MessageStore, MessageStoreReader  # noqa: F401
+from ._storage import Storage  # noqa: F401
+from ._subscription import Subscription, SubscriptionMessage  # noqa: F401

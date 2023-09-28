@@ -1,5 +1,5 @@
-import datetime as _dt
 import dataclasses as _dc
+import datetime as _dt
 import uuid as _uuid
 from typing import TypeVar
 
@@ -10,7 +10,6 @@ from depeche_db import (
     MessageSerializer,
     MessageStore,
 )
-
 from tests._tools import identifier
 
 E = TypeVar("E", bound=MessageProtocol)

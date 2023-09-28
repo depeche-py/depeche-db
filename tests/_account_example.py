@@ -1,6 +1,5 @@
 import datetime as _dt
 import functools as _ft
-import json
 import uuid as _uuid
 from typing import Generic, TypeVar
 
@@ -47,7 +46,7 @@ AccountEvent = AccountRegisteredEvent | AccountCreditedEvent
 
 class AccountEventSerializer(MessageSerializer[AccountEvent]):
     def serialize(self, message: AccountEvent) -> dict:
-        return message.model_dump(mode='json')
+        return message.model_dump(mode="json")
 
     def deserialize(self, message: dict) -> AccountEvent:
         return _pydantic.TypeAdapter(AccountEvent).validate_python(message)  # type: ignore

@@ -1,15 +1,13 @@
-from psycopg2.errors import LockNotAvailable
 import contextlib as _contextlib
-import dataclasses as _dc
 import datetime as _dt
 import uuid as _uuid
-from typing import Generic, Iterable, Iterator, Protocol, TypeVar
+from typing import Generic, Iterable, TypeVar
 
 import sqlalchemy as _sa
-import sqlalchemy.orm as _orm
+from psycopg2.errors import LockNotAvailable
 from sqlalchemy_utils import UUIDType as _UUIDType
 
-from ._interfaces import MessageProtocol, MessagePartitioner, StreamPartitionStatistic
+from ._interfaces import MessagePartitioner, MessageProtocol, StreamPartitionStatistic
 from ._message_store import MessageStore
 
 E = TypeVar("E", bound=MessageProtocol)
@@ -98,7 +96,7 @@ class LinkStream(Generic[E]):
         position: int,
         message_occurred_at: _dt.datetime,
     ) -> None:
-        res = conn.execute(
+        conn.execute(
             self._table.insert().values(
                 message_id=message_id,
                 origin_stream=stream,
@@ -196,7 +194,7 @@ class StreamProjector(Generic[E]):
         result = 0
         with self.stream._store.engine.connect() as conn:
             try:
-                res = conn.execute(
+                conn.execute(
                     _sa.text(
                         f"LOCK TABLE {self.stream._table.name} IN SHARE MODE NOWAIT"
                     )

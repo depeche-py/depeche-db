@@ -1,11 +1,5 @@
 import uuid as _uuid
 
-import pytest
-
-from depeche_db import (
-    Storage,
-)
-
 
 def test_storage(db_engine, storage):
     with db_engine.connect() as conn:

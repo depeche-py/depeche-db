@@ -1,4 +1,5 @@
 import sqlalchemy as _sa
+
 from depeche_db.tools import DbLockProvider
 from tests._tools import identifier
 

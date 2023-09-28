@@ -1,7 +1,6 @@
 import pytest
 
 from depeche_db import Storage
-
 from tests._tools import identifier
 
 

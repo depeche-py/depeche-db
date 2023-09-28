@@ -1,11 +1,10 @@
 import threading
 import time
 import uuid as _uuid
-import sqlalchemy as _sa
 
 import pytest
+import sqlalchemy as _sa
 
-from depeche_db.tools import DbSubscriptionStateProvider, DbLockProvider
 from depeche_db import (
     LinkStream,
     MessagePartitioner,
@@ -17,7 +16,7 @@ from depeche_db import (
     SubscriptionMessage,
     SubscriptionState,
 )
-
+from depeche_db.tools import DbSubscriptionStateProvider
 from tests._account_example import (
     Account,
     AccountEvent,

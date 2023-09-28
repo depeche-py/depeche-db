@@ -13,7 +13,6 @@ from depeche_db import (
     StoredMessage,
     StreamProjector,
 )
-
 from tests._tools import identifier
 
 
@@ -88,7 +87,10 @@ class MyPartitioner(MessagePartitioner[MyEvent]):
 
 @pytest.fixture
 def pg_notification_listener(pg_db):
-    import contextlib, threading, time
+    import contextlib
+    import threading
+    import time
+
     from depeche_db.tools import PgNotificationListener
 
     @contextlib.contextmanager
