@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_USER: depeche
       POSTGRES_PASSWORD: depeche
-      POSTGRES_DB: depeche_test
+      POSTGRES_DB: depeche_demo
     ports:
       - 4888:5432
     restart: unless-stopped

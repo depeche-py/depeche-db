@@ -83,8 +83,9 @@ class Storage:
         expected_version: int,
         messages: list[tuple[_uuid.UUID, dict]],
     ) -> MessagePosition:
-        if expected_version > 0:
-            if self.get_max_version(conn, stream).version != expected_version:
+        max_version = self.get_max_version(conn, stream).version
+        if expected_version > -1:
+            if max_version != expected_version:
                 raise ValueError("optimistic concurrency failure")
         conn.execute(
             self.message_table.insert(),
@@ -92,7 +93,7 @@ class Storage:
                 {
                     "message_id": message_id,
                     "stream": stream,
-                    "version": expected_version + i + 1,
+                    "version": max_version + i + 1,
                     "message": message,
                 }
                 for i, (message_id, message) in enumerate(messages)
@@ -111,8 +112,8 @@ class Storage:
             .select_from(self.message_table)
             .where(self.message_table.c.stream == stream),
         ).fetchone()
-        if not row:
-            return MessagePosition(stream, 0, 0)
+        if not row or row.version is None:
+            return MessagePosition(stream, 0, None)
         return MessagePosition(stream, row.version, row.global_position)
 
     def get_message_ids(

@@ -99,6 +99,7 @@ class MessageStore(Generic[E]):
         with self._get_connection() as conn:
             self._storage.truncate(conn)
 
+    # TODO allow write/sync to accept a user-supplied connection
     def write(
         self, stream: str, message: E, expected_version: int = -1
     ) -> MessagePosition:
@@ -113,6 +114,7 @@ class MessageStore(Generic[E]):
             conn.commit()
             return result
 
+    # TODO allow write/sync to accept a user-supplied connection
     def synchronize(
         self, stream: str, expected_version: int, messages: list[E]
     ) -> MessagePosition:

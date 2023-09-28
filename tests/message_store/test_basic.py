@@ -37,7 +37,7 @@ class MyEventSerializer(MessageSerializer[MyEvent]):
         return MyEvent(**message)
 
 
-def test_eventstore_idempotency(db_engine):
+def test_synchronize_idempotency(db_engine):
     subject = MessageStore(
         name=identifier(), engine=db_engine, serializer=MyEventSerializer()
     )
@@ -58,3 +58,20 @@ def test_eventstore_idempotency(db_engine):
 
     with pytest.raises(ValueError):
         subject.synchronize(stream=stream, expected_version=4, messages=events[1:])
+
+
+def test_write_sets_version(db_engine):
+    subject = MessageStore(
+        name=identifier(), engine=db_engine, serializer=MyEventSerializer()
+    )
+
+    stream = "aaa"
+    events = [
+        MyEvent(event_id=_uuid.uuid4(), num=1),
+        MyEvent(event_id=_uuid.uuid4(), num=2),
+        MyEvent(event_id=_uuid.uuid4(), num=3),
+        MyEvent(event_id=_uuid.uuid4(), num=4),
+    ]
+    subject.write(stream=stream, message=events[0])
+    subject.write(stream=stream, message=events[1])
+    assert {m.version for m in subject.read(stream)} == {1, 2}
