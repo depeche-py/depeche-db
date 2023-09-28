@@ -26,3 +26,12 @@ class DbLockProvider:
     def unlock(self, name: str):
         lock = self._locks.pop(name)
         lock.release()
+
+    def finalize(self):
+        try:
+            self.locker.engine.pool.dispose()
+        except Exception:
+            pass
+
+    def __del__(self):
+        self.finalize()
