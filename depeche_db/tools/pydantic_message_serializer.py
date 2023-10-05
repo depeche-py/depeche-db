@@ -6,6 +6,7 @@ E = TypeVar("E")
 
 
 class PydanticMessageSerializer(MessageSerializer[E]):
+    # TODO fix typing when Union is given (see typing of pydantic TypeAdapter)
     def __init__(self, message_type: Type[E]):
         self.message_type = message_type
 
@@ -17,4 +18,4 @@ class PydanticMessageSerializer(MessageSerializer[E]):
         import pydantic as _pydantic
 
         # TODO pydantic v1 compatibility
-        return _pydantic.TypeAdapter(self.message_type).validate_python(message)  # type: ignore
+        return _pydantic.TypeAdapter(self.message_type).validate_python(message)

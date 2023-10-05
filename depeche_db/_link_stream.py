@@ -1,3 +1,4 @@
+# TODO rename to aggregate_stream
 import contextlib as _contextlib
 import datetime as _dt
 import uuid as _uuid
@@ -7,7 +8,11 @@ import sqlalchemy as _sa
 from psycopg2.errors import LockNotAvailable
 from sqlalchemy_utils import UUIDType as _UUIDType
 
-from ._interfaces import MessagePartitioner, MessageProtocol, StreamPartitionStatistic
+from ._interfaces import (
+    MessagePartitioner,
+    MessageProtocol,
+    StreamPartitionStatistic,
+)
 from ._message_store import MessageStore
 
 E = TypeVar("E", bound=MessageProtocol)
@@ -113,6 +118,7 @@ class LinkStream(Generic[E]):
             .where(self._table.c.partition == partition)
             .order_by(self._table.c.position)
         ):
+            # TODO result object that has message_id, position and possibly partition?!
             yield row.message_id
 
     @_contextlib.contextmanager
@@ -165,6 +171,7 @@ class LinkStream(Generic[E]):
                 .order_by(tbl.c.message_occurred_at)
                 # TODO randomize order a bit, e.g. order by (hour(occurred_at), random())
                 .limit(result_limit)
+                # TODO does this return the same partition multiple times if if has multiple new messages?
             )
             result = conn.execute(qry)
             for row in result.fetchall():
@@ -178,6 +185,7 @@ class LinkStream(Generic[E]):
             del result
 
 
+# TODO this should be created by the stream instead of user code
 class StreamProjector(Generic[E]):
     def __init__(
         self,
@@ -189,6 +197,13 @@ class StreamProjector(Generic[E]):
         self.stream_wildcards = stream_wildcards
         self.partitioner = partitioner
         self.batch_size = 100
+
+    @property
+    def notification_channel(self) -> str:
+        return self.stream.notification_channel
+
+    def run(self):
+        self.update_full()
 
     def update_full(self) -> int:
         result = 0

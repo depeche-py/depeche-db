@@ -1,6 +1,6 @@
 import contextlib as _contextlib
 import dataclasses as _dc
-from typing import Generic, Iterator, TypeVar
+from typing import Callable, Generic, Iterator, TypeVar
 
 from ._interfaces import (
     LockProvider,
@@ -27,6 +27,7 @@ class SubscriptionMessage(Generic[E]):
 class Subscription(Generic[E]):
     def __init__(
         self,
+        # TODO just name?!
         group_name: str,
         stream: LinkStream[E],
         state_provider: SubscriptionStateProvider,
@@ -88,3 +89,71 @@ class Subscription(Generic[E]):
 
     def ack_message(self, message: SubscriptionMessage[E]):
         self.ack(partition=message.partition, position=message.position)
+
+
+@_dc.dataclass
+class _Handler:
+    handler: Callable
+    pass_subscription_message: bool
+    pass_stored_message: bool
+
+    def exec(self, message: SubscriptionMessage):
+        if self.pass_subscription_message:
+            self.handler(message)
+        elif self.pass_stored_message:
+            self.handler(message.stored_message)
+        else:
+            self.handler(message.stored_message.message)
+
+
+class SubscriptionHandler(Generic[E]):
+    def __init__(self, subscription: Subscription[E]):
+        self._subscription = subscription
+        self._handlers = {}
+
+    @property
+    def notification_channel(self) -> str:
+        return self._subscription._stream.notification_channel
+
+    def run(self):
+        self.run_once()
+
+    def register(self, handler):  # TODO type
+        assert len(handler.__annotations__) == 1
+        pass_subscription_message = False
+        pass_stored_message = False
+        handled_type = list(handler.__annotations__.values())[0]
+        if str(handled_type).startswith(
+            "depeche_db._subscription.SubscriptionMessage["
+        ):
+            pass_subscription_message = True
+            handled_type = handled_type.__args__[0]
+        if str(handled_type).startswith("depeche_db._interfaces.StoredMessage["):
+            pass_stored_message = True
+            handled_type = handled_type.__args__[0]
+        # TODO assert no overlap of handled types
+        self._handlers[handled_type] = _Handler(
+            handler=handler,
+            pass_subscription_message=pass_subscription_message,
+            pass_stored_message=pass_stored_message,
+        )
+        return handler
+
+    def handle(self, message: SubscriptionMessage):
+        message_type = type(message.stored_message.message)
+        for handled_type, handler in self._handlers.items():
+            if issubclass(message_type, handled_type):
+                try:
+                    handler.exec(message)
+                except Exception:
+                    # TODO error handler!
+                    pass
+                return
+
+    def run_once(self):
+        while True:
+            with self._subscription.get_next_message() as message:
+                if message is None:
+                    break
+                self.handle(message)
+                message.ack()

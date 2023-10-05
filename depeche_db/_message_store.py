@@ -1,6 +1,6 @@
 import contextlib as _contextlib
 import uuid as _uuid
-from typing import Generic, Iterable, Iterator, TypeVar
+from typing import Generic, Iterable, Iterator, Sequence, TypeVar
 
 import sqlalchemy as _sa
 
@@ -116,7 +116,7 @@ class MessageStore(Generic[E]):
 
     # TODO allow write/sync to accept a user-supplied connection
     def synchronize(
-        self, stream: str, expected_version: int, messages: list[E]
+        self, stream: str, expected_version: int, messages: Sequence[E]
     ) -> MessagePosition:
         with self._get_connection() as conn:
             stored_version = self._storage.get_max_version(conn, stream)

@@ -13,14 +13,17 @@ from depeche_db import (
     StreamPartitionStatistic,
     StreamProjector,
     Subscription,
+    SubscriptionHandler,
     SubscriptionMessage,
     SubscriptionState,
 )
 from depeche_db.tools import DbSubscriptionStateProvider
 from tests._account_example import (
     Account,
+    AccountCreditedEvent,
     AccountEvent,
     AccountEventSerializer,
+    AccountRegisteredEvent,
     AccountRepository,
 )
 from tests._tools import identifier
@@ -295,3 +298,27 @@ def assert_stream_projection(stream, db_engine, account, account2):
         assert list(stream.read(conn, partition=2)) == [
             event.event_id for event in account2.events
         ]
+
+
+def test_subscription_handler(db_engine, stream, stream_projector):
+    subject = Subscription[AccountEvent](
+        group_name=identifier(),
+        stream=stream,
+        lock_provider=MyLockProvider(),
+        state_provider=MyStateProvider(),
+    )
+    handler = SubscriptionHandler(subject)
+
+    seen = []
+
+    @handler.register
+    def handle_account_registered(event: SubscriptionMessage[AccountRegisteredEvent]):
+        seen.append(event)
+
+    @handler.register
+    def handle_account_credited(event: AccountCreditedEvent):
+        seen.append(event)
+
+    handler.run_once()
+    # TODO nice assertion
+    assert seen == []

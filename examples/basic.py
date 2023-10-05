@@ -23,32 +23,45 @@ class MyEvent(_pydantic.BaseModel, MessageProtocol):
         return self.happened_at
 
 
-subject = MessageStore(
+class EventA(MyEvent):
+    num: int
+
+
+class EventB(MyEvent):
+    text: str
+
+
+EventType = EventA | EventB
+
+message_store = MessageStore[EventType](
     name="example_basic",
     engine=_sa.create_engine(
         "postgresql://depeche:depeche@localhost:4888/depeche_demo"
     ),
-    serializer=PydanticMessageSerializer(MyEvent),
+    # TODO fix typing here!
+    serializer=PydanticMessageSerializer(EventType),
 )
 
 stream = f"stream-{_uuid.uuid4()}"
-events = [MyEvent(num=n + 1) for n in range(3)]
+events = [EventA(num=n + 1) for n in range(3)]
 
-subject.write(stream=stream, message=events[0])
-subject.write(stream=stream, message=events[1])
+result = message_store.write(stream=stream, message=events[0])
+print(result)
+message_store.write(stream=stream, message=events[1])
 print("Wrote 2 events")
-print([e.message.num for e in subject.read(stream)])
+print([e.message.num for e in message_store.read(stream)])
+print(next(message_store.read(stream)))
 
 try:
     # this fails because the expected version is 0, but the stream already has 2 events
-    subject.write(stream=stream, message=events[2], expected_version=0)
+    message_store.write(stream=stream, message=events[2], expected_version=0)
 except Exception as e:
     print("Failed to write:", e)
 
 # this is fine, because we expect the right version
-subject.write(stream=stream, message=events[2], expected_version=2)
+message_store.write(stream=stream, message=events[2], expected_version=2)
 
 # You can also just use the `synchronize` method to write a list of events
-subject.synchronize(stream=stream, messages=events, expected_version=3)
+message_store.synchronize(stream=stream, messages=events, expected_version=3)
 print("Now we have 4 events")
-print([e.message.num for e in subject.read(stream)])
+print([e.message.num for e in message_store.read(stream)])

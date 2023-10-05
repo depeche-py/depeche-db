@@ -13,6 +13,7 @@ class MessageProtocol:
 
 
 E = TypeVar("E", bound=MessageProtocol)
+M = TypeVar("M")
 
 
 @_dc.dataclass(frozen=True)
@@ -44,11 +45,11 @@ class SubscriptionState:
     positions: dict[int, int]
 
 
-class MessageSerializer(Protocol, Generic[E]):
-    def serialize(self, message: E) -> dict:
+class MessageSerializer(Protocol, Generic[M]):
+    def serialize(self, message: M) -> dict:
         raise NotImplementedError()
 
-    def deserialize(self, message: dict) -> E:
+    def deserialize(self, message: dict) -> M:
         raise NotImplementedError()
 
 
@@ -70,4 +71,13 @@ class SubscriptionStateProvider(Protocol):
         raise NotImplementedError
 
     def read(self, group_name: str) -> SubscriptionState:
+        raise NotImplementedError
+
+
+class RunOnNotification(Protocol):
+    @property
+    def notification_channel(self) -> str:
+        raise NotImplementedError
+
+    def run(self):
         raise NotImplementedError
