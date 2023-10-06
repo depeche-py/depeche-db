@@ -1,6 +1,6 @@
 import contextlib as _contextlib
 import dataclasses as _dc
-from typing import Callable, Generic, Iterator, TypeVar
+from typing import Callable, Generic, Iterator, Type, TypeVar
 
 from ._interfaces import (
     LockProvider,
@@ -109,7 +109,7 @@ class _Handler:
 class SubscriptionHandler(Generic[E]):
     def __init__(self, subscription: Subscription[E]):
         self._subscription = subscription
-        self._handlers = {}
+        self._handlers: dict[Type[E], _Handler] = {}
 
     @property
     def notification_channel(self) -> str:

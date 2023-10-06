@@ -309,7 +309,7 @@ def test_subscription_handler(db_engine, stream, stream_projector):
     )
     handler = SubscriptionHandler(subject)
 
-    seen = []
+    seen: list[SubscriptionMessage[AccountRegisteredEvent] | AccountEvent] = []
 
     @handler.register
     def handle_account_registered(event: SubscriptionMessage[AccountRegisteredEvent]):

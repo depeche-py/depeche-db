@@ -1,5 +1,5 @@
 import uuid as _uuid
-from typing import Iterable
+from typing import Iterator
 
 import sqlalchemy as _sa
 from sqlalchemy_utils import UUIDType as _UUIDType
@@ -118,7 +118,7 @@ class Storage:
 
     def get_message_ids(
         self, conn: _sa.Connection, stream: str
-    ) -> Iterable[_uuid.UUID]:
+    ) -> Iterator[_uuid.UUID]:
         return conn.execute(
             _sa.select(self.message_table.c.message_id)
             .select_from(self.message_table)
@@ -128,7 +128,7 @@ class Storage:
 
     def read(
         self, conn: _sa.Connection, stream: str
-    ) -> Iterable[tuple[_uuid.UUID, int, dict, int]]:
+    ) -> Iterator[tuple[_uuid.UUID, int, dict, int]]:
         return conn.execute(  # type: ignore
             _sa.select(
                 self.message_table.c.message_id,
@@ -143,7 +143,7 @@ class Storage:
 
     def read_multiple(
         self, conn: _sa.Connection, streams: list[str]
-    ) -> Iterable[tuple[_uuid.UUID, str, int, dict, int]]:
+    ) -> Iterator[tuple[_uuid.UUID, str, int, dict, int]]:
         return conn.execute(  # type: ignore
             _sa.select(
                 self.message_table.c.message_id,
@@ -159,7 +159,7 @@ class Storage:
 
     def read_wildcard(
         self, conn: _sa.Connection, stream_wildcard: str
-    ) -> Iterable[tuple[_uuid.UUID, str, int, dict, int]]:
+    ) -> Iterator[tuple[_uuid.UUID, str, int, dict, int]]:
         return conn.execute(  # type: ignore
             _sa.select(
                 self.message_table.c.message_id,
@@ -188,7 +188,7 @@ class Storage:
 
     def get_messages_by_ids(
         self, conn: _sa.Connection, message_ids: list[_uuid.UUID]
-    ) -> Iterable[tuple[_uuid.UUID, str, int, dict, int]]:
+    ) -> Iterator[tuple[_uuid.UUID, str, int, dict, int]]:
         return conn.execute(  # type: ignore
             _sa.select(
                 self.message_table.c.message_id,

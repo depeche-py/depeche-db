@@ -1,6 +1,6 @@
 import contextlib as _contextlib
 import uuid as _uuid
-from typing import Generic, Iterable, Iterator, Sequence, TypeVar
+from typing import Generic, Iterator, Sequence, TypeVar
 
 import sqlalchemy as _sa
 
@@ -39,7 +39,7 @@ class MessageStoreReader(Generic[E]):
 
     def get_messages_by_ids(
         self, message_ids: list[_uuid.UUID]
-    ) -> Iterable[StoredMessage[E]]:
+    ) -> Iterator[StoredMessage[E]]:
         for row in self._storage.get_messages_by_ids(
             conn=self._conn, message_ids=message_ids
         ):
@@ -52,7 +52,7 @@ class MessageStoreReader(Generic[E]):
                 global_position=global_position,
             )
 
-    def read(self, stream: str) -> Iterable[StoredMessage[E]]:
+    def read(self, stream: str) -> Iterator[StoredMessage[E]]:
         for message_id, version, message, global_position in self._storage.read(
             self._conn, stream
         ):
@@ -64,7 +64,7 @@ class MessageStoreReader(Generic[E]):
                 global_position=global_position,
             )
 
-    def read_wildcard(self, stream_wildcard: str) -> Iterable[StoredMessage[E]]:
+    def read_wildcard(self, stream_wildcard: str) -> Iterator[StoredMessage[E]]:
         for (
             message_id,
             stream,
@@ -162,6 +162,6 @@ class MessageStore(Generic[E]):
             with self._get_connection() as conn:
                 yield self._get_reader(conn)
 
-    def read(self, stream: str) -> Iterable[StoredMessage[E]]:
+    def read(self, stream: str) -> Iterator[StoredMessage[E]]:
         with self.reader() as reader:
             yield from reader.read(stream)

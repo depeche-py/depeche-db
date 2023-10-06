@@ -2,7 +2,7 @@
 import contextlib as _contextlib
 import datetime as _dt
 import uuid as _uuid
-from typing import Generic, Iterable, TypeVar
+from typing import Generic, Iterator, TypeVar
 
 import sqlalchemy as _sa
 from psycopg2.errors import LockNotAvailable
@@ -112,7 +112,7 @@ class LinkStream(Generic[E]):
             )
         )
 
-    def read(self, conn: _sa.Connection, partition: int) -> Iterable[_uuid.UUID]:
+    def read(self, conn: _sa.Connection, partition: int) -> Iterator[_uuid.UUID]:
         for row in conn.execute(
             _sa.select(self._table.c.message_id)
             .where(self._table.c.partition == partition)
@@ -133,7 +133,7 @@ class LinkStream(Generic[E]):
         self,
         position_limits: dict[int, int] = None,
         result_limit: int | None = None,
-    ) -> Iterable[StreamPartitionStatistic]:
+    ) -> Iterator[StreamPartitionStatistic]:
         with self._connection() as conn:
             position_limits = position_limits or {-1: -1}
             tbl = self._table.alias()

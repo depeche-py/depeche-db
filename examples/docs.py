@@ -33,7 +33,7 @@ class EventB(MyEvent):
 from depeche_db import MessageStore
 from depeche_db.tools import PydanticMessageSerializer
 
-message_store = MessageStore(
+message_store = MessageStore[EventA | EventB](
     name="example_docs2",
     engine=db_engine,
     serializer=PydanticMessageSerializer(EventA | EventB),
@@ -70,27 +70,29 @@ from depeche_db import LinkStream, StoredMessage, StreamProjector
 
 
 class NumMessagePartitioner:
-    def get_partition(self, message: StoredMessage[EventA]) -> int:
-        return message.message.num % 3
+    def get_partition(self, message: StoredMessage[EventA | EventB]) -> int:
+        if isinstance(message.message, EventA):
+            return message.message.num % 3
+        return 0
 
 
 link_stream = LinkStream(
     name="example_docs_aggregate_me2",
     store=message_store,
 )
-stream_projector = StreamProjector(
+stream_projector = StreamProjector[EventA | EventB](
     stream=link_stream,
     partitioner=NumMessagePartitioner(),
     stream_wildcards=["aggregate-me-%"],
 )
 stream_projector.update_full()
 
-result = next(link_stream.read(conn=db_engine.connect(), partition=0))
-print(result)
+first_id = next(link_stream.read(conn=db_engine.connect(), partition=0))
+print(first_id)
 # 4680cbaf-977e-43a4-afcb-f88e92043e9c (this is the message ID of the first message in partition 0)
 
 with message_store.reader() as reader:
-    print(reader.get_message_by_id(result))
+    print(reader.get_message_by_id(first_id))
 # StoredMessage(
 #     message_id=UUID("4680cbaf-977e-43a4-afcb-f88e92043e9c"),
 #     stream="aggregate-me-0",

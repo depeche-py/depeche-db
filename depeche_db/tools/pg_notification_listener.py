@@ -4,7 +4,7 @@ import logging
 import queue
 import select
 import threading
-from typing import Iterable
+from typing import Iterator
 
 import psycopg2
 
@@ -34,7 +34,7 @@ class PgNotificationListener:
         self._select_timeout = select_timeout
         self._queue_timeout = select_timeout / 2
 
-    def messages(self) -> Iterable[PgNotification]:
+    def messages(self) -> Iterator[PgNotification]:
         while self._keep_running:
             try:
                 yield self._queue.get(block=True, timeout=self._queue_timeout)
