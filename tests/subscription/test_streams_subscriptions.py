@@ -320,5 +320,10 @@ def test_subscription_handler(db_engine, stream, stream_projector):
         seen.append(event)
 
     handler.run_once()
-    # TODO nice assertion
-    assert seen == []
+    assert [type(obj) for obj in seen] == [
+        SubscriptionMessage,
+        SubscriptionMessage,
+        AccountCreditedEvent,
+        AccountCreditedEvent,
+        AccountCreditedEvent,
+    ]
