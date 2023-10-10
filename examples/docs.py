@@ -110,7 +110,6 @@ subscription = Subscription(
 )
 with subscription.get_next_message() as message:
     print(message)
-    message.ack()
 # SubscriptionMessage(
 #     partition=2,
 #     position=0,

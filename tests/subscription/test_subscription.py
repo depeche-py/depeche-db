@@ -19,7 +19,6 @@ def test_subscription(db_engine, stream_with_events, subscription_factory):
             if event is None:
                 break
             events.append(event)
-            event.ack()
 
     with subject.get_next_message() as event:
         assert event is None
@@ -46,7 +45,6 @@ def test_db_subscription_state(
             if event is None:
                 break
             events.append(event)
-            event.ack()
 
     assert_subscription_event_order(events)
 
@@ -78,7 +76,6 @@ def test_subscription_in_parallel(db_engine, stream_with_events, subscription_fa
                     failures += 1
                     continue
                 events.append((event, time.time() - start))
-                event.ack()
 
     threads = [
         threading.Thread(target=consume, args=(1,)),

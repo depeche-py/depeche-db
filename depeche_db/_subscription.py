@@ -20,10 +20,6 @@ class SubscriptionMessage(Generic[E]):
     partition: int
     position: int
     stored_message: StoredMessage[E]
-    _subscription: "Subscription[E]"
-
-    def ack(self):
-        self._subscription.ack_message(self)
 
 
 class Subscription(Generic[E]):
@@ -71,15 +67,18 @@ class Subscription(Generic[E]):
                         stored_message=reader.get_message_by_id(
                             statistic.next_message_id
                         ),
-                        _subscription=self,
                     )
+                self._ack(
+                    partition=statistic.partition_number,
+                    position=statistic.next_message_position,
+                )
                 break
             finally:
                 self._lock_provider.unlock(lock_key)
         else:
             yield None
 
-    def ack(self, partition: int, position: int):
+    def _ack(self, partition: int, position: int):
         state = self._state_provider.read(self.name)
         assert (
             state.positions.get(partition, -1) == position - 1
@@ -87,9 +86,6 @@ class Subscription(Generic[E]):
         self._state_provider.store(
             subscription_name=self.name, partition=partition, position=position
         )
-
-    def ack_message(self, message: SubscriptionMessage[E]):
-        self.ack(partition=message.partition, position=message.position)
 
 
 HandlerCallable = (
@@ -183,4 +179,3 @@ class SubscriptionHandler(Generic[E]):
                 if message is None:
                     break
                 self.handle(message)
-                message.ack()
