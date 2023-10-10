@@ -38,7 +38,6 @@ message_store = MessageStore[EventType](
     engine=_sa.create_engine(
         "postgresql://depeche:depeche@localhost:4888/depeche_demo"
     ),
-    # TODO fix typing here!
     serializer=PydanticMessageSerializer(EventType),
 )
 
