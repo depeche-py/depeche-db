@@ -49,12 +49,12 @@ def test_stream_projector_locking(db_engine, store_factory, stream_factory):
 
 def assert_stream_projection(stream, db_engine, account, account2):
     with db_engine.connect() as conn:
-        assert set(stream.read(conn, partition=1)).union(
-            set(stream.read(conn, partition=2))
+        assert {msg.message_id for msg in stream.read(conn, partition=1)}.union(
+            {msg.message_id for msg in stream.read(conn, partition=2)}
         ) == {event.event_id for event in account.events + account2.events}
-        assert list(stream.read(conn, partition=1)) == [
+        assert [msg.message_id for msg in stream.read(conn, partition=1)] == [
             event.event_id for event in account.events
         ]
-        assert list(stream.read(conn, partition=2)) == [
+        assert [msg.message_id for msg in stream.read(conn, partition=2)] == [
             event.event_id for event in account2.events
         ]

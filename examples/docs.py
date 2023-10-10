@@ -84,12 +84,12 @@ link_stream = AggregatedStream[EventA | EventB](
 )
 link_stream.projector.update_full()
 
-first_id = next(link_stream.read(conn=db_engine.connect(), partition=0))
-print(first_id)
+first_on_partition0 = next(link_stream.read(conn=db_engine.connect(), partition=0))
+print(first_on_partition0.message_id)
 # 4680cbaf-977e-43a4-afcb-f88e92043e9c (this is the message ID of the first message in partition 0)
 
 with message_store.reader() as reader:
-    print(reader.get_message_by_id(first_id))
+    print(reader.get_message_by_id(first_on_partition0.message_id))
 # StoredMessage(
 #     message_id=UUID("4680cbaf-977e-43a4-afcb-f88e92043e9c"),
 #     stream="aggregate-me-0",

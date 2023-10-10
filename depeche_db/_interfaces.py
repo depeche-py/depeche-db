@@ -41,6 +41,13 @@ class StreamPartitionStatistic:
 
 
 @_dc.dataclass
+class AggregatedStreamMessage:
+    partition: int
+    position: int
+    message_id: _uuid.UUID
+
+
+@_dc.dataclass
 class SubscriptionState:
     positions: dict[int, int]
 

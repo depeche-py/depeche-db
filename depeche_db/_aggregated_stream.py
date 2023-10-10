@@ -8,6 +8,7 @@ from psycopg2.errors import LockNotAvailable
 from sqlalchemy_utils import UUIDType as _UUIDType
 
 from ._interfaces import (
+    AggregatedStreamMessage,
     MessagePartitioner,
     MessageProtocol,
     StreamPartitionStatistic,
@@ -122,14 +123,17 @@ class AggregatedStream(Generic[E]):
             )
         )
 
-    def read(self, conn: _sa.Connection, partition: int) -> Iterator[_uuid.UUID]:
+    def read(
+        self, conn: _sa.Connection, partition: int
+    ) -> Iterator[AggregatedStreamMessage]:
         for row in conn.execute(
-            _sa.select(self._table.c.message_id)
+            _sa.select(self._table.c.message_id, self._table.c.position)
             .where(self._table.c.partition == partition)
             .order_by(self._table.c.position)
         ):
-            # TODO result object that has message_id, position and possibly partition?!
-            yield row.message_id
+            yield AggregatedStreamMessage(
+                message_id=row.message_id, position=row.position, partition=partition
+            )
 
     @_contextlib.contextmanager
     def _connection(self):
