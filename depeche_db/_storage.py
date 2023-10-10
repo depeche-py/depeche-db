@@ -31,10 +31,9 @@ class Storage:
             _sa.Column("stream", _sa.String(255), nullable=False),
             _sa.Column("version", _sa.Integer, nullable=False),
             _sa.Column("message", _sa.JSON, nullable=False),
-            # TODO ensure concurrent writes do not insert same version into
-            # a stream twice:
-            # _sa.UniqueConstraint("stream", "version", name="stream_version_unique"),
-            # OR: lock `add_all` over stream name?
+            _sa.UniqueConstraint(
+                "stream", "version", name=f"{name}_stream_version_unique"
+            ),
         )
         self.notification_channel = f"{name}_messages"
         trigger = _sa.DDL(
