@@ -1,5 +1,7 @@
 import contextlib as _contextlib
 import dataclasses as _dc
+import types as _types
+import typing as _typing
 from typing import Callable, Generic, Iterator, Type, TypeVar
 
 from ._aggregated_stream import AggregatedStream
@@ -128,7 +130,11 @@ class SubscriptionHandler(Generic[E]):
         self.run_once()
 
     def register(self, handler: H) -> H:
-        assert len(handler.__annotations__) == 1
+        if len(handler.__annotations__) != 1:
+            raise ValueError(
+                "Handler must accept exactly one (type annotated) argument"
+            )
+
         pass_subscription_message = False
         pass_stored_message = False
         handled_type = list(handler.__annotations__.values())[0]
@@ -140,13 +146,25 @@ class SubscriptionHandler(Generic[E]):
         if str(handled_type).startswith("depeche_db._interfaces.StoredMessage["):
             pass_stored_message = True
             handled_type = handled_type.__args__[0]
-        # TODO assert no overlap of handled types
+
+        self.assert_not_registered(handled_type)
         self._handlers[handled_type] = _Handler(
             handler=handler,
             pass_subscription_message=pass_subscription_message,
             pass_stored_message=pass_stored_message,
         )
         return handler
+
+    def assert_not_registered(self, handled_type: Type[E]):
+        if _typing.get_origin(handled_type) in (_typing.Union, _types.UnionType):
+            for member in _typing.get_args(handled_type):
+                self.assert_not_registered(member)
+        else:
+            for registered_type in self._handlers:
+                if issubclass(handled_type, registered_type):
+                    raise ValueError(
+                        f"Handler for {handled_type} is already registered for {registered_type}"
+                    )
 
     def handle(self, message: SubscriptionMessage):
         message_type = type(message.stored_message.message)
