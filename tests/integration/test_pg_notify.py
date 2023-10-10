@@ -5,7 +5,7 @@ import uuid as _uuid
 import pytest
 
 from depeche_db import (
-    LinkStream,
+    AggregatedStream,
     MessagePartitioner,
     MessageProtocol,
     MessageSerializer,
@@ -20,7 +20,7 @@ def test_pg_notify_storage_and_stream(db_engine, pg_notification_listener):
     store = MessageStore(
         name=identifier(), engine=db_engine, serializer=MyEventSerializer()
     )
-    stream = LinkStream[MyEvent](
+    stream = AggregatedStream[MyEvent](
         name=identifier(),
         store=store,
         partitioner=MyPartitioner(),

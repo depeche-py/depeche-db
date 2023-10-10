@@ -1,4 +1,3 @@
-# TODO rename to aggregate_stream
 import contextlib as _contextlib
 import datetime as _dt
 import uuid as _uuid
@@ -18,7 +17,7 @@ from ._message_store import MessageStore
 E = TypeVar("E", bound=MessageProtocol)
 
 
-class LinkStream(Generic[E]):
+class AggregatedStream(Generic[E]):
     def __init__(
         self,
         name: str,
@@ -198,7 +197,7 @@ class LinkStream(Generic[E]):
 class StreamProjector(Generic[E]):
     def __init__(
         self,
-        stream: LinkStream[E],
+        stream: AggregatedStream[E],
         partitioner: MessagePartitioner[E],
         stream_wildcards: list[str],
     ):

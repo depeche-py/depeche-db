@@ -6,7 +6,7 @@ import pytest
 import sqlalchemy as _sa
 
 from depeche_db import (
-    LinkStream,
+    AggregatedStream,
     MessagePartitioner,
     MessageStore,
     StoredMessage,
@@ -61,7 +61,7 @@ def store_with_events(db_engine):
 @pytest.fixture
 def stream(db_engine, store_with_events):
     event_store, _, _ = store_with_events
-    stream = LinkStream[AccountEvent](
+    stream = AggregatedStream[AccountEvent](
         name=identifier(),
         store=event_store,
         partitioner=MyPartitioner(),
@@ -241,7 +241,7 @@ def test_stream_projector(db_engine, log_queries):
         engine=db_engine,
         serializer=AccountEventSerializer(),
     )
-    stream = LinkStream[AccountEvent](
+    stream = AggregatedStream[AccountEvent](
         name=identifier(),
         store=event_store,
         partitioner=MyPartitioner(),
@@ -277,7 +277,7 @@ def test_stream_projector_locking(db_engine):
         engine=db_engine,
         serializer=AccountEventSerializer(),
     )
-    stream = LinkStream[AccountEvent](
+    stream = AggregatedStream[AccountEvent](
         name=identifier(),
         store=event_store,
         partitioner=MyPartitioner(),

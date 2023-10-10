@@ -2,13 +2,13 @@ import contextlib as _contextlib
 import dataclasses as _dc
 from typing import Callable, Generic, Iterator, Type, TypeVar
 
+from ._aggregated_stream import AggregatedStream
 from ._interfaces import (
     LockProvider,
     MessageProtocol,
     StoredMessage,
     SubscriptionStateProvider,
 )
-from ._link_stream import LinkStream
 
 E = TypeVar("E", bound=MessageProtocol)
 
@@ -29,7 +29,7 @@ class Subscription(Generic[E]):
         self,
         # TODO just name?!
         group_name: str,
-        stream: LinkStream[E],
+        stream: AggregatedStream[E],
         state_provider: SubscriptionStateProvider,
         lock_provider: LockProvider,
         # TODO start at time
