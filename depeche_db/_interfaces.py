@@ -67,10 +67,10 @@ class LockProvider(Protocol):
 
 
 class SubscriptionStateProvider(Protocol):
-    def store(self, group_name: str, partition: int, position: int):
+    def store(self, subscription_name: str, partition: int, position: int):
         raise NotImplementedError
 
-    def read(self, group_name: str) -> SubscriptionState:
+    def read(self, subscription_name: str) -> SubscriptionState:
         raise NotImplementedError
 
 

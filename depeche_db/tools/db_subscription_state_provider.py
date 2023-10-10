@@ -13,22 +13,26 @@ class DbSubscriptionStateProvider:
         self.state_table = _sa.Table(
             f"{name}_subscription_state",
             self.metadata,
-            _sa.Column("group_name", _sa.String, primary_key=True),
+            _sa.Column("subscription_name", _sa.String, primary_key=True),
             _sa.Column("partition", _sa.Integer, primary_key=True),
             _sa.Column("position", _sa.Integer, nullable=False),
         )
         self.metadata.create_all(self._engine)
 
-    def store(self, group_name: str, partition: int, position: int):
+    def store(self, subscription_name: str, partition: int, position: int):
         from sqlalchemy.dialects.postgresql import insert
 
         with self._engine.connect() as conn:
             conn.execute(
                 insert(self.state_table)
-                .values(group_name=group_name, partition=partition, position=position)
+                .values(
+                    subscription_name=subscription_name,
+                    partition=partition,
+                    position=position,
+                )
                 .on_conflict_do_update(
                     index_elements=[
-                        self.state_table.c.group_name,
+                        self.state_table.c.subscription_name,
                         self.state_table.c.partition,
                     ],
                     set_={
@@ -38,7 +42,7 @@ class DbSubscriptionStateProvider:
             )
             conn.commit()
 
-    def read(self, group_name: str) -> SubscriptionState:
+    def read(self, subscription_name: str) -> SubscriptionState:
         with self._engine.connect() as conn:
             return SubscriptionState(
                 {
@@ -47,7 +51,9 @@ class DbSubscriptionStateProvider:
                         _sa.select(
                             self.state_table.c.partition,
                             self.state_table.c.position,
-                        ).where(self.state_table.c.group_name == group_name)
+                        ).where(
+                            self.state_table.c.subscription_name == subscription_name
+                        )
                     )
                 }
             )

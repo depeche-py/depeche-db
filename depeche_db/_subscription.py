@@ -27,16 +27,15 @@ class SubscriptionMessage(Generic[E]):
 class Subscription(Generic[E]):
     def __init__(
         self,
-        # TODO just name?!
-        group_name: str,
+        name: str,
         stream: AggregatedStream[E],
         state_provider: SubscriptionStateProvider,
         lock_provider: LockProvider,
         # TODO start at time
         # TODO start at "next message"
     ):
-        assert group_name.isidentifier(), "Group name must be a valid identifier"
-        self.group_name = group_name
+        assert name.isidentifier(), "Group name must be a valid identifier"
+        self.name = name
         self._stream = stream
         self._lock_provider = lock_provider
         self._state_provider = state_provider
@@ -44,19 +43,19 @@ class Subscription(Generic[E]):
     @_contextlib.contextmanager
     def get_next_message(self) -> Iterator[SubscriptionMessage[E]]:
         # TODO get more than one message (accept a batch size parameter)
-        state = self._state_provider.read(self.group_name)
+        state = self._state_provider.read(self.name)
         statistics = list(
             self._stream.get_partition_statistics(
                 position_limits=state.positions, result_limit=10
             )
         )
         for statistic in statistics:
-            lock_key = f"subscription-{self.group_name}-{statistic.partition_number}"
+            lock_key = f"subscription-{self.name}-{statistic.partition_number}"
             if not self._lock_provider.lock(lock_key):
                 continue
             # now we have the lock, we need to check if the position is still valid
             # if not, we need to release the lock and try the next partition
-            state = self._state_provider.read(self.group_name)
+            state = self._state_provider.read(self.name)
             if state.positions.get(statistic.partition_number, -1) != (
                 statistic.next_message_position - 1
             ):
@@ -79,12 +78,12 @@ class Subscription(Generic[E]):
             yield None
 
     def ack(self, partition: int, position: int):
-        state = self._state_provider.read(self.group_name)
+        state = self._state_provider.read(self.name)
         assert (
             state.positions.get(partition, -1) == position - 1
         ), f"{partition} should have {position - 1} as last position, but has {state.positions.get(partition, -1)}"
         self._state_provider.store(
-            group_name=self.group_name, partition=partition, position=position
+            subscription_name=self.name, partition=partition, position=position
         )
 
     def ack_message(self, message: SubscriptionMessage[E]):

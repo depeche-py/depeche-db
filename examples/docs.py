@@ -100,7 +100,7 @@ from depeche_db import Subscription
 from depeche_db.tools import DbLockProvider, DbSubscriptionStateProvider
 
 subscription = Subscription(
-    group_name="sub_example_docs_aggregate_me2",
+    name="sub_example_docs_aggregate_me2",
     stream=link_stream,
     state_provider=DbSubscriptionStateProvider(
         name="sub_state1",

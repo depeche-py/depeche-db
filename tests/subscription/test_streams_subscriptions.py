@@ -103,10 +103,10 @@ class MyStateProvider:
     def __init__(self):
         self._state = SubscriptionState(positions={})
 
-    def store(self, group_name: str, partition: int, position: int):
+    def store(self, subscription_name: str, partition: int, position: int):
         self._state.positions[partition] = position
 
-    def read(self, group_name: str) -> SubscriptionState:
+    def read(self, subscription_name: str) -> SubscriptionState:
         return self._state
 
 
@@ -145,7 +145,7 @@ def assert_subscription_event_order(events: list[SubscriptionMessage[AccountEven
 
 def test_subscription(db_engine, stream, stream_projector):
     subject = Subscription[AccountEvent](
-        group_name=identifier(),
+        name=identifier(),
         stream=stream,
         lock_provider=MyLockProvider(),
         state_provider=MyStateProvider(),
@@ -168,7 +168,7 @@ def test_subscription(db_engine, stream, stream_projector):
 def test_db_subscription_state(db_engine, stream, stream_projector):
     state_provider_name = identifier()
     subject = Subscription[AccountEvent](
-        group_name=identifier(),
+        name=identifier(),
         stream=stream,
         lock_provider=MyLockProvider(),
         state_provider=DbSubscriptionStateProvider(
@@ -187,7 +187,7 @@ def test_db_subscription_state(db_engine, stream, stream_projector):
     assert_subscription_event_order(events)
 
     subject = Subscription[AccountEvent](
-        group_name=subject.group_name,
+        name=subject.name,
         stream=stream,
         lock_provider=MyLockProvider(),
         state_provider=DbSubscriptionStateProvider(
@@ -201,7 +201,7 @@ def test_db_subscription_state(db_engine, stream, stream_projector):
 
 def test_subscription_in_parallel(db_engine, stream, stream_projector):
     subject = Subscription[AccountEvent](
-        group_name=identifier(),
+        name=identifier(),
         stream=stream,
         lock_provider=MyThreadLockProvider(),
         state_provider=MyStateProvider(),
@@ -306,7 +306,7 @@ def assert_stream_projection(stream, db_engine, account, account2):
 
 def test_subscription_handler(db_engine, stream, stream_projector):
     subject = Subscription[AccountEvent](
-        group_name=identifier(),
+        name=identifier(),
         stream=stream,
         lock_provider=MyLockProvider(),
         state_provider=MyStateProvider(),
