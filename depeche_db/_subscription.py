@@ -90,19 +90,29 @@ class Subscription(Generic[E]):
         self.ack(partition=message.partition, position=message.position)
 
 
+HandlerCallable = (
+    Callable[[E], None]
+    | Callable[[StoredMessage[E]], None]
+    | Callable[[SubscriptionMessage[E]], None]
+)
+
+
 @_dc.dataclass
 class _Handler:
-    handler: Callable
+    handler: HandlerCallable
     pass_subscription_message: bool
     pass_stored_message: bool
 
     def exec(self, message: SubscriptionMessage):
         if self.pass_subscription_message:
-            self.handler(message)
+            self.handler(message)  # type: ignore
         elif self.pass_stored_message:
-            self.handler(message.stored_message)
+            self.handler(message.stored_message)  # type: ignore
         else:
             self.handler(message.stored_message.message)
+
+
+H = TypeVar("H", bound=HandlerCallable)
 
 
 class SubscriptionHandler(Generic[E]):
@@ -117,7 +127,7 @@ class SubscriptionHandler(Generic[E]):
     def run(self):
         self.run_once()
 
-    def register(self, handler):  # TODO type
+    def register(self, handler: H) -> H:
         assert len(handler.__annotations__) == 1
         pass_subscription_message = False
         pass_stored_message = False
