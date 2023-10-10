@@ -233,10 +233,13 @@ class StreamProjector(Generic[E]):
 
     @property
     def notification_channel(self) -> str:
-        return self.stream.notification_channel
+        return self.stream._store._storage.notification_channel
 
     def run(self):
-        self.update_full()
+        try:
+            self.update_full()
+        except RuntimeError:  # TODO proper exception type
+            pass
 
     def update_full(self) -> int:
         result = 0
@@ -244,7 +247,7 @@ class StreamProjector(Generic[E]):
             try:
                 conn.execute(
                     _sa.text(
-                        f"LOCK TABLE {self.stream._table.name} IN SHARE MODE NOWAIT"
+                        f"LOCK TABLE {self.stream._table.name} IN EXCLUSIVE MODE NOWAIT"
                     )
                 )
             except _sa.exc.OperationalError as exc:
@@ -308,12 +311,12 @@ class StreamProjector(Generic[E]):
 
     def add(self, conn, messages):
         positions = {
-            row.partition: row.position
+            row.partition: row.max_position
             for row in conn.execute(
                 _sa.select(
                     self.stream._table.c.partition,
-                    self.stream._table.c.position,
-                )
+                    _sa.func.max(self.stream._table.c.position).label("max_position"),
+                ).group_by(self.stream._table.c.partition)
             )
         }
 
