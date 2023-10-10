@@ -11,7 +11,6 @@ from depeche_db import (
     MessageSerializer,
     MessageStore,
     StoredMessage,
-    StreamProjector,
 )
 from tests._tools import identifier
 
@@ -21,7 +20,12 @@ def test_pg_notify_storage_and_stream(db_engine, pg_notification_listener):
     store = MessageStore(
         name=identifier(), engine=db_engine, serializer=MyEventSerializer()
     )
-    stream = LinkStream[MyEvent](name=identifier(), store=store)
+    stream = LinkStream[MyEvent](
+        name=identifier(),
+        store=store,
+        partitioner=MyPartitioner(),
+        stream_wildcards=[stream_name],
+    )
 
     events = [
         MyEvent(event_id=_uuid.uuid4(), num=1),
@@ -48,10 +52,7 @@ def test_pg_notify_storage_and_stream(db_engine, pg_notification_listener):
     ]
 
     with pg_notification_listener(stream.notification_channel) as notifications_stream:
-        proj = StreamProjector(
-            stream=stream, partitioner=MyPartitioner(), stream_wildcards=[stream_name]
-        )
-        proj.update_full()
+        stream.projector.update_full()
     assert notifications_stream == [
         {"message_id": str(events[0].event_id), "partition": 1, "position": 0},
         {"message_id": str(events[1].event_id), "partition": 2, "position": 0},

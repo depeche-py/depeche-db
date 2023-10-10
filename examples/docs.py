@@ -66,7 +66,7 @@ for _ in range(20):
     message_store.write(stream=stream, message=EventA(num=n))
 
 
-from depeche_db import LinkStream, StoredMessage, StreamProjector
+from depeche_db import LinkStream, StoredMessage
 
 
 class NumMessagePartitioner:
@@ -76,16 +76,13 @@ class NumMessagePartitioner:
         return 0
 
 
-link_stream = LinkStream(
+link_stream = LinkStream[EventA | EventB](
     name="example_docs_aggregate_me2",
     store=message_store,
-)
-stream_projector = StreamProjector[EventA | EventB](
-    stream=link_stream,
     partitioner=NumMessagePartitioner(),
     stream_wildcards=["aggregate-me-%"],
 )
-stream_projector.update_full()
+link_stream.projector.update_full()
 
 first_id = next(link_stream.read(conn=db_engine.connect(), partition=0))
 print(first_id)

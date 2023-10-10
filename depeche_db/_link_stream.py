@@ -19,7 +19,13 @@ E = TypeVar("E", bound=MessageProtocol)
 
 
 class LinkStream(Generic[E]):
-    def __init__(self, name: str, store: MessageStore[E]):
+    def __init__(
+        self,
+        name: str,
+        store: MessageStore[E],
+        partitioner: MessagePartitioner[E],
+        stream_wildcards: list[str],
+    ) -> None:
         # TODO start at "next message"
         # TODO start at time
         assert name.isidentifier(), "name must be a valid identifier"
@@ -82,6 +88,11 @@ class LinkStream(Generic[E]):
             self._table, "after_create", trigger.execute_if(dialect="postgresql")
         )
         self._metadata.create_all(store.engine, checkfirst=True)
+        self.projector = StreamProjector(
+            stream=self,
+            partitioner=partitioner,
+            stream_wildcards=stream_wildcards,
+        )
 
     def has_message(self, conn: _sa.Connection, message_id: _uuid.UUID) -> bool:
         return conn.execute(
@@ -171,7 +182,6 @@ class LinkStream(Generic[E]):
                 .order_by(tbl.c.message_occurred_at)
                 # TODO randomize order a bit, e.g. order by (hour(occurred_at), random())
                 .limit(result_limit)
-                # TODO does this return the same partition multiple times if if has multiple new messages?
             )
             result = conn.execute(qry)
             for row in result.fetchall():
@@ -185,7 +195,6 @@ class LinkStream(Generic[E]):
             del result
 
 
-# TODO this should be created by the stream instead of user code
 class StreamProjector(Generic[E]):
     def __init__(
         self,

@@ -11,7 +11,6 @@ from depeche_db import (
     MessageStore,
     StoredMessage,
     StreamPartitionStatistic,
-    StreamProjector,
     Subscription,
     SubscriptionHandler,
     SubscriptionMessage,
@@ -62,7 +61,12 @@ def store_with_events(db_engine):
 @pytest.fixture
 def stream(db_engine, store_with_events):
     event_store, _, _ = store_with_events
-    stream = LinkStream[AccountEvent](name=identifier(), store=event_store)
+    stream = LinkStream[AccountEvent](
+        name=identifier(),
+        store=event_store,
+        partitioner=MyPartitioner(),
+        stream_wildcards=["account-%"],
+    )
     with db_engine.connect() as conn:
         stream.truncate(conn)
         conn.commit()
@@ -71,12 +75,8 @@ def stream(db_engine, store_with_events):
 
 @pytest.fixture
 def stream_projector(db_engine, store_with_events, stream):
-    event_store, _, _ = store_with_events
-    proj = StreamProjector(
-        stream=stream, partitioner=MyPartitioner(), stream_wildcards=["account-%"]
-    )
-    proj.update_full()
-    return proj
+    stream.projector.update_full()
+    return stream.projector
 
 
 def test_link_stream(db_engine, store_with_events, stream, stream_projector):
@@ -241,30 +241,32 @@ def test_stream_projector(db_engine, log_queries):
         engine=db_engine,
         serializer=AccountEventSerializer(),
     )
-    stream = LinkStream[AccountEvent](name=identifier(), store=event_store)
-    subject = StreamProjector(
-        stream=stream, partitioner=MyPartitioner(), stream_wildcards=["account-%"]
+    stream = LinkStream[AccountEvent](
+        name=identifier(),
+        store=event_store,
+        partitioner=MyPartitioner(),
+        stream_wildcards=["account-%"],
     )
-    assert subject.update_full() == 0
+    assert stream.projector.update_full() == 0
 
     account_repo = AccountRepository(event_store)
 
     account = Account.register(id=ACCOUNT1_ID, owner_id=_uuid.uuid4(), number="123")
     account.credit(100)
     account_repo.save(account, expected_version=0)
-    assert subject.update_full() == 2
+    assert stream.projector.update_full() == 2
 
     account2 = Account.register(id=ACCOUNT2_ID, owner_id=_uuid.uuid4(), number="234")
     account2.credit(100)
     account_repo.save(account2, expected_version=0)
-    assert subject.update_full() == 2
+    assert stream.projector.update_full() == 2
 
     account2.credit(100)
     account2.credit(100)
     account2.credit(100)
     account2.credit(100)
     account_repo.save(account2, expected_version=2)
-    assert subject.update_full() == 4
+    assert stream.projector.update_full() == 4
 
     assert_stream_projection(stream, db_engine, account, account2)
 
@@ -275,16 +277,18 @@ def test_stream_projector_locking(db_engine):
         engine=db_engine,
         serializer=AccountEventSerializer(),
     )
-    stream = LinkStream[AccountEvent](name=identifier(), store=event_store)
-    subject = StreamProjector(
-        stream=stream, partitioner=MyPartitioner(), stream_wildcards=["account-%"]
+    stream = LinkStream[AccountEvent](
+        name=identifier(),
+        store=event_store,
+        partitioner=MyPartitioner(),
+        stream_wildcards=["account-%"],
     )
     with db_engine.connect() as conn:
         conn.execute(
             _sa.text(f"LOCK TABLE {stream._table.name} IN ACCESS EXCLUSIVE MODE")
         )
         with pytest.raises(RuntimeError):
-            subject.update_full()
+            stream.projector.update_full()
 
 
 def assert_stream_projection(stream, db_engine, account, account2):
