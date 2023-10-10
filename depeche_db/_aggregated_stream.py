@@ -135,6 +135,27 @@ class AggregatedStream(Generic[E]):
                 message_id=row.message_id, position=row.position, partition=partition
             )
 
+    def read_slice(
+        self, partition: int, start: int, count: int
+    ) -> Iterator[AggregatedStreamMessage]:
+        with self._connection() as conn:
+            for row in conn.execute(
+                _sa.select(self._table.c.message_id, self._table.c.position)
+                .where(
+                    _sa.and_(
+                        self._table.c.partition == partition,
+                        self._table.c.position >= start,
+                    )
+                )
+                .order_by(self._table.c.position)
+                .limit(count)
+            ):
+                yield AggregatedStreamMessage(
+                    message_id=row.message_id,
+                    position=row.position,
+                    partition=partition,
+                )
+
     @_contextlib.contextmanager
     def _connection(self):
         conn = self._store.engine.connect()

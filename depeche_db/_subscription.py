@@ -1,4 +1,3 @@
-import contextlib as _contextlib
 import dataclasses as _dc
 import types as _types
 import typing as _typing
@@ -38,9 +37,7 @@ class Subscription(Generic[E]):
         self._lock_provider = lock_provider
         self._state_provider = state_provider
 
-    @_contextlib.contextmanager
-    def get_next_message(self) -> Iterator[SubscriptionMessage[E]]:
-        # TODO get more than one message (accept a batch size parameter)
+    def get_next_messages(self, count: int) -> Iterator[SubscriptionMessage[E]]:
         state = self._state_provider.read(self.name)
         statistics = list(
             self._stream.get_partition_statistics(
@@ -61,22 +58,33 @@ class Subscription(Generic[E]):
                 continue
             try:
                 with self._stream._store.reader() as reader:
-                    yield SubscriptionMessage(
-                        partition=statistic.partition_number,
-                        position=statistic.next_message_position,
-                        stored_message=reader.get_message_by_id(
-                            statistic.next_message_id
-                        ),
+                    message_pointers = list(
+                        self._stream.read_slice(
+                            partition=statistic.partition_number,
+                            start=statistic.next_message_position,
+                            count=count,
+                        )
                     )
-                self._ack(
-                    partition=statistic.partition_number,
-                    position=statistic.next_message_position,
-                )
+                    stored_messages = {
+                        message.message_id: message
+                        for message in reader.get_messages_by_ids(
+                            [pointer.message_id for pointer in message_pointers]
+                        )
+                    }
+
+                    for pointer in message_pointers:
+                        yield SubscriptionMessage(
+                            partition=pointer.partition,
+                            position=pointer.position,
+                            stored_message=stored_messages[pointer.message_id],
+                        )
+                        self._ack(
+                            partition=pointer.partition,
+                            position=pointer.position,
+                        )
                 break
             finally:
                 self._lock_provider.unlock(lock_key)
-        else:
-            yield None
 
     def _ack(self, partition: int, position: int):
         state = self._state_provider.read(self.name)
@@ -117,6 +125,7 @@ class SubscriptionHandler(Generic[E]):
     def __init__(self, subscription: Subscription[E]):
         self._subscription = subscription
         self._handlers: dict[Type[E], _Handler] = {}
+        self._batch_size = 1
 
     @property
     def notification_channel(self) -> str:
@@ -175,7 +184,9 @@ class SubscriptionHandler(Generic[E]):
 
     def run_once(self):
         while True:
-            with self._subscription.get_next_message() as message:
-                if message is None:
-                    break
+            n = 0
+            for message in self._subscription.get_next_messages(count=self._batch_size):
+                n += 1
                 self.handle(message)
+            if n == 0:
+                break

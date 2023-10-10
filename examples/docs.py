@@ -108,7 +108,7 @@ subscription = Subscription(
     ),
     lock_provider=DbLockProvider(name="locks1", engine=db_engine),
 )
-with subscription.get_next_message() as message:
+for message in subscription.get_next_messages(count=1):
     print(message)
 # SubscriptionMessage(
 #     partition=2,

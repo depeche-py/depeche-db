@@ -15,13 +15,15 @@ def test_subscription(db_engine, stream_with_events, subscription_factory):
 
     events = []
     while True:
-        with subject.get_next_message() as event:
-            if event is None:
-                break
+        found = False
+        for event in subject.get_next_messages(count=100):
+            found = True
             events.append(event)
+        if not found:
+            break
 
-    with subject.get_next_message() as event:
-        assert event is None
+    for _ in subject.get_next_messages(count=100):
+        raise AssertionError("Should not have any more events")
 
     assert_subscription_event_order(events)
 
@@ -41,10 +43,12 @@ def test_db_subscription_state(
 
     events = []
     while True:
-        with subject.get_next_message() as event:
-            if event is None:
-                break
+        found = False
+        for event in subject.get_next_messages(count=100):
+            found = True
             events.append(event)
+        if not found:
+            break
 
     assert_subscription_event_order(events)
 
@@ -57,8 +61,8 @@ def test_db_subscription_state(
         ),
     )
 
-    with subject.get_next_message() as event:
-        assert event is None
+    for _ in subject.get_next_messages(count=100):
+        raise AssertionError("Should not have any more events")
 
 
 def test_subscription_in_parallel(db_engine, stream_with_events, subscription_factory):
@@ -70,12 +74,13 @@ def test_subscription_in_parallel(db_engine, stream_with_events, subscription_fa
     def consume(n):
         failures = 0
         while failures < 10:
-            with subject.get_next_message() as event:
-                if event is None:
-                    time.sleep(0.001)
-                    failures += 1
-                    continue
+            found = False
+            for event in subject.get_next_messages(count=1):
                 events.append((event, time.time() - start))
+                found = True
+            if not found:
+                time.sleep(0.001)
+                failures += 1
 
     threads = [
         threading.Thread(target=consume, args=(1,)),
