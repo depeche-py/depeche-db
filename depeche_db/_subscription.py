@@ -134,7 +134,7 @@ class SubscriptionHandler(Generic[E]):
 
     def run(self):
         assert (
-            self.subscription.handler is self
+            self._subscription.handler is self
         ), "A subscription can only have one handler"
         self.run_once()
 
