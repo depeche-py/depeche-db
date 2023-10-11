@@ -4,6 +4,7 @@ from typing import Generic, Iterator, Optional, Sequence, TypeVar
 
 import sqlalchemy as _sa
 
+from ._compat import SAConnection
 from ._exceptions import MessageNotFound
 from ._interfaces import (
     MessagePosition,
@@ -18,7 +19,7 @@ E = TypeVar("E", bound=MessageProtocol)
 
 class MessageStoreReader(Generic[E]):
     def __init__(
-        self, conn: _sa.Connection, storage: Storage, serializer: MessageSerializer[E]
+        self, conn: SAConnection, storage: Storage, serializer: MessageSerializer[E]
     ):
         self._conn = conn
         self._storage = storage
@@ -92,7 +93,7 @@ class MessageStore(Generic[E]):
         self._storage = Storage(name=name, engine=engine)
         self._serializer = serializer
 
-    def _get_connection(self) -> _sa.Connection:
+    def _get_connection(self) -> SAConnection:
         return self.engine.connect()
 
     def truncate(self):
@@ -145,7 +146,7 @@ class MessageStore(Generic[E]):
                 result = stored_version
             return result
 
-    def _get_reader(self, conn: _sa.Connection) -> MessageStoreReader[E]:
+    def _get_reader(self, conn: SAConnection) -> MessageStoreReader[E]:
         return MessageStoreReader(
             conn=conn,
             storage=self._storage,
@@ -154,7 +155,7 @@ class MessageStore(Generic[E]):
 
     @_contextlib.contextmanager
     def reader(
-        self, conn: Optional[_sa.Connection] = None
+        self, conn: Optional[SAConnection] = None
     ) -> Iterator[MessageStoreReader[E]]:
         if conn:
             yield self._get_reader(conn)

@@ -4,6 +4,7 @@ from typing import Iterator, Sequence, Tuple
 import sqlalchemy as _sa
 from sqlalchemy_utils import UUIDType as _UUIDType
 
+from ._compat import SAConnection
 from ._interfaces import MessagePosition
 
 
@@ -67,7 +68,7 @@ class Storage:
 
     def add(
         self,
-        conn: _sa.Connection,
+        conn: SAConnection,
         stream: str,
         expected_version: int,
         message_id: _uuid.UUID,
@@ -77,7 +78,7 @@ class Storage:
 
     def add_all(
         self,
-        conn: _sa.Connection,
+        conn: SAConnection,
         stream: str,
         expected_version: int,
         messages: Sequence[Tuple[_uuid.UUID, dict]],
@@ -100,7 +101,7 @@ class Storage:
         )
         return self.get_max_version(conn, stream)
 
-    def get_max_version(self, conn: _sa.Connection, stream: str) -> MessagePosition:
+    def get_max_version(self, conn: SAConnection, stream: str) -> MessagePosition:
         row = conn.execute(
             _sa.select(
                 _sa.func.max(self.message_table.c.version).label("version"),
@@ -115,18 +116,17 @@ class Storage:
             return MessagePosition(stream, 0, None)
         return MessagePosition(stream, row.version, row.global_position)
 
-    def get_message_ids(
-        self, conn: _sa.Connection, stream: str
-    ) -> Iterator[_uuid.UUID]:
-        return conn.execute(
+    def get_message_ids(self, conn: SAConnection, stream: str) -> Iterator[_uuid.UUID]:
+        for id in conn.execute(
             _sa.select(self.message_table.c.message_id)
             .select_from(self.message_table)
             .where(self.message_table.c.stream == stream)
             .order_by(self.message_table.c.version)
-        ).scalars()
+        ).scalars():
+            yield id
 
     def read(
-        self, conn: _sa.Connection, stream: str
+        self, conn: SAConnection, stream: str
     ) -> Iterator[Tuple[_uuid.UUID, int, dict, int]]:
         return conn.execute(  # type: ignore
             _sa.select(
@@ -141,7 +141,7 @@ class Storage:
         )
 
     def read_multiple(
-        self, conn: _sa.Connection, streams: Sequence[str]
+        self, conn: SAConnection, streams: Sequence[str]
     ) -> Iterator[Tuple[_uuid.UUID, str, int, dict, int]]:
         return conn.execute(  # type: ignore
             _sa.select(
@@ -157,7 +157,7 @@ class Storage:
         )
 
     def read_wildcard(
-        self, conn: _sa.Connection, stream_wildcard: str
+        self, conn: SAConnection, stream_wildcard: str
     ) -> Iterator[Tuple[_uuid.UUID, str, int, dict, int]]:
         return conn.execute(  # type: ignore
             _sa.select(
@@ -173,7 +173,7 @@ class Storage:
         )
 
     def get_message_by_id(
-        self, conn: _sa.Connection, message_id: _uuid.UUID
+        self, conn: SAConnection, message_id: _uuid.UUID
     ) -> Tuple[_uuid.UUID, str, int, dict, int]:
         return conn.execute(  # type: ignore
             _sa.select(
@@ -186,7 +186,7 @@ class Storage:
         ).first()
 
     def get_messages_by_ids(
-        self, conn: _sa.Connection, message_ids: Sequence[_uuid.UUID]
+        self, conn: SAConnection, message_ids: Sequence[_uuid.UUID]
     ) -> Iterator[Tuple[_uuid.UUID, str, int, dict, int]]:
         return conn.execute(  # type: ignore
             _sa.select(
@@ -198,5 +198,5 @@ class Storage:
             ).where(self.message_table.c.message_id.in_(message_ids))
         )
 
-    def truncate(self, conn: _sa.Connection):
+    def truncate(self, conn: SAConnection):
         conn.execute(self.message_table.delete())

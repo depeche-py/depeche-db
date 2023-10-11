@@ -7,6 +7,7 @@ import sqlalchemy as _sa
 from psycopg2.errors import LockNotAvailable
 from sqlalchemy_utils import UUIDType as _UUIDType
 
+from ._compat import SAConnection
 from ._interfaces import (
     AggregatedStreamMessage,
     MessagePartitioner,
@@ -94,17 +95,18 @@ class AggregatedStream(Generic[E]):
             stream_wildcards=stream_wildcards,
         )
 
-    def has_message(self, conn: _sa.Connection, message_id: _uuid.UUID) -> bool:
-        return conn.execute(
+    def has_message(self, conn: SAConnection, message_id: _uuid.UUID) -> bool:
+        result: bool = conn.execute(
             _sa.select(_sa.exists().where(self._table.c.message_id == message_id))
         ).scalar()
+        return result
 
-    def truncate(self, conn: _sa.Connection):
+    def truncate(self, conn: SAConnection):
         conn.execute(self._table.delete())
 
     def add(
         self,
-        conn: _sa.Connection,
+        conn: SAConnection,
         message_id: _uuid.UUID,
         stream: str,
         stream_version: int,
@@ -124,7 +126,7 @@ class AggregatedStream(Generic[E]):
         )
 
     def read(
-        self, conn: _sa.Connection, partition: int
+        self, conn: SAConnection, partition: int
     ) -> Iterator[AggregatedStreamMessage]:
         for row in conn.execute(
             _sa.select(self._table.c.message_id, self._table.c.position)

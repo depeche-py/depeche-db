@@ -9,3 +9,11 @@ else:
     import types
 
     UNION_TYPES = (typing.Union, types.UnionType)
+
+
+SA_VERSION = "2.x"
+try:
+    from sqlalchemy import Connection as SAConnection  # noqa
+except ImportError:
+    SA_VERSION = "1.4.x"
+    from sqlalchemy.engine import Connection as SAConnection  # noqa

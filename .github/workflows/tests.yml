@@ -8,6 +8,7 @@ jobs:
     strategy:
       matrix:
         python: ["3.9", "3.10", "3.11"]
+        sqlalchemy: ["^1.4", "^2.0"]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -23,6 +24,8 @@ jobs:
             pipx install poetry
             poetry env use ${{ matrix.python }}
       - name: Install dependencies
-        run: poetry install --with dev
+        run: |
+          poetry install --with dev
+          poetry add sqlalchemy${{ matrix.sqlalchemy }}
       - name: Run tests
         run: poetry run pytest -vv
