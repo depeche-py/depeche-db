@@ -28,6 +28,8 @@ Key features:
 
 Python 3.10+
 
+SQLAlchemy 2+
+
 PostgreSQL 13+
 
 
