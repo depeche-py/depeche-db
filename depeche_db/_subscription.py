@@ -121,6 +121,7 @@ class _Handler:
 H = TypeVar("H", bound=HandlerCallable)
 
 
+# TODO make this a direct child of Subscription?
 class SubscriptionHandler(Generic[E]):
     def __init__(self, subscription: Subscription[E]):
         self._subscription = subscription
