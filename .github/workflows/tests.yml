@@ -27,5 +27,6 @@ jobs:
         run: |
           poetry install --with dev
           poetry add sqlalchemy${{ matrix.sqlalchemy }}
+          poetry show
       - name: Run tests
         run: poetry run pytest -vv
