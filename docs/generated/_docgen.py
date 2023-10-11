@@ -53,7 +53,7 @@ Part = Code | Markdown
 class DocGen:
     def __init__(self, input_file_name):
         self.input_file_name = input_file_name
-        self.markdown_parts: dict[str, list[Part]] = {}
+        self.markdown_parts: dict[str, list[Markdown]] = {}
         self.current_file = None
         self.current_show = None
         self.current_show_caller = None
@@ -65,7 +65,7 @@ class DocGen:
         code = doc.get_code_parts()
         for output_file, content in doc.markdown_parts.items():
             code_parts = iter(code[output_file])
-            interleaved = [next(code_parts)]
+            interleaved: list[Part] = [next(code_parts)]
             for part in content:
                 interleaved.append(part)
                 code_part = next(code_parts)
@@ -75,14 +75,14 @@ class DocGen:
             with open(f"output/{output_file}", "w") as f:
                 f.write(result)
 
-    def get_code_parts(self):
-        result = {}
+    def get_code_parts(self) -> dict[str, list[Code]]:
+        result: dict[str, list[Code]] = {}
         code = open(self.input_file_name).read()
         file_parts = ["doc.output(" + part for part in code.split("doc.output(")[1:]]
         for file_part in file_parts:
             file_name = re.search(r"\"(.*)\"", file_part).group(1)
             result[file_name] = []
-            file_part_clean = []
+            file_part_clean: list[str] = []
             in_md = False
             in_catch = False
             for line in file_part.splitlines():
