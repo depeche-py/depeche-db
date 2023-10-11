@@ -16,4 +16,4 @@ repos:
     rev: v0.0.274
     hooks:
       - id: ruff
-        exclude: examples/docs.py
+        exclude: examples/.*py|docs/generated/[^_].*py

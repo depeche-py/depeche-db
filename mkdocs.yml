@@ -4,9 +4,9 @@ nav:
   - Home: index.md
   - Getting started:
       - Installation: getting-started/installation.md
-      - Writing & reading messages: getting-started/write-read.md
-      - Aggregated streams: getting-started/aggregated-stream.md
-      - Subscription: getting-started/subscription.md
+      - Writing & reading messages: generated/output/getting-started-write-read.md
+      - Aggregated streams: generated/output/getting-started-aggregated-stream.md
+      - Subscription: generated/output/getting-started-subscription.md
       - Executor: getting-started/executor.md
   - Concepts:
     - Data model: concepts/data-model.md
