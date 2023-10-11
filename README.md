@@ -26,11 +26,11 @@ Key features:
 
 ## Requirements
 
-Python 3.10+
+Python 3.9+
 
-SQLAlchemy 2+
+SQLAlchemy 1.4 or 2+
 
-PostgreSQL 13+
+PostgreSQL 12+
 
 
 ## Installation

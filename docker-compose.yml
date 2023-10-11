@@ -2,8 +2,7 @@ version: '3'
 
 services:
   db_dev:
-    image: 'postgres:14.5'
-    command: [ "postgres", "-c", "wal_level=logical" ]
+    image: 'postgres:${POSTGRES_VERSION:-14.5}'
     environment:
       POSTGRES_USER: depeche
       POSTGRES_PASSWORD: depeche
@@ -11,8 +10,3 @@ services:
     ports:
       - 4888:5432
     restart: unless-stopped
-    healthcheck:
-      test: ['CMD', 'pg_isready', '-U', 'es']
-      timeout: 15s
-      interval: 5s
-      retries: 10

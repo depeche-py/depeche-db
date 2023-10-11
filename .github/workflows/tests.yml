@@ -4,11 +4,10 @@ on:
   push:
 
 jobs:
-  tests:
+  tests-python-versions:
     strategy:
       matrix:
         python: ["3.9", "3.10", "3.11"]
-        sqlalchemy: ["^1.4", "^2.0"]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -19,14 +18,44 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python }}
-      - name: Install poetry
+      - name: Install
         run: |
-            pipx install poetry
-            poetry env use ${{ matrix.python }}
-      - name: Install dependencies
+          pipx install poetry
+          poetry env use ${{ matrix.python }}
+          poetry install --with dev
+      - name: Run tests
+        run: poetry run pytest -vv
+  tests-sqlalchemy-versions:
+    strategy:
+      matrix:
+        sqlalchemy: ["^1.4", "^2.0"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run dependencies
         run: |
+          docker-compose -f docker-compose.yml up -d
+      - name: Install
+        run: |
+          pipx install poetry
           poetry install --with dev
           poetry add sqlalchemy${{ matrix.sqlalchemy }}
           poetry show
+      - name: Run tests
+        run: poetry run pytest -vv
+  tests-postgresql-versions:
+    strategy:
+      matrix:
+        postgres: ["12", "13", "14", "15", "16"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run dependencies
+        run: |
+          POSTGRES_VERSION=${{ matrix.postgres }} docker-compose -f docker-compose.yml up -d
+      - name: Install
+        run: |
+          pipx install poetry
+          poetry install --with dev
       - name: Run tests
         run: poetry run pytest -vv
