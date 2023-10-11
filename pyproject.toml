@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "depeche-db"
-version = "0.2.0"
+version = "0.3.0"
 description = ""
 authors = ["Martin Vielsmaier <martin@vielsmaier.net>"]
 readme = "README.md"
