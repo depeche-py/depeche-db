@@ -11,16 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Install poetry
-        run: pipx install poetry
       - name: Run dependencies
         run: |
           docker-compose -f docker-compose.yml up -d
-      - uses: actions/setup-python@v3
-        with:
-          python-version: ${{ matrix.python }}
-          cache: 'pip'
-          cache-dependency-path: poetry.lock
+      - name: Install poetry
+        run: |
+            pipx install poetry
+            poetry env use ${{ matrix.python }}
       - name: Install dependencies
         run: poetry install --with dev
       - name: Run tests
