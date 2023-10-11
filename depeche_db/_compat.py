@@ -1,9 +1,9 @@
 import sys
 import typing
 
-if sys.version < "3.8":
+if sys.version_info < (3, 8):
     raise RuntimeError("DepecheDB requires Python 3.8 or newer")
-elif sys.version < "3.10":
+elif sys.version_info < (3, 10):
     UNION_TYPES = (typing.Union,)
 else:
     import types
