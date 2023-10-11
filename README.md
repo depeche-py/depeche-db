@@ -3,6 +3,7 @@
 
 A library for building event-based systems on top of PostgreSQL
 
+[![Tests](https://github.com/depeche-py/depeche-db/actions/workflows/tests.yml/badge.svg)](https://github.com/depeche-py/depeche-db/actions/workflows/tests.yml)
 [![pypi](https://img.shields.io/pypi/v/depeche-db.svg)](https://pypi.python.org/pypi/depeche-db)
 [![versions](https://img.shields.io/pypi/pyversions/depeche-db.svg)](https://github.com/depeche-py/depeche-db)
 [![Docs](https://img.shields.io/badge/docs-here-green.svg)](https://depeche-py.github.io/depeche-db/)
