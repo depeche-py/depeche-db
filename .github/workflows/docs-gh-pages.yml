@@ -9,6 +9,9 @@ on:
       - ".github/workflows/docs-gh-pages.yml"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   deploy-docs:
     name: Deploy docs
