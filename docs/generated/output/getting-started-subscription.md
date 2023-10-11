@@ -48,14 +48,10 @@ In order to continously handle messages on a subscription we would use the
 `SubscriptionHandler`:
 
 ```python
-from depeche_db import SubscriptionHandler, SubscriptionMessage
-
-my_handler = SubscriptionHandler(
-    subscription=subscription,
-)
+from depeche_db import SubscriptionMessage
 
 
-@my_handler.register
+@subscription.handler.register
 def handle_event_a(msg: SubscriptionMessage[EventA]):
     real_message = msg.stored_message.message
     doc.show(f"num={real_message.num} (partition {msg.partition} at {msg.position})")
@@ -67,7 +63,7 @@ message types must not overlap. Given your event type `E`, you can request
 argument to the handler by using type hints.
 
 ```python
-my_handler.run_once()
+subscription.handler.run_once()
 #  num=111 (partition 0 at 0)
 #  num=199 (partition 1 at 0)
 #  num=166 (partition 1 at 1)

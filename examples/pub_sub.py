@@ -14,7 +14,6 @@ from depeche_db import (
     MessageStore,
     StoredMessage,
     Subscription,
-    SubscriptionHandler,
     SubscriptionMessage,
 )
 from depeche_db.tools import (
@@ -69,12 +68,7 @@ subscription = Subscription(
 )
 
 
-my_handler = SubscriptionHandler(
-    subscription=subscription,
-)
-
-
-@my_handler.register
+@subscription.handler.register
 def handle_event_a(message: SubscriptionMessage[MyMessage]):
     real_message = message.stored_message.message
     print(
@@ -98,7 +92,7 @@ def pub():
 def sub():
     executor = Executor(db_dsn=DB_DSN)
     executor.register(stream.projector)
-    executor.register(my_handler)
+    executor.register(subscription.handler)
     executor.run()
 
 

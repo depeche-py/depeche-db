@@ -17,7 +17,7 @@ from depeche_db import Executor
 
 executor = Executor(db_dsn=DB_DSN)
 executor.register(aggregated_stream.projector)
-executor.register(my_handler)
+executor.register(subscription.handler)
 
 # this will run until stopped via SIGINT etc
 executor.run()

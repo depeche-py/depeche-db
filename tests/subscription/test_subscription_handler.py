@@ -1,6 +1,6 @@
 import pytest
 
-from depeche_db import SubscriptionHandler, SubscriptionMessage
+from depeche_db import Subscription, SubscriptionMessage
 
 # from ._tools import MyLockProvider, MyStateProvider, MyThreadLockProvider
 from tests._account_example import (
@@ -11,8 +11,8 @@ from tests._account_example import (
 
 
 def test_register_negative_cases(stream_with_events, subscription_factory):
-    subscription = subscription_factory(stream_with_events)
-    subject = SubscriptionHandler(subscription)
+    subscription: Subscription = subscription_factory(stream_with_events)
+    subject = subscription.handler
 
     with pytest.raises(ValueError):
         subject.register(lambda: None)  # type: ignore
@@ -31,8 +31,8 @@ def test_register_negative_cases(stream_with_events, subscription_factory):
 
 
 def test_register_overlap_union(stream_with_events, subscription_factory):
-    subscription = subscription_factory(stream_with_events)
-    subject = SubscriptionHandler(subscription)
+    subscription: Subscription = subscription_factory(stream_with_events)
+    subject = subscription.handler
 
     @subject.register
     def handler1(event: AccountEvent):
@@ -52,8 +52,8 @@ def test_register_overlap_union(stream_with_events, subscription_factory):
 
 
 def test_register_overlap_direct(stream_with_events, subscription_factory):
-    subscription = subscription_factory(stream_with_events)
-    subject = SubscriptionHandler(subscription)
+    subscription: Subscription = subscription_factory(stream_with_events)
+    subject = subscription.handler
 
     @subject.register
     def handler1(event: AccountCreditedEvent):
@@ -67,8 +67,8 @@ def test_register_overlap_direct(stream_with_events, subscription_factory):
 
 
 def test_passes_right_type(stream_with_events, subscription_factory):
-    subscription = subscription_factory(stream_with_events)
-    subject = SubscriptionHandler(subscription)
+    subscription: Subscription = subscription_factory(stream_with_events)
+    subject = subscription.handler
 
     seen: list[SubscriptionMessage[AccountRegisteredEvent] | AccountEvent] = []
 

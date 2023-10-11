@@ -249,14 +249,10 @@ doc.md(
     """
 )
 
-from depeche_db import SubscriptionHandler, SubscriptionMessage
-
-my_handler = SubscriptionHandler(
-    subscription=subscription,
-)
+from depeche_db import SubscriptionMessage
 
 
-@my_handler.register
+@subscription.handler.register
 def handle_event_a(msg: SubscriptionMessage[EventA]):
     real_message = msg.stored_message.message
     doc.show(f"num={real_message.num} (partition {msg.partition} at {msg.position})")
@@ -273,7 +269,7 @@ doc.md(
 
 
 doc.begin_show()
-my_handler.run_once()
+subscription.handler.run_once()
 doc.end_show()
 # > num=111 (partition 0 at 0)
 # > num=199 (partition 1 at 0)

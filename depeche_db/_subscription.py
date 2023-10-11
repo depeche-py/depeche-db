@@ -36,6 +36,7 @@ class Subscription(Generic[E]):
         self._stream = stream
         self._lock_provider = lock_provider
         self._state_provider = state_provider
+        self.handler = SubscriptionHandler(self)
 
     def get_next_messages(self, count: int) -> Iterator[SubscriptionMessage[E]]:
         state = self._state_provider.read(self.name)
@@ -121,7 +122,6 @@ class _Handler:
 H = TypeVar("H", bound=HandlerCallable)
 
 
-# TODO make this a direct child of Subscription?
 class SubscriptionHandler(Generic[E]):
     def __init__(self, subscription: Subscription[E]):
         self._subscription = subscription
@@ -133,6 +133,9 @@ class SubscriptionHandler(Generic[E]):
         return self._subscription._stream.notification_channel
 
     def run(self):
+        assert (
+            self.subscription.handler is self
+        ), "A subscription can only have one handler"
         self.run_once()
 
     def register(self, handler: H) -> H:
