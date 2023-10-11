@@ -1,7 +1,7 @@
 import dataclasses as _dc
 import types as _types
 import typing as _typing
-from typing import Callable, Dict, Generic, Iterator, Type, TypeVar
+from typing import Callable, Dict, Generic, Iterator, Type, TypeVar, Union
 
 from ._aggregated_stream import AggregatedStream
 from ._interfaces import (
@@ -97,11 +97,11 @@ class Subscription(Generic[E]):
         )
 
 
-HandlerCallable = (
-    Callable[[E], None]
-    | Callable[[StoredMessage[E]], None]
-    | Callable[[SubscriptionMessage[E]], None]
-)
+HandlerCallable = Union[
+    Callable[[E], None],
+    Callable[[StoredMessage[E]], None],
+    Callable[[SubscriptionMessage[E]], None],
+]
 
 
 @_dc.dataclass

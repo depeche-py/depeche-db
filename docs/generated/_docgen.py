@@ -5,7 +5,7 @@ import pathlib
 import re
 import sys
 import textwrap
-from typing import Dict, List
+from typing import Dict, List, Union
 
 sys.path.append(str(pathlib.Path(__file__).parent.parent.parent.absolute()))
 
@@ -48,7 +48,7 @@ class CodeOutput:
         self.output = output
 
 
-Part = Code | Markdown
+Part = Union[Code, Markdown]
 
 
 class DocGen:

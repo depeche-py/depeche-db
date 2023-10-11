@@ -1,7 +1,7 @@
 import contextlib as _contextlib
 import datetime as _dt
 import uuid as _uuid
-from typing import Dict, Generic, Iterator, List, TypeVar
+from typing import Dict, Generic, Iterator, List, Optional, TypeVar
 
 import sqlalchemy as _sa
 from psycopg2.errors import LockNotAvailable
@@ -167,7 +167,7 @@ class AggregatedStream(Generic[E]):
     def get_partition_statistics(
         self,
         position_limits: Dict[int, int] = None,
-        result_limit: int | None = None,
+        result_limit: Optional[int] = None,
     ) -> Iterator[StreamPartitionStatistic]:
         with self._connection() as conn:
             position_limits = position_limits or {-1: -1}

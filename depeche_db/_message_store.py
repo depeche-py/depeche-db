@@ -1,6 +1,6 @@
 import contextlib as _contextlib
 import uuid as _uuid
-from typing import Generic, Iterator, Sequence, TypeVar
+from typing import Generic, Iterator, Optional, Sequence, TypeVar
 
 import sqlalchemy as _sa
 
@@ -154,7 +154,7 @@ class MessageStore(Generic[E]):
 
     @_contextlib.contextmanager
     def reader(
-        self, conn: _sa.Connection | None = None
+        self, conn: Optional[_sa.Connection] = None
     ) -> Iterator[MessageStoreReader[E]]:
         if conn:
             yield self._get_reader(conn)

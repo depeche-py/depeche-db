@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Union
 
 import pytest
 
@@ -72,7 +72,7 @@ def test_passes_right_type(stream_with_events, subscription_factory):
     subscription: Subscription = subscription_factory(stream_with_events)
     subject = subscription.handler
 
-    seen: List[SubscriptionMessage[AccountRegisteredEvent] | AccountEvent] = []
+    seen: List[Union[SubscriptionMessage[AccountRegisteredEvent], AccountEvent]] = []
 
     @subject.register
     def handle_account_registered(event: SubscriptionMessage[AccountRegisteredEvent]):

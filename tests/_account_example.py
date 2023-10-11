@@ -1,7 +1,7 @@
 import datetime as _dt
 import functools as _ft
 import uuid as _uuid
-from typing import Generic, List, TypeVar
+from typing import Generic, List, Optional, TypeVar, Union
 
 import pydantic as _pydantic
 
@@ -41,7 +41,7 @@ class AccountCreditedEvent(Event):
     balance: int
 
 
-AccountEvent = AccountRegisteredEvent | AccountCreditedEvent
+AccountEvent = Union[AccountRegisteredEvent, AccountCreditedEvent]
 
 
 class AccountEventSerializer(MessageSerializer[AccountEvent]):
@@ -121,7 +121,7 @@ class Account(AggregateRoot[AccountEvent]):
 
     @classmethod
     def register(
-        cls, owner_id: _uuid.UUID, number: str, id: _uuid.UUID | None = None
+        cls, owner_id: _uuid.UUID, number: str, id: Optional[_uuid.UUID] = None
     ) -> "Account":
         account = cls()
         account.apply(

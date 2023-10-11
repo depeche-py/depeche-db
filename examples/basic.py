@@ -1,3 +1,4 @@
+from typing import Union
 import datetime as _dt
 import uuid as _uuid
 
@@ -31,7 +32,7 @@ class EventB(MyEvent):
     text: str
 
 
-EventType = EventA | EventB
+EventType = Union[EventA, EventB]
 
 message_store = MessageStore[EventType](
     name="example_basic",
