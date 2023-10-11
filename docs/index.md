@@ -25,6 +25,8 @@ Depeche DB has two main parts:
 
 Depeche DB is obviously influenced by message stores like
 [EventStoreDB](https://www.eventstore.com/) and takes some inspiration from
-[Kafka](https://kafka.apache.org/). Another strong influence has been the
-[Message DB](https://github.com/message-db/message-db) project which is pretty
-similar on the implementation side.
+[Kafka](https://kafka.apache.org/). More inspiration is taken from
+[Marten](https://martendb.io/), a project that implements an event store on top
+of PostgreSQL. Another strong influence has been the [Message
+DB](https://github.com/message-db/message-db) project which is pretty similar
+on the implementation side.
