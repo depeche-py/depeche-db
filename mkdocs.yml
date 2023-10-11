@@ -1,5 +1,15 @@
 strict: true
 site_name: Depeche DB
+repo_name: depeche-py/depeche-db
+repo_url: https://github.com/depeche-py/depeche-db
+copyright: Copyright &copy; 2023 Martin Vielsmaier
+extra:
+  generator: false
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/depeche-py/depeche-db/
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/depeche-db/
 nav:
   - Home: index.md
   - Getting started:
@@ -20,6 +30,10 @@ plugins:
   - macros
 theme:
   name: material
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    primary: light green
   features:
     - navigation.expand
 markdown_extensions:
