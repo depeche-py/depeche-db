@@ -1,9 +1,9 @@
 import dataclasses as _dc
-import types as _types
 import typing as _typing
 from typing import Callable, Dict, Generic, Iterator, Type, TypeVar, Union
 
 from ._aggregated_stream import AggregatedStream
+from ._compat import UNION_TYPES
 from ._interfaces import (
     LockProvider,
     MessageProtocol,
@@ -165,7 +165,7 @@ class SubscriptionHandler(Generic[E]):
         return handler
 
     def assert_not_registered(self, handled_type: Type[E]):
-        if _typing.get_origin(handled_type) in (_typing.Union, _types.UnionType):
+        if _typing.get_origin(handled_type) in UNION_TYPES:
             for member in _typing.get_args(handled_type):
                 self.assert_not_registered(member)
         else:
