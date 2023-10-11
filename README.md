@@ -1,4 +1,7 @@
-[![PyPI version fury.io](https://badge.fury.io/py/ansicolortags.svg)](https://pypi.python.org/pypi/depeche-db/)
+[![pypi](https://img.shields.io/pypi/v/depeche-db.svg)](https://pypi.python.org/pypi/depeche-db)
+[![versions](https://img.shields.io/pypi/pyversions/depeche-db.svg)](https://github.com/depeche-py/depeche-db)
+[![Docs](https://img.shields.io/badge/docs-here-green.svg)](https://depeche-py.github.io/depeche-db/)
+[![license](https://img.shields.io/github/license/depeche-py/depeche-db.svg)](https://github.com/depeche-py/depeche-db/blob/main/LICENSE)
 
 # Depeche DB
 
