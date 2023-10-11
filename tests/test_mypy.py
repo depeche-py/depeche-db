@@ -1,8 +1,12 @@
 import pathlib as _pathlib
 import subprocess as _subprocess
+import sys as _sys
 
 
 def test_typing():
+    ini = "mypy.ini"
+    if _sys.version_info < (3, 10):
+        ini = "mypy39.ini"
     repo_path = _pathlib.Path(__file__).parent.parent
     res = _subprocess.run(
         [
@@ -11,7 +15,7 @@ def test_typing():
             "--",
             "mypy",
             "--config",
-            str(repo_path / "mypy.ini"),
+            str(repo_path / ini),
             ".",
             "--show-traceback",
         ],
