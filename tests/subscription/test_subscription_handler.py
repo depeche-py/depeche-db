@@ -1,3 +1,4 @@
+import sys as _sys
 from typing import List, Union
 
 import pytest
@@ -32,6 +33,7 @@ def test_register_negative_cases(stream_with_events, subscription_factory):
             pass
 
 
+@pytest.mark.skipif(_sys.version_info < (3, 10), reason="requires python3.10 or higher")
 def test_register_overlap_union(stream_with_events, subscription_factory):
     subscription: Subscription = subscription_factory(stream_with_events)
     subject = subscription.handler
