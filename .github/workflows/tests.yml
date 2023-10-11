@@ -5,7 +5,9 @@ on:
 
 jobs:
   tests:
-    name: tests
+    strategy:
+      matrix:
+        python: ["3.8", "3.9", "3.10", "3.11", "3.12"]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -16,7 +18,7 @@ jobs:
           docker-compose -f docker-compose.yml up -d
       - uses: actions/setup-python@v3
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python }}
           cache: 'pip'
           cache-dependency-path: poetry.lock
       - name: Install dependencies
