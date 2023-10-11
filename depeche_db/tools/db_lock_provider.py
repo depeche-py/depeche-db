@@ -1,3 +1,5 @@
+from typing import Dict
+
 import pals as _pals
 import sqlalchemy as _sa
 
@@ -11,7 +13,7 @@ class DbLockProvider:
             create_engine_callable=lambda: self._engine,
             blocking_default=False,
         )
-        self._locks: dict[str, _pals.Lock] = {}  # type: ignore
+        self._locks: Dict[str, _pals.Lock] = {}  # type: ignore
 
     def lock(self, name: str) -> bool:
         assert name not in self._locks, "Lock already acquired"

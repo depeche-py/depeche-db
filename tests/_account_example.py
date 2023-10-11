@@ -1,7 +1,7 @@
 import datetime as _dt
 import functools as _ft
 import uuid as _uuid
-from typing import Generic, TypeVar
+from typing import Generic, List, TypeVar
 
 import pydantic as _pydantic
 
@@ -54,11 +54,11 @@ class AccountEventSerializer(MessageSerializer[AccountEvent]):
 
 class AggregateRoot(Generic[E]):
     def __init__(self):
-        self._events: list[E] = []
+        self._events: List[E] = []
         self._version = 0
 
     @property
-    def events(self) -> list[E]:
+    def events(self) -> List[E]:
         return list(self._events)
 
     def _add_event(self, event: E) -> None:

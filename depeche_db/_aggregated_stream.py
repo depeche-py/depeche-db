@@ -1,7 +1,7 @@
 import contextlib as _contextlib
 import datetime as _dt
 import uuid as _uuid
-from typing import Generic, Iterator, TypeVar
+from typing import Dict, Generic, Iterator, List, TypeVar
 
 import sqlalchemy as _sa
 from psycopg2.errors import LockNotAvailable
@@ -24,7 +24,7 @@ class AggregatedStream(Generic[E]):
         name: str,
         store: MessageStore[E],
         partitioner: MessagePartitioner[E],
-        stream_wildcards: list[str],
+        stream_wildcards: List[str],
     ) -> None:
         # TODO start at "next message"
         # TODO start at time
@@ -166,7 +166,7 @@ class AggregatedStream(Generic[E]):
 
     def get_partition_statistics(
         self,
-        position_limits: dict[int, int] = None,
+        position_limits: Dict[int, int] = None,
         result_limit: int | None = None,
     ) -> Iterator[StreamPartitionStatistic]:
         with self._connection() as conn:
@@ -224,7 +224,7 @@ class StreamProjector(Generic[E]):
         self,
         stream: AggregatedStream[E],
         partitioner: MessagePartitioner[E],
-        stream_wildcards: list[str],
+        stream_wildcards: List[str],
     ):
         self.stream = stream
         self.stream_wildcards = stream_wildcards

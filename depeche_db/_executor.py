@@ -1,6 +1,6 @@
 import collections as _collections
 import signal as _signal
-from typing import Callable
+from typing import Callable, Dict, List
 
 from ._interfaces import RunOnNotification
 from .tools import PgNotificationListener
@@ -9,8 +9,8 @@ from .tools import PgNotificationListener
 class Executor:
     def __init__(self, db_dsn: str):
         self._db_dsn = db_dsn
-        self.channel_register: dict[
-            str, list[Callable[[], None]]
+        self.channel_register: Dict[
+            str, List[Callable[[], None]]
         ] = _collections.defaultdict(list)
 
     def register(self, handler: RunOnNotification):

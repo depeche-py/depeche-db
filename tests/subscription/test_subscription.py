@@ -1,5 +1,6 @@
 import threading
 import time
+from typing import List
 
 from depeche_db import Subscription, SubscriptionMessage
 from depeche_db.tools import DbSubscriptionStateProvider
@@ -96,7 +97,7 @@ def test_subscription_in_parallel(db_engine, stream_with_events, subscription_fa
     assert_subscription_event_order([e for e, _ in sorted(events, key=lambda x: x[-1])])
 
 
-def assert_subscription_event_order(events: list[SubscriptionMessage[AccountEvent]]):
+def assert_subscription_event_order(events: List[SubscriptionMessage[AccountEvent]]):
     for partition in {evt.partition for evt in events}:
         partition_events = [evt for evt in events if evt.partition == partition]
         assert partition_events == sorted(

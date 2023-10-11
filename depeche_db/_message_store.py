@@ -38,7 +38,7 @@ class MessageStoreReader(Generic[E]):
         raise MessageNotFound(message_id)
 
     def get_messages_by_ids(
-        self, message_ids: list[_uuid.UUID]
+        self, message_ids: Sequence[_uuid.UUID]
     ) -> Iterator[StoredMessage[E]]:
         for row in self._storage.get_messages_by_ids(
             conn=self._conn, message_ids=message_ids

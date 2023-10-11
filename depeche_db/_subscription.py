@@ -1,7 +1,7 @@
 import dataclasses as _dc
 import types as _types
 import typing as _typing
-from typing import Callable, Generic, Iterator, Type, TypeVar
+from typing import Callable, Dict, Generic, Iterator, Type, TypeVar
 
 from ._aggregated_stream import AggregatedStream
 from ._interfaces import (
@@ -125,7 +125,7 @@ H = TypeVar("H", bound=HandlerCallable)
 class SubscriptionHandler(Generic[E]):
     def __init__(self, subscription: Subscription[E]):
         self._subscription = subscription
-        self._handlers: dict[Type[E], _Handler] = {}
+        self._handlers: Dict[Type[E], _Handler] = {}
         self._batch_size = 1
 
     @property

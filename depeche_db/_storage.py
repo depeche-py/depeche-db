@@ -1,5 +1,5 @@
 import uuid as _uuid
-from typing import Iterator
+from typing import Iterator, Sequence, Tuple
 
 import sqlalchemy as _sa
 from sqlalchemy_utils import UUIDType as _UUIDType
@@ -80,7 +80,7 @@ class Storage:
         conn: _sa.Connection,
         stream: str,
         expected_version: int,
-        messages: list[tuple[_uuid.UUID, dict]],
+        messages: Sequence[Tuple[_uuid.UUID, dict]],
     ) -> MessagePosition:
         max_version = self.get_max_version(conn, stream).version
         if expected_version > -1:
@@ -127,7 +127,7 @@ class Storage:
 
     def read(
         self, conn: _sa.Connection, stream: str
-    ) -> Iterator[tuple[_uuid.UUID, int, dict, int]]:
+    ) -> Iterator[Tuple[_uuid.UUID, int, dict, int]]:
         return conn.execute(  # type: ignore
             _sa.select(
                 self.message_table.c.message_id,
@@ -141,8 +141,8 @@ class Storage:
         )
 
     def read_multiple(
-        self, conn: _sa.Connection, streams: list[str]
-    ) -> Iterator[tuple[_uuid.UUID, str, int, dict, int]]:
+        self, conn: _sa.Connection, streams: Sequence[str]
+    ) -> Iterator[Tuple[_uuid.UUID, str, int, dict, int]]:
         return conn.execute(  # type: ignore
             _sa.select(
                 self.message_table.c.message_id,
@@ -158,7 +158,7 @@ class Storage:
 
     def read_wildcard(
         self, conn: _sa.Connection, stream_wildcard: str
-    ) -> Iterator[tuple[_uuid.UUID, str, int, dict, int]]:
+    ) -> Iterator[Tuple[_uuid.UUID, str, int, dict, int]]:
         return conn.execute(  # type: ignore
             _sa.select(
                 self.message_table.c.message_id,
@@ -174,7 +174,7 @@ class Storage:
 
     def get_message_by_id(
         self, conn: _sa.Connection, message_id: _uuid.UUID
-    ) -> tuple[_uuid.UUID, str, int, dict, int]:
+    ) -> Tuple[_uuid.UUID, str, int, dict, int]:
         return conn.execute(  # type: ignore
             _sa.select(
                 self.message_table.c.message_id,
@@ -186,8 +186,8 @@ class Storage:
         ).first()
 
     def get_messages_by_ids(
-        self, conn: _sa.Connection, message_ids: list[_uuid.UUID]
-    ) -> Iterator[tuple[_uuid.UUID, str, int, dict, int]]:
+        self, conn: _sa.Connection, message_ids: Sequence[_uuid.UUID]
+    ) -> Iterator[Tuple[_uuid.UUID, str, int, dict, int]]:
         return conn.execute(  # type: ignore
             _sa.select(
                 self.message_table.c.message_id,

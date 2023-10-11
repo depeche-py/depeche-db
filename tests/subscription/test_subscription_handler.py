@@ -1,3 +1,5 @@
+from typing import List
+
 import pytest
 
 from depeche_db import Subscription, SubscriptionMessage
@@ -70,7 +72,7 @@ def test_passes_right_type(stream_with_events, subscription_factory):
     subscription: Subscription = subscription_factory(stream_with_events)
     subject = subscription.handler
 
-    seen: list[SubscriptionMessage[AccountRegisteredEvent] | AccountEvent] = []
+    seen: List[SubscriptionMessage[AccountRegisteredEvent] | AccountEvent] = []
 
     @subject.register
     def handle_account_registered(event: SubscriptionMessage[AccountRegisteredEvent]):

@@ -1,7 +1,7 @@
 import dataclasses as _dc
 import datetime as _dt
 import uuid as _uuid
-from typing import Generic, Protocol, TypeVar
+from typing import Dict, Generic, Protocol, TypeVar
 
 
 class MessageProtocol:
@@ -49,7 +49,7 @@ class AggregatedStreamMessage:
 
 @_dc.dataclass
 class SubscriptionState:
-    positions: dict[int, int]
+    positions: Dict[int, int]
 
 
 class MessageSerializer(Protocol, Generic[M]):

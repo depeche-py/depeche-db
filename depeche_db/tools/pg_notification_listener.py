@@ -4,7 +4,7 @@ import logging
 import queue
 import select
 import threading
-from typing import Iterator
+from typing import Iterator, Sequence
 
 import psycopg2
 
@@ -21,7 +21,7 @@ class PgNotificationListener:
     def __init__(
         self,
         dsn: str,
-        channels: list[str],
+        channels: Sequence[str],
         select_timeout: float = 3.0,
         ignore_payload: bool = False,
     ):
