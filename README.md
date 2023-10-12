@@ -1,7 +1,7 @@
 
 
 <p align="center">
-  <img src="https://depeche-py.github.io/depeche-db/assets/logo.png" width="300" />
+  <img src="https://depeche-py.github.io/depeche-db/assets/logo-bg.png" width="200" />
 </p>
 
 # Depeche DB
