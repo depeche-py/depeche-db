@@ -99,6 +99,7 @@ class MessageStore(Generic[E]):
     def truncate(self):
         with self._get_connection() as conn:
             self._storage.truncate(conn)
+            conn.commit()
 
     # TODO allow write/sync to accept a user-supplied connection
     def write(

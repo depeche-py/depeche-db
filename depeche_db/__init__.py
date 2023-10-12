@@ -2,6 +2,7 @@ from ._aggregated_stream import AggregatedStream  # noqa: F401
 from ._executor import Executor  # noqa: F401
 from ._interfaces import (  # noqa: F401
     MessagePartitioner,
+    MessagePosition,
     MessageProtocol,
     MessageSerializer,
     StoredMessage,
