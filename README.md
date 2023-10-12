@@ -1,4 +1,7 @@
 
+
+<img src="https://depeche-py.github.io/depeche-db/assets/logo.png" width="400" style="margin: 0 auto" />
+
 # Depeche DB
 
 A library for building event-based systems on top of PostgreSQL

@@ -30,6 +30,8 @@ plugins:
   - macros
 theme:
   name: material
+  favicon: assets/logo-bg256.png
+  logo: assets/logo512.png
   icon:
     repo: fontawesome/brands/github
   palette:
