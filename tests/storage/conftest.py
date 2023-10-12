@@ -5,5 +5,5 @@ from tests._tools import identifier
 
 
 @pytest.fixture
-def storage(db_engine):
+def storage(db_engine) -> Storage:
     return Storage(name=identifier(), engine=db_engine)

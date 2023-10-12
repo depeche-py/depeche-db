@@ -19,3 +19,4 @@ tmp/*
 
 # mkdocs build dir
 site/
+.coverage

@@ -1,35 +1,120 @@
 import uuid as _uuid
 
+import pytest
 
-def test_storage(db_engine, storage):
+
+def test_write(db_engine, storage):
     with db_engine.connect() as conn:
         subject = storage
 
         id1 = _uuid.uuid4()
-        result = subject.add(conn, "stream1", 0, id1, {"foo": "bar"})
-        assert result.version == 1
-
-        id3 = _uuid.uuid4()
-        result = subject.add(conn, "stream2", 0, id3, {"foo": "bar"})
+        result = subject.add(conn, "stream1", 0, id1, {"foo": "bar1"})
         assert result.version == 1
 
         id2 = _uuid.uuid4()
-        result = subject.add(conn, "stream1", 1, id2, {"foo": "bar"})
+        result = subject.add(conn, "stream2", 0, id2, {"foo": "bar2"})
+        assert result.version == 1
+
+        id3 = _uuid.uuid4()
+        result = subject.add(conn, "stream1", 1, id3, {"foo": "bar3"})
         assert result.version == 2
 
+        table_content = conn.execute(
+            storage.message_table.select().order_by(
+                storage.message_table.c.global_position
+            )
+        ).fetchall()
+        assert len(table_content) == 3
+        assert [row.global_position for row in table_content] == [1, 2, 3]
+        assert [(row.message_id, row.stream, row.version) for row in table_content] == [
+            (id1, "stream1", 1),
+            (id2, "stream2", 1),
+            (id3, "stream1", 2),
+        ]
+        assert [row.message for row in table_content] == [
+            {"foo": "bar1"},
+            {"foo": "bar2"},
+            {"foo": "bar3"},
+        ]
+
+
+def test_write_concurrency_failure(db_engine, storage):
+    with db_engine.connect() as conn:
+        subject = storage
+
+        id1 = _uuid.uuid4()
+        result = subject.add(conn, "stream1", 0, id1, {"foo": "bar1"})
+        assert result.version == 1
+
+        id2 = _uuid.uuid4()
+        with pytest.raises(ValueError):
+            result = subject.add(conn, "stream1", 0, id2, {"foo": "bar2"})
+
+
+def test_read_streams(db_engine, storage):
+    with db_engine.connect() as conn:
+        subject = storage
+
+        id1 = _uuid.uuid4()
+        subject.add(conn, "stream1", 0, id1, {"foo": "bar1"})
+        id2 = _uuid.uuid4()
+        subject.add(conn, "stream2", 0, id2, {"foo": "bar2"})
+        id3 = _uuid.uuid4()
+        subject.add(conn, "stream1", 1, id3, {"foo": "bar3"})
+
+        assert set(subject.get_message_ids(conn, "stream1")) == {id1, id3}
         assert list(subject.read(conn, "stream1")) == [
-            (id1, 1, {"foo": "bar"}, 1),
-            (id2, 2, {"foo": "bar"}, 3),
+            (id1, 1, {"foo": "bar1"}, 1),
+            (id3, 2, {"foo": "bar3"}, 3),
         ]
 
         assert list(subject.read_multiple(conn, ["stream1", "stream2"])) == [
-            (id1, "stream1", 1, {"foo": "bar"}, 1),
-            (id3, "stream2", 1, {"foo": "bar"}, 2),
-            (id2, "stream1", 2, {"foo": "bar"}, 3),
+            (id1, "stream1", 1, {"foo": "bar1"}, 1),
+            (id2, "stream2", 1, {"foo": "bar2"}, 2),
+            (id3, "stream1", 2, {"foo": "bar3"}, 3),
         ]
 
         assert list(subject.read_wildcard(conn, "stream%")) == [
-            (id1, "stream1", 1, {"foo": "bar"}, 1),
-            (id3, "stream2", 1, {"foo": "bar"}, 2),
-            (id2, "stream1", 2, {"foo": "bar"}, 3),
+            (id1, "stream1", 1, {"foo": "bar1"}, 1),
+            (id2, "stream2", 1, {"foo": "bar2"}, 2),
+            (id3, "stream1", 2, {"foo": "bar3"}, 3),
         ]
+
+
+def test_read_messages(db_engine, storage):
+    with db_engine.connect() as conn:
+        subject = storage
+
+        id1 = _uuid.uuid4()
+        subject.add(conn, "stream1", 0, id1, {"foo": "bar1"})
+        id2 = _uuid.uuid4()
+        subject.add(conn, "stream2", 0, id2, {"foo": "bar2"})
+        id3 = _uuid.uuid4()
+        subject.add(conn, "stream1", 1, id3, {"foo": "bar3"})
+
+        assert subject.get_message_by_id(conn, id1) == (
+            id1,
+            "stream1",
+            1,
+            {"foo": "bar1"},
+            1,
+        )
+
+        assert sorted(subject.get_messages_by_ids(conn, [id1, id2])) == sorted(
+            [
+                (id1, "stream1", 1, {"foo": "bar1"}, 1),
+                (id2, "stream2", 1, {"foo": "bar2"}, 2),
+            ]
+        )
+
+
+def test_truncate(db_engine, storage):
+    with db_engine.connect() as conn:
+        subject = storage
+        id1 = _uuid.uuid4()
+        subject.add(conn, "stream1", 0, id1, {"foo": "bar1"})
+
+        subject.truncate(conn)
+
+        table_content = conn.execute(storage.message_table.select()).fetchall()
+        assert len(table_content) == 0
