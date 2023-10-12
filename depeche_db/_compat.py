@@ -5,10 +5,25 @@ if sys.version_info < (3, 9):
     raise RuntimeError("DepecheDB requires Python 3.9 or newer")
 elif sys.version_info < (3, 10):
     UNION_TYPES = (typing.Union,)
+
+    def issubclass_with_union(cls, superclass):
+        if typing.get_origin(superclass) in UNION_TYPES:
+            if cls == superclass:
+                return True
+            return any(
+                issubclass_with_union(cls, member)
+                for member in typing.get_args(superclass)
+            )
+
+        return issubclass(cls, superclass)
+
 else:
     import types
 
     UNION_TYPES = (typing.Union, types.UnionType)
+
+    def issubclass_with_union(cls, class_or_tuple):
+        return issubclass(cls, class_or_tuple)
 
 
 SA_VERSION = "2.x"

@@ -3,7 +3,7 @@ import typing as _typing
 from typing import Callable, Dict, Generic, Iterator, Type, TypeVar, Union
 
 from ._aggregated_stream import AggregatedStream
-from ._compat import UNION_TYPES
+from ._compat import UNION_TYPES, issubclass_with_union
 from ._interfaces import (
     LockProvider,
     MessageProtocol,
@@ -170,7 +170,7 @@ class SubscriptionHandler(Generic[E]):
                 self.assert_not_registered(member)
         else:
             for registered_type in self._handlers:
-                if issubclass(handled_type, registered_type):
+                if issubclass_with_union(handled_type, registered_type):
                     raise ValueError(
                         f"Handler for {handled_type} is already registered for {registered_type}"
                     )
@@ -178,7 +178,7 @@ class SubscriptionHandler(Generic[E]):
     def handle(self, message: SubscriptionMessage):
         message_type = type(message.stored_message.message)
         for handled_type, handler in self._handlers.items():
-            if issubclass(message_type, handled_type):
+            if issubclass_with_union(message_type, handled_type):
                 try:
                     handler.exec(message)
                 except Exception:
