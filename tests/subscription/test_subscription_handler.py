@@ -1,15 +1,18 @@
 import sys as _sys
-from typing import List, Union
+import uuid as _uuid
+from typing import List
 
 import pytest
 
-from depeche_db import Subscription, SubscriptionMessage
-
-# from ._tools import MyLockProvider, MyStateProvider, MyThreadLockProvider
+from depeche_db import (
+    StoredMessage,
+    Subscription,
+    SubscriptionHandler,
+    SubscriptionMessage,
+)
 from tests._account_example import (
     AccountCreditedEvent,
     AccountEvent,
-    AccountRegisteredEvent,
 )
 
 
@@ -70,25 +73,73 @@ def test_register_overlap_direct(stream_with_events, subscription_factory):
             pass
 
 
-def test_passes_right_type(stream_with_events, subscription_factory):
-    subscription: Subscription = subscription_factory(stream_with_events)
-    subject = subscription.handler
+MSG_ID = _uuid.uuid4()
+SUB_MSG = SubscriptionMessage(
+    partition=0,
+    position=0,
+    stored_message=StoredMessage(
+        message_id=MSG_ID,
+        stream="stream",
+        version=0,
+        message=AccountCreditedEvent(
+            event_id=MSG_ID,
+            account_id=_uuid.uuid4(),
+            amount=1,
+            balance=1,
+        ),
+        global_position=0,
+    ),
+)
 
-    seen: List[Union[SubscriptionMessage[AccountRegisteredEvent], AccountEvent]] = []
 
-    @subject.register
-    def handle_account_registered(event: SubscriptionMessage[AccountRegisteredEvent]):
-        seen.append(event)
+def test_passes_undecorated_type():
+    subject = SubscriptionHandler(None)  # type: ignore
+
+    seen: List[AccountEvent] = []
 
     @subject.register
     def handle_account_credited(event: AccountCreditedEvent):
         seen.append(event)
 
+    subject.handle(SUB_MSG)
+    assert [type(obj) for obj in seen] == [AccountCreditedEvent]
+
+
+def test_passes_stored_message():
+    subject = SubscriptionHandler(None)  # type: ignore
+
+    seen: List[StoredMessage[AccountCreditedEvent]] = []
+
+    @subject.register
+    def handle_account_credited(event: StoredMessage[AccountCreditedEvent]):
+        seen.append(event)
+
+    subject.handle(SUB_MSG)
+    assert [type(obj) for obj in seen] == [StoredMessage]
+
+
+def test_passes_subscription_message():
+    subject = SubscriptionHandler(None)  # type: ignore
+
+    seen: List[SubscriptionMessage[AccountCreditedEvent]] = []
+
+    @subject.register
+    def handle_account_credited(event: SubscriptionMessage[AccountCreditedEvent]):
+        seen.append(event)
+
+    subject.handle(SUB_MSG)
+    assert [type(obj) for obj in seen] == [SubscriptionMessage]
+
+
+def test_exhausts_the_aggregated_stream(stream_with_events, subscription_factory):
+    subscription: Subscription = subscription_factory(stream_with_events)
+    subject = subscription.handler
+
+    seen: List[AccountEvent] = []
+
+    @subject.register
+    def handle(event: AccountEvent):
+        seen.append(event)
+
     subject.run_once()
-    assert [type(obj) for obj in seen] == [
-        SubscriptionMessage,
-        SubscriptionMessage,
-        AccountCreditedEvent,
-        AccountCreditedEvent,
-        AccountCreditedEvent,
-    ]
+    assert len(seen) == 5
