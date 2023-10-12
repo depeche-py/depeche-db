@@ -1,6 +1,8 @@
 
 
-<img src="https://depeche-py.github.io/depeche-db/assets/logo.png" width="400" style="margin: 0 auto" />
+<p align="center">
+  <img src="https://depeche-py.github.io/depeche-db/assets/logo.png" width="300" />
+</p>
 
 # Depeche DB
 
