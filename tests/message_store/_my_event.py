@@ -27,4 +27,4 @@ class MyEventSerializer(MessageSerializer[MyEvent]):
         return val
 
     def deserialize(self, message: dict) -> MyEvent:
-        return MyEvent(**message)
+        return MyEvent(event_id=_uuid.UUID(message["event_id"]), num=message["num"])
