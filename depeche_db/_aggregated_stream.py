@@ -246,6 +246,14 @@ class StreamProjector(Generic[E]):
     def update_full(self) -> int:
         result = 0
         with self.stream._store.engine.connect() as conn:
+            # TODO move to store/storage
+            cutoff = conn.execute(
+                _sa.select(
+                    _sa.func.max(
+                        self.stream._store._storage.message_table.c.global_position
+                    )
+                )
+            ).scalar()
             try:
                 conn.execute(
                     _sa.text(
@@ -259,14 +267,14 @@ class StreamProjector(Generic[E]):
                     )
                 raise
             while True:
-                batch_num = self._update_batch(conn)
+                batch_num = self._update_batch(conn, cutoff)
                 if batch_num == 0:
                     break
                 result += batch_num
             conn.commit()
         return result
 
-    def _update_batch(self, conn):
+    def _update_batch(self, conn, cutoff: Optional[int] = None) -> int:
         tbl = self.stream._table.alias()
         message_table = self.stream._store._storage.message_table
         last_seen = (
@@ -277,6 +285,9 @@ class StreamProjector(Generic[E]):
             .group_by(tbl.c.origin_stream)
             .cte()
         )
+        cutoff_cond = []
+        if cutoff is not None:
+            cutoff_cond = [message_table.c.global_position <= cutoff]
         q = (
             _sa.select(
                 message_table.c.message_id,
@@ -302,6 +313,7 @@ class StreamProjector(Generic[E]):
                         message_table.c.version > last_seen.c.max_version,
                         last_seen.c.max_version.is_(None),
                     ),
+                    *cutoff_cond,
                 )
             )
             .order_by(message_table.c.global_position)
