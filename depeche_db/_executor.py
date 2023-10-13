@@ -27,7 +27,7 @@ class Executor:
             ignore_payload=True,
         )
         keep_running = True
-        handler_queue = []
+        handler_queue: list[Callable[[], None]] = []
         handler_queue_event = _threading.Event()
 
         def stop():
