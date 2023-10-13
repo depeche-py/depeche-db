@@ -83,6 +83,7 @@ class Storage:
         expected_version: int,
         messages: Sequence[Tuple[_uuid.UUID, dict]],
     ) -> MessagePosition:
+        # TODO move to DB & make atomic
         max_version = self.get_max_version(conn, stream).version
         if expected_version > -1:
             if max_version != expected_version:
