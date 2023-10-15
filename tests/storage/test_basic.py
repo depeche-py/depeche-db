@@ -161,3 +161,11 @@ def test_write_performance(db_engine, storage):
     rate = N / (end - start)
     print(f"Write performance: {rate:.2f} messages/s")
     assert rate > 500  # Low value for CI
+
+
+def test_get_global_position(db_engine, storage):
+    with db_engine.connect() as conn:
+        subject = storage
+        assert subject.get_global_position(conn) == 0
+        subject.add(conn, "stream1", 0, _uuid.uuid4(), {"foo": "bar1"})
+        assert subject.get_global_position(conn) == 1

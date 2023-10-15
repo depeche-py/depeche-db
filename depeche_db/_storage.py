@@ -226,6 +226,12 @@ class Storage:
             global_position=row.global_position,
         )
 
+    def get_global_position(self, conn: SAConnection) -> int:
+        result: Any = conn.execute(
+            _sa.select(_sa.func.max(self.message_table.c.global_position))
+        )
+        return result.scalar() or 0
+
     def get_max_version(self, conn: SAConnection, stream: str) -> MessagePosition:
         row = conn.execute(
             _sa.select(

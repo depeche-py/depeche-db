@@ -249,14 +249,7 @@ class StreamProjector(Generic[E]):
     def update_full(self) -> int:
         result = 0
         with self.stream._store.engine.connect() as conn:
-            # TODO move to store/storage
-            cutoff = conn.execute(
-                _sa.select(
-                    _sa.func.max(
-                        self.stream._store._storage.message_table.c.global_position
-                    )
-                )
-            ).scalar()
+            cutoff = self.stream._store._storage.get_global_position(conn)
             try:
                 conn.execute(
                     _sa.text(
