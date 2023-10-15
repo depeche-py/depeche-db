@@ -3,7 +3,7 @@ The storage implementation in PL/SQL is heavily inspired by
 https://github.com/message-db/message-db
 """
 import uuid as _uuid
-from typing import Iterator, Optional, Sequence, Tuple
+from typing import Any, Iterator, Optional, Sequence, Tuple
 
 import sqlalchemy as _sa
 from psycopg2.extras import Json as _PsycoPgJson
@@ -207,7 +207,7 @@ class Storage:
                 _expected_version = (
                     expected_version + idx if expected_version is not None else None,
                 )
-                result = conn.execute(  # type: ignore
+                result: Any = conn.execute(
                     _sa.select(
                         _sa.column("version"), _sa.column("global_position")
                     ).select_from(
