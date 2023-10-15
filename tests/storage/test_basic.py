@@ -1,3 +1,4 @@
+import time as _time
 import uuid as _uuid
 
 import pytest
@@ -36,6 +37,34 @@ def test_write(db_engine, storage):
             {"foo": "bar2"},
             {"foo": "bar3"},
         ]
+
+
+def test_write_multiple(db_engine, storage):
+    with db_engine.connect() as conn:
+        subject = storage
+
+        id1 = _uuid.uuid4()
+        result = subject.add_all(conn, "stream1", 0, [(id1, {"foo": "bar1"})])
+        assert result.version == 1
+
+        id2 = _uuid.uuid4()
+        id3 = _uuid.uuid4()
+        result = subject.add_all(
+            conn, "stream1", 1, [(id2, {"foo": "bar1"}), (id3, {"foo": "bar2"})]
+        )
+        assert result.version == 3
+
+
+def test_write_multiple_no_expected_version(db_engine, storage):
+    with db_engine.connect() as conn:
+        subject = storage
+
+        id1 = _uuid.uuid4()
+        id2 = _uuid.uuid4()
+        result = subject.add_all(
+            conn, "stream1", None, [(id1, {"foo": "bar1"}), (id2, {"foo": "bar2"})]
+        )
+        assert result.version == 2
 
 
 def test_write_concurrency_failure(db_engine, storage):
@@ -118,3 +147,17 @@ def test_truncate(db_engine, storage):
 
         table_content = conn.execute(storage.message_table.select()).fetchall()
         assert len(table_content) == 0
+
+
+def test_write_performance(db_engine, storage):
+    N = 2000
+    start = _time.time()
+    with db_engine.connect() as conn:
+        storage.add_all(
+            conn, "stream1", 0, [(_uuid.uuid4(), {"foo": "bar1"}) for _ in range(N)]
+        )
+        conn.commit()
+    end = _time.time()
+    rate = N / (end - start)
+    print(f"Write performance: {rate:.2f} messages/s")
+    assert rate > 1000

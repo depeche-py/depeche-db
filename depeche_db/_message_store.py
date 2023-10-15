@@ -103,7 +103,7 @@ class MessageStore(Generic[E]):
 
     # TODO allow write/sync to accept a user-supplied connection
     def write(
-        self, stream: str, message: E, expected_version: int = -1
+        self, stream: str, message: E, expected_version: Optional[int] = None
     ) -> MessagePosition:
         with self._get_connection() as conn:
             result = self._storage.add(

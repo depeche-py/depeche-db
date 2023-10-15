@@ -146,7 +146,7 @@ def run_test():
 
 
 def usage():
-    print("Usage: pub_sub.py [pub|sub]")
+    print("Usage: pub_sub.py [pub|sub|run_test]")
     sys.exit(1)
 
 
