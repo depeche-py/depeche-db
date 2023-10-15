@@ -44,6 +44,7 @@ class Storage:
         )
         # TODO second table for stream metadata (e.g. last version, last global position)
         self.notification_channel = f"{name}_messages"
+        # TODO move functions to separate file(s)
         trigger = _sa.DDL(
             f"""
             CREATE OR REPLACE FUNCTION {name}_notify_message_inserted()
