@@ -206,7 +206,6 @@ class AggregatedStream(Generic[E]):
                     )
                 )
                 .order_by(tbl.c.message_occurred_at)
-                # TODO randomize order a bit, e.g. order by (hour(occurred_at), random())
                 .limit(result_limit)
             )
             result = conn.execute(qry)
@@ -219,6 +218,10 @@ class AggregatedStream(Generic[E]):
                 )
             result.close()
             del result
+
+
+class _AlreadyUpdating(RuntimeError):
+    pass
 
 
 class StreamProjector(Generic[E]):
@@ -240,7 +243,7 @@ class StreamProjector(Generic[E]):
     def run(self):
         try:
             self.update_full()
-        except RuntimeError:  # TODO proper exception type
+        except _AlreadyUpdating:
             pass
 
     def update_full(self) -> int:
@@ -262,7 +265,7 @@ class StreamProjector(Generic[E]):
                 )
             except _sa.exc.OperationalError as exc:
                 if isinstance(exc.orig, LockNotAvailable):
-                    raise RuntimeError(
+                    raise _AlreadyUpdating(
                         "Cannot update stream projection, because another process is already updating it."
                     )
                 raise
