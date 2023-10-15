@@ -39,7 +39,7 @@ def test_stream_projector_cutoff(db_engine, store_factory, stream_factory, accou
     ACCOUNT1_ID, ACCOUNT2_ID = account_ids
     store = store_factory()
     subject = stream_factory(store)
-    # TODO
+
     # create events
     account_repo = AccountRepository(store)
 
