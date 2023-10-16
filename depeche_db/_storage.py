@@ -7,6 +7,7 @@ from typing import Any, Iterator, Optional, Sequence, Tuple
 
 import sqlalchemy as _sa
 from psycopg2.extras import Json as _PsycoPgJson
+from sqlalchemy.dialects.postgresql import JSONB as _PostgresJsonb
 from sqlalchemy_utils import UUIDType as _UUIDType
 
 from ._compat import SAConnection
@@ -36,7 +37,7 @@ class Storage:
             ),
             _sa.Column("stream", _sa.String(255), nullable=False),
             _sa.Column("version", _sa.Integer, nullable=False),
-            _sa.Column("message", _sa.JSON, nullable=False),
+            _sa.Column("message", _PostgresJsonb, nullable=False),
             # TODO is this still required? only add in tests?
             _sa.UniqueConstraint(
                 "stream", "version", name=f"{name}_stream_version_unique"
