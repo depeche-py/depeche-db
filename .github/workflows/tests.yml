@@ -73,7 +73,7 @@ jobs:
         run: |
           pipx install poetry
           poetry install --with dev
-          poetry add pydantic${{ matrix.pydantic }}
+          poetry add --group dev pydantic${{ matrix.pydantic }}
           poetry show
       - name: Run tests
         run: poetry run pytest -vv tests/tools/test_pydantic_serializer.py
