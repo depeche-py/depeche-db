@@ -59,3 +59,21 @@ jobs:
           poetry install --with dev
       - name: Run tests
         run: poetry run pytest -vv
+  tests-pydantic:
+    strategy:
+      matrix:
+        pydantic: ["^1.10", "^2.4"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run dependencies
+        run: |
+          docker-compose -f docker-compose.yml up -d
+      - name: Install
+        run: |
+          pipx install poetry
+          poetry install --with dev
+          poetry add pydantic${{ matrix.pydantic }}
+          poetry show
+      - name: Run tests
+        run: poetry run pytest -vv tests/tools/test_pydantic_serializer.py
