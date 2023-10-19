@@ -1,9 +1,21 @@
 [tool.poetry]
 name = "depeche-db"
-version = "0.4.0"
+version = "0.4.1"
 description = ""
 authors = ["Martin Vielsmaier <martin@vielsmaier.net>"]
 readme = "README.md"
+license = "MIT"
+homepage = "https://github.com/depeche-py/depeche-db"
+repository = "https://github.com/depeche-py/depeche-db"
+documentation = "https://depeche-py.github.io/depeche-db/"
+keywords = ["sqlalchemy", "postgresql", "event-driven", "event store", "message store"]
+classifiers = [
+"Development Status :: 3 - Alpha",
+"Intended Audience :: Developers",
+"License :: OSI Approved :: MIT License",
+"Topic :: Database",
+"Topic :: Software Development :: Libraries",
+]
 
 [tool.poetry.dependencies]
 python = "^3.9"
