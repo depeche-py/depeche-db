@@ -44,142 +44,18 @@ class Storage:
             ),
         )
         self.notification_channel = f"{name}_messages"
-        # TODO move functions to separate file(s)
-        trigger = _sa.DDL(
-            f"""
-            CREATE OR REPLACE FUNCTION {name}_notify_message_inserted()
-              RETURNS trigger AS $$
-            DECLARE
-            BEGIN
-              PERFORM pg_notify(
-                '{self.notification_channel}',
-                json_build_object(
-                    'message_id', NEW.message_id,
-                    'stream', NEW.stream,
-                    'version', NEW.version,
-                    'global_position', NEW.global_position
-                )::text);
-              RETURN NEW;
-            END;
-            $$ LANGUAGE plpgsql;
-
-            CREATE TRIGGER {name}_notify_message_inserted
-              AFTER INSERT ON {name}_messages
-              FOR EACH ROW
-              EXECUTE PROCEDURE {name}_notify_message_inserted();
-
-            CREATE OR REPLACE FUNCTION {name}_stream_version(
-              stream varchar
+        ddl = _sa.DDL(
+            "\n".join(
+                [
+                    _notify_trigger(
+                        prefix=name, notification_channel=self.notification_channel
+                    ),
+                    _write_message_fn(prefix=name),
+                ]
             )
-            RETURNS bigint
-            AS $$
-            DECLARE
-              _stream_version bigint;
-            BEGIN
-              SELECT
-                max(version) into _stream_version
-              FROM
-                {name}_messages
-              WHERE
-                {name}_messages.stream = {name}_stream_version.stream;
-
-              RETURN _stream_version;
-            END;
-            $$ LANGUAGE plpgsql
-            VOLATILE;
-
-            CREATE OR REPLACE FUNCTION {name}_hash_64(
-              value varchar
-            )
-            RETURNS bigint
-            AS $$
-            DECLARE
-              _hash bigint;
-            BEGIN
-              SELECT left('x' || md5({name}_hash_64.value), 17)::bit(64)::bigint INTO _hash;
-              return _hash;
-            END;
-            $$ LANGUAGE plpgsql
-            IMMUTABLE;
-
-            CREATE OR REPLACE FUNCTION {name}_acquire_lock(
-              stream varchar
-            )
-            RETURNS bigint
-            AS $$
-            DECLARE
-              _stream_hash bigint;
-            BEGIN
-              _stream_hash := {name}_hash_64({name}_acquire_lock.stream);
-              PERFORM pg_advisory_xact_lock(_stream_hash);
-
-              RETURN _stream_hash;
-            END;
-            $$ LANGUAGE plpgsql
-            VOLATILE;
-
-            CREATE OR REPLACE FUNCTION {name}_write_message(
-              message_id uuid,
-              stream varchar,
-              message json,
-              expected_version bigint DEFAULT NULL,
-              OUT version bigint,
-              OUT global_position bigint
-            )
-            AS $$
-            DECLARE
-              _stream_version bigint;
-              _next_version bigint;
-              _next_global_position bigint;
-            BEGIN
-              PERFORM {name}_acquire_lock({name}_write_message.stream);
-
-              _stream_version := {name}_stream_version({name}_write_message.stream);
-
-              IF _stream_version IS NULL THEN
-                _stream_version := 0;
-              END IF;
-
-              IF {name}_write_message.expected_version IS NOT NULL THEN
-                IF {name}_write_message.expected_version != _stream_version THEN
-                  RAISE EXCEPTION
-                    'Wrong expected version: %% (Stream: %%, Stream Version: %%)',
-                    {name}_write_message.expected_version,
-                    {name}_write_message.stream,
-                    _stream_version;
-                END IF;
-              END IF;
-
-              _next_version := _stream_version + 1;
-              _next_global_position := nextval('{name}_messages_global_position_seq');
-
-              INSERT INTO {name}_messages
-                (
-                  message_id,
-                  stream,
-                  version,
-                  message,
-                  global_position
-                )
-              VALUES
-                (
-                  {name}_write_message.message_id,
-                  {name}_write_message.stream,
-                  _next_version,
-                  {name}_write_message.message,
-                  _next_global_position
-                )
-              ;
-
-              version := _next_version;
-              global_position := _next_global_position;
-            END;
-            $$ LANGUAGE plpgsql
-            VOLATILE;
-            """
         )
         _sa.event.listen(
-            self.message_table, "after_create", trigger.execute_if(dialect="postgresql")
+            self.message_table, "after_create", ddl.execute_if(dialect="postgresql")
         )
         self.metadata.create_all(engine, checkfirst=True)
 
@@ -330,3 +206,98 @@ class Storage:
 
     def truncate(self, conn: SAConnection):
         conn.execute(self.message_table.delete())
+
+
+def _notify_trigger(prefix: str, notification_channel: str) -> str:
+    return f"""
+        CREATE OR REPLACE FUNCTION {prefix}_notify_message_inserted()
+          RETURNS trigger AS $$
+        DECLARE
+        BEGIN
+          PERFORM pg_notify(
+            '{notification_channel}',
+            json_build_object(
+                'message_id', NEW.message_id,
+                'stream', NEW.stream,
+                'version', NEW.version,
+                'global_position', NEW.global_position
+            )::text);
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+
+        CREATE TRIGGER {prefix}_notify_message_inserted
+          AFTER INSERT ON {prefix}_messages
+          FOR EACH ROW
+          EXECUTE PROCEDURE {prefix}_notify_message_inserted();
+     """
+
+
+def _write_message_fn(prefix: str) -> str:
+    return f"""
+        CREATE OR REPLACE FUNCTION {prefix}_write_message(
+          message_id uuid,
+          stream varchar,
+          message json,
+          expected_version bigint DEFAULT NULL,
+          OUT version bigint,
+          OUT global_position bigint
+        )
+        AS $$
+        DECLARE
+          _stream_hash bigint;
+          _stream_version bigint;
+          _next_version bigint;
+          _next_global_position bigint;
+        BEGIN
+          _stream_hash := left('x' || md5({prefix}_write_message.stream), 17)::bit(64)::bigint;
+          PERFORM pg_advisory_xact_lock(_stream_hash);
+
+          SELECT
+            max({prefix}_messages.version) into _stream_version
+          FROM
+            {prefix}_messages
+          WHERE
+            {prefix}_messages.stream = {prefix}_write_message.stream;
+
+          IF _stream_version IS NULL THEN
+            _stream_version := 0;
+          END IF;
+
+          IF {prefix}_write_message.expected_version IS NOT NULL THEN
+            IF {prefix}_write_message.expected_version != _stream_version THEN
+              RAISE EXCEPTION
+                'Wrong expected version: %% (Stream: %%, Stream Version: %%)',
+                {prefix}_write_message.expected_version,
+                {prefix}_write_message.stream,
+                _stream_version;
+            END IF;
+          END IF;
+
+          _next_version := _stream_version + 1;
+          _next_global_position := nextval('{prefix}_messages_global_position_seq');
+
+          INSERT INTO {prefix}_messages
+            (
+              message_id,
+              stream,
+              version,
+              message,
+              global_position
+            )
+          VALUES
+            (
+              {prefix}_write_message.message_id,
+              {prefix}_write_message.stream,
+              _next_version,
+              {prefix}_write_message.message,
+              _next_global_position
+            )
+          ;
+
+          version := _next_version;
+          global_position := _next_global_position;
+        END;
+        $$ LANGUAGE plpgsql
+        VOLATILE;
+    """
