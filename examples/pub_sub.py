@@ -17,11 +17,7 @@ from depeche_db import (
     Subscription,
     SubscriptionMessage,
 )
-from depeche_db.tools import (
-    DbLockProvider,
-    DbSubscriptionStateProvider,
-    PydanticMessageSerializer,
-)
+from depeche_db.tools import PydanticMessageSerializer
 
 DB_DSN = "postgresql://depeche:depeche@localhost:4888/depeche_demo"
 db_engine = create_engine(DB_DSN)
