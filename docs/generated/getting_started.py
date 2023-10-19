@@ -163,29 +163,12 @@ doc.md(
     appended to the relevant partition of the aggregated stream in the right order.
     We will not have to call this manually though. We can use the
     [`Executor`](../../getting-started/executor.md) to do it for us.
-
-    We can read the aggregated stream. The items returned from it are just
-    pointers to messages in the message store.
     """
 )
 
-first_on_partition0 = next(
-    aggregated_stream.read(conn=db_engine.connect(), partition=0)
-)
-doc.show(first_on_partition0.message_id)
-# > 4680cbaf-977e-43a4-afcb-f88e92043e9c (this is the message ID of the first message in partition 0)
-
-with message_store.reader() as reader:
-    doc.show(reader.get_message_by_id(first_on_partition0.message_id))
-# > StoredMessage(
-# >     message_id=UUID("4680cbaf-977e-43a4-afcb-f88e92043e9c"),
-# >     stream="aggregate-me-0",
-# >     ...
-# > )
-
 doc.md(
     """\
-    Usually, we would not read the aggregated stream directly, but we would use
+    Usually, we do not read the aggregated stream directly, but we would use
     a subscription to consume it. We will get to that in the [next
     chapter](getting-started-subscription.md).\
     """
@@ -203,16 +186,10 @@ doc.md(
 
 
 from depeche_db import Subscription
-from depeche_db.tools import DbLockProvider, DbSubscriptionStateProvider
 
 subscription = Subscription(
     name="sub_example_docs_aggregate_me2",
     stream=aggregated_stream,
-    state_provider=DbSubscriptionStateProvider(
-        name="sub_state1",
-        engine=db_engine,
-    ),
-    lock_provider=DbLockProvider(name="locks1", engine=db_engine),
 )
 
 doc.md(

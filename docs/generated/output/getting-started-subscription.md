@@ -6,16 +6,10 @@ subscription.
 
 ```python
 from depeche_db import Subscription
-from depeche_db.tools import DbLockProvider, DbSubscriptionStateProvider
 
 subscription = Subscription(
     name="sub_example_docs_aggregate_me2",
     stream=aggregated_stream,
-    state_provider=DbSubscriptionStateProvider(
-        name="sub_state1",
-        engine=db_engine,
-    ),
-    lock_provider=DbLockProvider(name="locks1", engine=db_engine),
 )
 ```
 

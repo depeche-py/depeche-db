@@ -5,6 +5,7 @@ import logging as _logging
 import typing as _typing
 from typing import Callable, Dict, Generic, Iterator, Optional, Type, TypeVar, Union
 
+from . import tools as _tools
 from ._aggregated_stream import AggregatedStream
 from ._compat import UNION_TYPES, issubclass_with_union
 from ._interfaces import (
@@ -71,8 +72,8 @@ class Subscription(Generic[E]):
         self,
         name: str,
         stream: AggregatedStream[E],
-        state_provider: SubscriptionStateProvider,
-        lock_provider: LockProvider,
+        state_provider: Optional[SubscriptionStateProvider] = None,
+        lock_provider: Optional[LockProvider] = None,
         error_handler: Optional[SubscriptionErrorHandler] = None,
         call_middleware: Optional[CallMiddleware] = None,
         # TODO start at time
@@ -81,8 +82,12 @@ class Subscription(Generic[E]):
         assert name.isidentifier(), "Group name must be a valid identifier"
         self.name = name
         self._stream = stream
-        self._lock_provider = lock_provider
-        self._state_provider = state_provider
+        self._lock_provider = lock_provider or _tools.DbLockProvider(
+            name, self._stream._store.engine
+        )
+        self._state_provider = state_provider or _tools.DbSubscriptionStateProvider(
+            name, self._stream._store.engine
+        )
         self.handler = SubscriptionHandler(
             subscription=self,
             error_handler=error_handler,
