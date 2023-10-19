@@ -88,3 +88,6 @@ class RunOnNotification(Protocol):
 
     def run(self):
         raise NotImplementedError
+
+    def stop(self):
+        raise NotImplementedError

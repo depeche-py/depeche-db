@@ -172,9 +172,10 @@ class SubscriptionHandler(Generic[E]):
     ):
         self._subscription = subscription
         self._handlers: Dict[Type[E], _Handler] = {}
-        self._batch_size = 1
+        self._batch_size = 100
         self._error_handler = error_handler or ExitSubscriptionErrorHandler()
         self._call_middleware = call_middleware
+        self._keep_running = True
 
     def register(self, handler: H) -> H:
         signature = _inspect.signature(handler)
@@ -230,13 +231,16 @@ class SubscriptionHandler(Generic[E]):
         ), "A subscription can only have one handler"
         self.run_once()
 
+    def stop(self):
+        self._keep_running = False
+
     def run_once(self):
-        while True:
+        while self._keep_running:
             n = 0
             for message in self._subscription.get_next_messages(count=self._batch_size):
                 n += 1
                 self.handle(message)
-            if n == 0:
+            if n < self._batch_size:
                 break
 
     def handle(self, message: SubscriptionMessage):

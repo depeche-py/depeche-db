@@ -244,6 +244,9 @@ class StreamProjector(Generic[E]):
         except _AlreadyUpdating:
             pass
 
+    def stop(self):
+        pass
+
     def update_full(self) -> int:
         result = 0
         with self.stream._store.engine.connect() as conn:

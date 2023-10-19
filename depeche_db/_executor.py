@@ -14,7 +14,7 @@ class Executor:
     def __init__(self, db_dsn: str):
         self._db_dsn = db_dsn
         self.channel_register: Dict[
-            str, List[Callable[[], None]]
+            str, List[RunOnNotification]
         ] = _collections.defaultdict(list)
         self.stimulation_interval = 0.5
         self.keep_running = True
@@ -26,13 +26,17 @@ class Executor:
         _signal.signal(_signal.SIGTERM, lambda *_: self.stop())
 
     def register(self, handler: RunOnNotification):
-        self.channel_register[handler.notification_channel].append(handler.run)
+        self.channel_register[handler.notification_channel].append(handler)
         return handler
 
     def stop(self):
         self.keep_running = False
         if self.listener is not None:
             self.listener.stop()
+
+        for handlers in self.channel_register.values():
+            for handler in handlers:
+                handler.stop()
 
     def run(self):
         self.listener = PgNotificationListener(
@@ -47,7 +51,7 @@ class Executor:
 
         for notification in self.listener.messages():
             for handler in self.channel_register[notification.channel]:
-                self.handler_queue.put(handler)
+                self.handler_queue.put(handler.run)
 
         self.handler_thread.join()
         self.stimulator_thread.join()
@@ -68,7 +72,7 @@ class Executor:
         while self.keep_running:
             for handlers in self.channel_register.values():
                 for handler in handlers:
-                    self.handler_queue.put(handler)
+                    self.handler_queue.put(handler.run)
             _time.sleep(self.stimulation_interval)
 
 

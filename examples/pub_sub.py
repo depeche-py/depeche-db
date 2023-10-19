@@ -1,3 +1,4 @@
+import logging
 import random
 import sys
 import time
@@ -57,15 +58,7 @@ stream = AggregatedStream[MyMessage](
     stream_wildcards=["aggregate-me-%"],
 )
 
-subscription = Subscription(
-    name="example_pub_sub",
-    stream=stream,
-    state_provider=DbSubscriptionStateProvider(
-        name="sub_state2",
-        engine=db_engine,
-    ),
-    lock_provider=DbLockProvider(name="locks1", engine=db_engine),
-)
+subscription = Subscription(name="example_pub_sub", stream=stream)
 
 
 @subscription.handler.register
@@ -102,6 +95,7 @@ def usage():
 
 
 def main():
+    logging.basicConfig()
     if len(sys.argv) < 2:
         usage()
     if sys.argv[1] == "pub":
