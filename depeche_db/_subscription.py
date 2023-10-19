@@ -240,7 +240,7 @@ class SubscriptionHandler(Generic[E]):
             for message in self._subscription.get_next_messages(count=self._batch_size):
                 n += 1
                 self.handle(message)
-            if n < self._batch_size:
+            if n == 0:
                 break
 
     def handle(self, message: SubscriptionMessage):
