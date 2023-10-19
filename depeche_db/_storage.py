@@ -43,7 +43,6 @@ class Storage:
                 "stream", "version", name=f"{name}_stream_version_unique"
             ),
         )
-        # TODO second table for stream metadata (e.g. last version, last global position)
         self.notification_channel = f"{name}_messages"
         # TODO move functions to separate file(s)
         trigger = _sa.DDL(
@@ -172,7 +171,6 @@ class Storage:
                 )
               ;
 
-              -- TODO update stream metadata?!
               version := _next_version;
               global_position := _next_global_position;
             END;
