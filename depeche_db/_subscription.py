@@ -1,4 +1,6 @@
 import dataclasses as _dc
+import enum as _enum
+import logging as _logging
 import typing as _typing
 from typing import Callable, Dict, Generic, Iterator, Type, TypeVar, Union
 
@@ -12,6 +14,8 @@ from ._interfaces import (
 )
 
 E = TypeVar("E", bound=MessageProtocol)
+
+DEPECHE_LOGGER = _logging.getLogger("depeche_db")
 
 
 @_dc.dataclass(frozen=True)
@@ -36,7 +40,10 @@ class Subscription(Generic[E]):
         self._stream = stream
         self._lock_provider = lock_provider
         self._state_provider = state_provider
-        self.handler = SubscriptionHandler(self)
+        self.handler = SubscriptionHandler(
+            subscription=self,
+            error_handler=LogAndIgnoreSubscriptionErrorHandler(self.name),
+        )
 
     def get_next_messages(self, count: int) -> Iterator[SubscriptionMessage[E]]:
         state = self._state_provider.read(self.name)
@@ -119,12 +126,48 @@ class _Handler:
             self.handler(message.stored_message.message)
 
 
+class SubscriptionErrorHandler(Generic[E]):
+    class Action(_enum.Enum):
+        IGNORE = "ignore"
+        EXIT = "exit"
+
+    def handle_error(self, error: Exception, message: SubscriptionMessage[E]) -> Action:
+        raise NotImplementedError
+
+
+class ExitSubscriptionErrorHandler(SubscriptionErrorHandler):
+    def handle_error(
+        self, error: Exception, message: SubscriptionMessage[E]
+    ) -> SubscriptionErrorHandler.Action:
+        return SubscriptionErrorHandler.Action.EXIT
+
+
+class LogAndIgnoreSubscriptionErrorHandler(SubscriptionErrorHandler):
+    def __init__(self, subscription_name: str):
+        self._logger = _logging.getLogger(
+            f"depeche_db.subscription.{subscription_name}"
+        )
+
+    def handle_error(
+        self, error: Exception, message: SubscriptionMessage[E]
+    ) -> SubscriptionErrorHandler.Action:
+        self._logger.exception(
+            "Error while handling message {message.stored_message.message_id}:{message.stored_message.message.__class__.__name__}"
+        )
+        return SubscriptionErrorHandler.Action.IGNORE
+
+
 H = TypeVar("H", bound=HandlerCallable)
 
 
 class SubscriptionHandler(Generic[E]):
-    def __init__(self, subscription: Subscription[E]):
+    def __init__(
+        self,
+        subscription: Subscription[E],
+        error_handler: SubscriptionErrorHandler,
+    ):
         self._subscription = subscription
+        self._error_handler = error_handler
         self._handlers: Dict[Type[E], _Handler] = {}
         self._batch_size = 1
 
@@ -181,9 +224,12 @@ class SubscriptionHandler(Generic[E]):
             if issubclass_with_union(message_type, handled_type):
                 try:
                     handler.exec(message)
-                except Exception:
-                    # TODO error handler!
-                    pass
+                except Exception as error:
+                    error_handling_result = self._error_handler.handle_error(
+                        error=error, message=message
+                    )
+                    if error_handling_result == SubscriptionErrorHandler.Action.EXIT:
+                        raise
                 return
 
     def run_once(self):

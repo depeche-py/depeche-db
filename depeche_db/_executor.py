@@ -56,7 +56,11 @@ class Executor:
         while self.keep_running:
             if self.handler_queue:
                 handler = self.handler_queue.get()
-                handler()
+                try:
+                    handler()
+                except Exception:
+                    self.stop()
+                    raise
             else:
                 self.handler_queue.wait()
 

@@ -4,6 +4,8 @@ from typing import List
 import pytest
 
 from depeche_db import (
+    ExitSubscriptionErrorHandler,
+    LogAndIgnoreSubscriptionErrorHandler,
     StoredMessage,
     Subscription,
     SubscriptionHandler,
@@ -91,7 +93,7 @@ SUB_MSG = SubscriptionMessage(
 
 
 def test_passes_undecorated_type():
-    subject = SubscriptionHandler(None)  # type: ignore
+    subject = SubscriptionHandler(None, None)  # type: ignore
 
     seen: List[AccountEvent] = []
 
@@ -104,7 +106,7 @@ def test_passes_undecorated_type():
 
 
 def test_passes_stored_message():
-    subject = SubscriptionHandler(None)  # type: ignore
+    subject = SubscriptionHandler(None, None)  # type: ignore
 
     seen: List[StoredMessage[AccountCreditedEvent]] = []
 
@@ -117,7 +119,7 @@ def test_passes_stored_message():
 
 
 def test_passes_subscription_message():
-    subject = SubscriptionHandler(None)  # type: ignore
+    subject = SubscriptionHandler(None, None)  # type: ignore
 
     seen: List[SubscriptionMessage[AccountCreditedEvent]] = []
 
@@ -141,3 +143,25 @@ def test_exhausts_the_aggregated_stream(stream_with_events, subscription_factory
 
     subject.run_once()
     assert len(seen) == 5
+
+
+def test_ignores_exception():
+    subject = SubscriptionHandler(None, error_handler=LogAndIgnoreSubscriptionErrorHandler("foo"))  # type: ignore
+
+    @subject.register
+    def handle_account_credited(event: SubscriptionMessage[AccountCreditedEvent]):
+        raise ValueError("foo")
+
+    subject.handle(SUB_MSG)
+    # No exception raised
+
+
+def test_reraises_exception():
+    subject = SubscriptionHandler(None, error_handler=ExitSubscriptionErrorHandler())  # type: ignore
+
+    @subject.register
+    def handle_account_credited(event: SubscriptionMessage[AccountCreditedEvent]):
+        raise ValueError("foo")
+
+    with pytest.raises(ValueError):
+        subject.handle(SUB_MSG)
