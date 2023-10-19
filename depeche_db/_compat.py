@@ -15,6 +15,12 @@ elif sys.version_info < (3, 10):
                 for member in typing.get_args(superclass)
             )
 
+        if typing.get_origin(cls) in UNION_TYPES:
+            return all(
+                issubclass_with_union(member, superclass)
+                for member in typing.get_args(cls)
+            )
+
         return issubclass(cls, superclass)
 
 else:
@@ -23,6 +29,11 @@ else:
     UNION_TYPES = (typing.Union, types.UnionType)
 
     def issubclass_with_union(cls, class_or_tuple):
+        if typing.get_origin(cls) in UNION_TYPES:
+            return all(
+                issubclass_with_union(member, class_or_tuple)
+                for member in typing.get_args(cls)
+            )
         return issubclass(cls, class_or_tuple)
 
 

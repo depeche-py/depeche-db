@@ -14,6 +14,7 @@ from depeche_db import (
 from tests._account_example import (
     AccountCreditedEvent,
     AccountEvent,
+    AccountRegisteredEvent,
 )
 
 
@@ -22,18 +23,18 @@ def test_register_negative_cases(stream_with_events, subscription_factory):
     subject = subscription.handler
 
     with pytest.raises(ValueError):
-        subject.register(lambda: None)  # type: ignore
+        subject.register(lambda: None)
 
     with pytest.raises(ValueError):
 
-        @subject.register  # type: ignore
+        @subject.register
         def handler1():
             pass
 
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
 
-        @subject.register  # type: ignore
-        def handler2(message: AccountCreditedEvent, other: int):
+        @subject.register
+        def handler2(foo: int):
             pass
 
 
@@ -129,6 +130,47 @@ def test_passes_subscription_message():
 
     subject.handle(SUB_MSG)
     assert [type(obj) for obj in seen] == [SubscriptionMessage]
+
+
+def test_register_with_additional_params_requires_call_middleware():
+    subject = SubscriptionHandler(None, None)  # type: ignore
+
+    with pytest.raises(ValueError):
+
+        @subject.register
+        def handle_account_credited(event: AccountCreditedEvent, foo: int):
+            pass
+
+
+def test_register_with_additional_params_is_ok():
+    subject = SubscriptionHandler(None, None, call_middleware="dummy")  # type: ignore
+
+    @subject.register
+    def handle_account_credited(event: AccountCreditedEvent, foo: int):
+        pass
+
+    @subject.register
+    def handle_account_registered(
+        event: SubscriptionMessage[AccountRegisteredEvent], foo: int
+    ):
+        pass
+
+
+def test_uses_call_middleware():
+    class Middleware:
+        def call(self, handler, message):
+            return handler(message, 123)
+
+    subject = SubscriptionHandler(None, ExitSubscriptionErrorHandler(), call_middleware=Middleware())  # type: ignore
+
+    seen: List[int] = []
+
+    @subject.register
+    def handle_account_credited(event: AccountCreditedEvent, foo: int):
+        seen.append(foo)
+
+    subject.handle(SUB_MSG)
+    assert seen == [123]
 
 
 def test_exhausts_the_aggregated_stream(stream_with_events, subscription_factory):
