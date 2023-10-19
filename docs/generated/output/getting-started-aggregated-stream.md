@@ -53,7 +53,7 @@ first_on_partition0 = next(
 print(first_on_partition0.message_id)
 
 with message_store.reader() as reader:
-    doc.show(reader.get_message_by_id(first_on_partition0.message_id))
+    print(reader.get_message_by_id(first_on_partition0.message_id))
 #  4680cbaf-977e-43a4-afcb-f88e92043e9c (this is the message ID of the first message in partition 0)
 #  StoredMessage(
 #      message_id=UUID("4680cbaf-977e-43a4-afcb-f88e92043e9c"),

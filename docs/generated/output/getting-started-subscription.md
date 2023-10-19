@@ -26,7 +26,7 @@ the metadata about the message in the context of the subscription/aggregated str
 
 ```python
 for message in subscription.get_next_messages(count=1):
-    doc.show(message)
+    print(message)
 #  SubscriptionMessage(
 #      partition=2,
 #      position=0,
@@ -54,7 +54,7 @@ from depeche_db import SubscriptionMessage
 @subscription.handler.register
 def handle_event_a(msg: SubscriptionMessage[EventA]):
     real_message = msg.stored_message.message
-    doc.show(f"num={real_message.num} (partition {msg.partition} at {msg.position})")
+    print(f"num={real_message.num} (partition {msg.partition} at {msg.position})")
 ```
 
 You can register multiple handlers for different message types. The handled
