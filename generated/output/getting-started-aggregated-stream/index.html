@@ -16,7 +16,7 @@
       
       
       <link rel="icon" href="../../../assets/logo-bg256.png">
-      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.4.5">
+      <meta name="generator" content="mkdocs-1.5.3, mkdocs-material-9.4.6">
     
     
       
@@ -24,7 +24,7 @@
       
     
     
-      <link rel="stylesheet" href="../../../assets/stylesheets/main.6a10b989.min.css">
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.35e1ed30.min.css">
       
         
         <link rel="stylesheet" href="../../../assets/stylesheets/palette.356b1318.min.css">
@@ -542,23 +542,7 @@ create a new set of streams within it:</p>
 appended to the relevant partition of the aggregated stream in the right order.
 We will not have to call this manually though. We can use the
 <a href="../../../getting-started/executor/"><code>Executor</code></a> to do it for us.</p>
-<p>We can read the aggregated stream. The items returned from it are just
-pointers to messages in the message store.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">first_on_partition0</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">aggregated_stream</span><span class="o">.</span><span class="n">read</span><span class="p">(</span><span class="n">conn</span><span class="o">=</span><span class="n">db_engine</span><span class="o">.</span><span class="n">connect</span><span class="p">(),</span> <span class="n">partition</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="p">)</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="nb">print</span><span class="p">(</span><span class="n">first_on_partition0</span><span class="o">.</span><span class="n">message_id</span><span class="p">)</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="k">with</span> <span class="n">message_store</span><span class="o">.</span><span class="n">reader</span><span class="p">()</span> <span class="k">as</span> <span class="n">reader</span><span class="p">:</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">doc</span><span class="o">.</span><span class="n">show</span><span class="p">(</span><span class="n">reader</span><span class="o">.</span><span class="n">get_message_by_id</span><span class="p">(</span><span class="n">first_on_partition0</span><span class="o">.</span><span class="n">message_id</span><span class="p">))</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="c1">#  4680cbaf-977e-43a4-afcb-f88e92043e9c (this is the message ID of the first message in partition 0)</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="c1">#  StoredMessage(</span>
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="c1">#      message_id=UUID(&quot;4680cbaf-977e-43a4-afcb-f88e92043e9c&quot;),</span>
-<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="c1">#      stream=&quot;aggregate-me-0&quot;,</span>
-<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="c1">#      ...</span>
-<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="c1">#  )</span>
-</code></pre></div>
-<p>Usually, we would not read the aggregated stream directly, but we would use
+<p>Usually, we do not read the aggregated stream directly, but we would use
 a subscription to consume it. We will get to that in the <a href="../getting-started-subscription/">next
 chapter</a>.</p>
 

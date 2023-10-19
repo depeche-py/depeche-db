@@ -40,7 +40,7 @@ class Markdown:
         self.code_outputs.append(code_output)
 
     def render(self):
-        return self.markdown
+        return self.markdown.strip(" ")
 
 
 class CodeOutput:
@@ -111,7 +111,7 @@ class DocGen:
                     continue
                 if line.startswith("doc.begin_show") or line.startswith("doc.end_show"):
                     continue
-                if line.startswith("doc.show"):
+                if "doc.show" in line:
                     line = line.replace("doc.show", "print")
                 file_part_clean.append(line)
             result[file_name].append(Code("\n".join(file_part_clean).strip()))
