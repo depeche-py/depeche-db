@@ -27,8 +27,6 @@ class AggregatedStream(Generic[E]):
         partitioner: MessagePartitioner[E],
         stream_wildcards: List[str],
     ) -> None:
-        # TODO start at "next message"
-        # TODO start at time
         assert name.isidentifier(), "name must be a valid identifier"
         self.name = name
         self._store = store
