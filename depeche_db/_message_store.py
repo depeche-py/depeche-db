@@ -101,51 +101,102 @@ class MessageStore(Generic[E]):
             self._storage.truncate(conn)
             conn.commit()
 
-    # TODO allow write/sync to accept a user-supplied connection
     def write(
-        self, stream: str, message: E, expected_version: Optional[int] = None
+        self,
+        stream: str,
+        message: E,
+        expected_version: Optional[int] = None,
+        conn: Optional[SAConnection] = None,
     ) -> MessagePosition:
-        with self._get_connection() as conn:
-            result = self._storage.add(
+        if conn is None:
+            with self._get_connection() as conn:
+                result = self._write(
+                    conn=conn,
+                    stream=stream,
+                    message=message,
+                    expected_version=expected_version,
+                )
+                conn.commit()
+                return result
+        else:
+            return self._write(
+                conn=conn,
+                stream=stream,
+                message=message,
+                expected_version=expected_version,
+            )
+
+    def _write(
+        self,
+        conn: SAConnection,
+        stream: str,
+        message: E,
+        expected_version: Optional[int] = None,
+    ) -> MessagePosition:
+        return self._storage.add(
+            conn=conn,
+            stream=stream,
+            expected_version=expected_version,
+            message_id=message.get_message_id(),
+            message=self._serializer.serialize(message),
+        )
+
+    def synchronize(
+        self,
+        stream: str,
+        expected_version: int,
+        messages: Sequence[E],
+        conn: Optional[SAConnection] = None,
+    ) -> MessagePosition:
+        if conn is None:
+            with self._get_connection() as conn:
+                result = self._synchronize(
+                    conn=conn,
+                    stream=stream,
+                    expected_version=expected_version,
+                    messages=messages,
+                )
+                conn.commit()
+                return result
+        else:
+            return self._synchronize(
                 conn=conn,
                 stream=stream,
                 expected_version=expected_version,
-                message_id=message.get_message_id(),
-                message=self._serializer.serialize(message),
+                messages=messages,
             )
-            conn.commit()
-            return result
 
-    # TODO allow write/sync to accept a user-supplied connection
-    def synchronize(
-        self, stream: str, expected_version: int, messages: Sequence[E]
+    def _synchronize(
+        self,
+        conn: SAConnection,
+        stream: str,
+        expected_version: int,
+        messages: Sequence[E],
     ) -> MessagePosition:
-        with self._get_connection() as conn:
-            stored_version = self._storage.get_max_version(conn, stream)
-            if stored_version is not None:
-                stored_ids = list(self._storage.get_message_ids(conn, stream))
-                message_ids = [message.get_message_id() for message in messages]
-                for stored, given in zip(stored_ids, message_ids):
-                    if stored != given:
-                        raise ValueError("Message ID mismatch")
-                messages = messages[len(stored_ids) :]
-            if messages:
-                result = self._storage.add_all(
-                    conn,
-                    stream,
-                    expected_version,
-                    [
-                        (
-                            message.get_message_id(),
-                            self._serializer.serialize(message),
-                        )
-                        for message in messages
-                    ],
-                )
-                conn.commit()
-            else:
-                result = stored_version
-            return result
+        stored_version = self._storage.get_max_version(conn, stream)
+        if stored_version is not None:
+            stored_ids = list(self._storage.get_message_ids(conn, stream))
+            message_ids = [message.get_message_id() for message in messages]
+            for stored, given in zip(stored_ids, message_ids):
+                if stored != given:
+                    raise ValueError("Message ID mismatch")
+            messages = messages[len(stored_ids) :]
+        if messages:
+            result = self._storage.add_all(
+                conn,
+                stream,
+                expected_version,
+                [
+                    (
+                        message.get_message_id(),
+                        self._serializer.serialize(message),
+                    )
+                    for message in messages
+                ],
+            )
+        else:
+            result = stored_version
+        return result
 
     def _get_reader(self, conn: SAConnection) -> MessageStoreReader[E]:
         return MessageStoreReader(
