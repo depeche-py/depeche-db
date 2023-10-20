@@ -1,6 +1,6 @@
-from typing import Any, TypeVar, no_type_check
+from typing import Any, Optional, Type, TypeVar, no_type_check
 
-from depeche_db._compat import get_union_members
+from depeche_db._compat import get_union_members, issubclass_with_union
 
 from .._interfaces import MessageSerializer
 
@@ -10,14 +10,16 @@ T = TypeVar("T")
 class PydanticMessageSerializer(MessageSerializer[T]):
     # the real type would be: (self, message_type: Type[T])
     # but this is not supported by mypy (yet)
-    def __init__(self, message_type: Any) -> None:
+    def __init__(
+        self, message_type: Any, aliases: Optional[dict[str, Type]] = None
+    ) -> None:
         import pydantic
 
         version = pydantic.VERSION.split(".")[0]
         self.pydantic_v2 = version == "2"
 
         self.message_type: type[T] = message_type
-        self.message_types = {}
+        self.message_types: dict[str, Type] = {}
         for member in get_union_members(message_type):
             if member.__name__ in self.message_types:
                 raise ValueError(
@@ -25,13 +27,25 @@ class PydanticMessageSerializer(MessageSerializer[T]):
                 )
             self.message_types[member.__name__] = member
 
+        if aliases is not None:
+            for alias, member in aliases.items():
+                if alias in self.message_types:
+                    raise ValueError(
+                        f"Alias {alias} conflicts with existing class name in union {message_type}"
+                    )
+                if not issubclass_with_union(member, self.message_type):
+                    raise ValueError(
+                        f"Type {member} is not a subclass of {self.message_type}"
+                    )
+                self.message_types[alias] = member
+
     def serialize(self, message: T) -> dict:
         typename = message.__class__.__name__
         if typename not in self.message_types:
             raise TypeError(
                 f"Unknown message type {typename} (expected one of {self.message_types})"
             )
-        result = self._serialize(message)
+        result: dict = self._serialize(message)
         result["__typename__"] = typename
         return result
 

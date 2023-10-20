@@ -107,3 +107,16 @@ def test_duplicate_class_name():
 
     with pytest.raises(ValueError):
         PydanticMessageSerializer(Union[OuterFoo, Union[A, Foo]])
+
+
+def test_aliases():
+    subject: Any = PydanticMessageSerializer(Union[A, B], aliases={"OldNameOfA": A})
+    assert subject.deserialize({"__typename__": "OldNameOfA", "a": "foo"}) == A(a="foo")
+
+
+def test_aliases_not_valid():
+    with pytest.raises(ValueError):
+        PydanticMessageSerializer(Union[A], aliases={"OldNameOfB": B})
+
+    with pytest.raises(ValueError):
+        PydanticMessageSerializer(Union[A, B], aliases={"A": B})
