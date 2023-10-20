@@ -37,6 +37,14 @@ else:
         return issubclass(cls, class_or_tuple)
 
 
+def get_union_members(union_or_type) -> typing.Generator[typing.Type, None, None]:
+    if typing.get_origin(union_or_type) in UNION_TYPES:
+        for member in typing.get_args(union_or_type):
+            yield from get_union_members(member)
+    else:
+        yield union_or_type
+
+
 SA_VERSION = "2.x"
 try:
     from sqlalchemy import Connection as SAConnection  # noqa
