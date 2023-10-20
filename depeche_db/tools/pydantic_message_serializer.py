@@ -1,3 +1,7 @@
+import datetime as _dt
+import decimal as _decimal
+import enum as _enum
+import uuid as _uuid
 from typing import Any, Optional, Type, TypeVar, no_type_check
 
 from depeche_db._compat import get_union_members, issubclass_with_union
@@ -53,7 +57,7 @@ class PydanticMessageSerializer(MessageSerializer[T]):
     def _serialize(self, message: T) -> dict:
         if self.pydantic_v2:
             return message.model_dump(mode="json")
-        return message.dict()
+        return make_jsonable(message.dict())
 
     @no_type_check
     def deserialize(self, message: dict) -> T:
@@ -69,3 +73,23 @@ class PydanticMessageSerializer(MessageSerializer[T]):
         if self.pydantic_v2:
             return _pydantic.TypeAdapter(message_type).validate_python(message)
         return _pydantic.parse_obj_as(message_type, message)
+
+
+def make_jsonable(obj):
+    if isinstance(obj, list):
+        return [make_jsonable(elem) for elem in obj]
+    if isinstance(obj, dict):
+        return {key: make_jsonable(value) for key, value in obj.items()}
+    if isinstance(obj, _uuid.UUID):
+        return str(obj)
+    if isinstance(obj, _decimal.Decimal):
+        return str(obj)
+    if isinstance(obj, _dt.datetime):
+        return obj.isoformat()
+    if isinstance(obj, _dt.date):
+        return obj.isoformat()
+    if isinstance(obj, _enum.Enum):
+        return obj.value
+    if obj is None or isinstance(obj, (str, int, float, bool)):
+        return obj
+    raise NotImplementedError(f"Cannot make object of type {type(obj)} jsonable")

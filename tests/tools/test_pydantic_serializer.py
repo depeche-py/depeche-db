@@ -19,6 +19,7 @@ class Bar(pydantic.BaseModel):
 
 class Scalars(pydantic.BaseModel):
     dt: _dt.datetime
+    d: _dt.date
     uuid: _uuid.UUID
     decimal: _decimal.Decimal
     flt: float
@@ -43,6 +44,7 @@ def test_serialize_scalars():
     assert subject.serialize(
         Scalars(
             dt=_dt.datetime(2020, 1, 1, 0, 0, 0, 0),
+            d=_dt.date(2020, 1, 1),
             uuid=_uuid.UUID("00000000-0000-0000-0000-000000000000"),
             decimal=_decimal.Decimal("1.0"),
             flt=1.0,
@@ -50,6 +52,7 @@ def test_serialize_scalars():
     ) == {
         "__typename__": "Scalars",
         "dt": "2020-01-01T00:00:00",
+        "d": "2020-01-01",
         "uuid": "00000000-0000-0000-0000-000000000000",
         "decimal": "1.0",
         "flt": 1.0,
@@ -62,12 +65,14 @@ def test_deserialize_scalars():
         {
             "__typename__": "Scalars",
             "dt": "2020-01-01T00:00:00",
+            "d": "2020-01-01",
             "uuid": "00000000-0000-0000-0000-000000000000",
             "decimal": "1.0",
             "flt": 1.0,
         }
     ) == Scalars(
         dt=_dt.datetime(2020, 1, 1, 0, 0, 0, 0),
+        d=_dt.date(2020, 1, 1),
         uuid=_uuid.UUID("00000000-0000-0000-0000-000000000000"),
         decimal=_decimal.Decimal("1.0"),
         flt=1.0,
