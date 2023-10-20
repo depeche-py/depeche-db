@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "depeche-db"
-version = "0.4.3"
+version = "0.4.4"
 description = "A library for building event-based systems on top of PostgreSQL"
 authors = ["Martin Vielsmaier <martin@vielsmaier.net>"]
 readme = "README.md"
