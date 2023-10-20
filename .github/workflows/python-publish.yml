@@ -26,8 +26,6 @@ jobs:
       uses: actions/setup-python@v3
       with:
         python-version: '3.11'
-        cache: 'pip'
-        cache-dependency-path: poetry.lock
     - name: Install poetry & dependencies
       run: |
         pipx install poetry
