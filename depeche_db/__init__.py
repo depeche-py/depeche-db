@@ -5,6 +5,7 @@ from ._interfaces import (  # noqa: F401
     MessagePosition,
     MessageProtocol,
     MessageSerializer,
+    RunOnNotification,
     StoredMessage,
     StreamPartitionStatistic,
     SubscriptionState,
