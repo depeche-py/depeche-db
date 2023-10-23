@@ -1,7 +1,7 @@
 import dataclasses as _dc
 import datetime as _dt
 import uuid as _uuid
-from typing import Dict, Generic, Protocol, TypeVar
+from typing import Callable, Dict, Generic, Protocol, TypeVar, Union
 
 
 class MessageProtocol:
@@ -23,6 +23,13 @@ class StoredMessage(Generic[E]):
     version: int
     message: E
     global_position: int
+
+
+@_dc.dataclass(frozen=True)
+class SubscriptionMessage(Generic[E]):
+    partition: int
+    position: int
+    stored_message: StoredMessage[E]
 
 
 @_dc.dataclass(frozen=True)
@@ -78,6 +85,15 @@ class SubscriptionStateProvider(Protocol):
         raise NotImplementedError
 
     def read(self, subscription_name: str) -> SubscriptionState:
+        raise NotImplementedError
+
+
+class CallMiddleware(Generic[E]):
+    def call(
+        self,
+        handler: Callable,
+        message: Union[SubscriptionMessage[E], StoredMessage[E], E],
+    ):
         raise NotImplementedError
 
 

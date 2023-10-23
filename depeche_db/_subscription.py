@@ -9,22 +9,17 @@ from . import tools as _tools
 from ._aggregated_stream import AggregatedStream
 from ._compat import UNION_TYPES, issubclass_with_union
 from ._interfaces import (
+    CallMiddleware,
     LockProvider,
     MessageProtocol,
     StoredMessage,
+    SubscriptionMessage,
     SubscriptionStateProvider,
 )
 
 E = TypeVar("E", bound=MessageProtocol)
 
 DEPECHE_LOGGER = _logging.getLogger("depeche_db")
-
-
-@_dc.dataclass(frozen=True)
-class SubscriptionMessage(Generic[E]):
-    partition: int
-    position: int
-    stored_message: StoredMessage[E]
 
 
 class SubscriptionErrorHandler(Generic[E]):
@@ -56,15 +51,6 @@ class LogAndIgnoreSubscriptionErrorHandler(SubscriptionErrorHandler):
             "Error while handling message {message.stored_message.message_id}:{message.stored_message.message.__class__.__name__}"
         )
         return SubscriptionErrorHandler.Action.IGNORE
-
-
-class CallMiddleware(Generic[E]):
-    def call(
-        self,
-        handler: Callable,
-        message: Union[SubscriptionMessage[E], StoredMessage[E], E],
-    ):
-        raise NotImplementedError
 
 
 class Subscription(Generic[E]):
