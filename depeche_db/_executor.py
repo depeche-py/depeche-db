@@ -1,8 +1,9 @@
 import collections as _collections
+import queue as _queue
 import signal as _signal
 import threading as _threading
 import time as _time
-from typing import Callable, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from ._interfaces import RunOnNotification
 from .tools import PgNotificationListener
@@ -18,7 +19,7 @@ class Executor:
         ] = _collections.defaultdict(list)
         self.stimulation_interval = 0.5
         self.keep_running = True
-        self.handler_queue = HandlerQueue()
+        self.handler_queue = UniqueQueue()
         self.stimulator_thread = _threading.Thread(target=self.stimulate, daemon=True)
         self.handler_thread = _threading.Thread(target=self.run_handlers, daemon=True)
         self.listener = None
@@ -58,15 +59,16 @@ class Executor:
 
     def run_handlers(self):
         while self.keep_running:
-            if self.handler_queue:
-                handler = self.handler_queue.get()
+            try:
+                handler = self.handler_queue.get(timeout=0.5)
+                print("Running handler", handler)
                 try:
                     handler()
                 except Exception:
                     self.stop()
                     raise
-            else:
-                self.handler_queue.wait()
+            except _queue.Empty:
+                pass
 
     def stimulate(self):
         while self.keep_running:
@@ -76,28 +78,7 @@ class Executor:
             _time.sleep(self.stimulation_interval)
 
 
-class HandlerQueue:
-    def __init__(self):
-        self._queue: list[Callable[[], None]] = []
-        self._event = _threading.Event()
-
-    def put(self, handler: Callable[[], None]):
-        if handler not in self._queue:
-            self._event.set()
-            self._queue.append(handler)
-
-    @property
-    def should_wait(self):
-        return not self._event.is_set()
-
-    def wait(self):
-        self._event.wait()
-
-    def get(self) -> Callable[[], None]:
-        return self._queue.pop(0)
-
-    def __bool__(self):
-        return bool(self._queue)
-
-    def __len__(self):
-        return len(self._queue)
+class UniqueQueue(_queue.Queue):
+    def _put(self, item):
+        if item not in self.queue:
+            self.queue.append(item)
