@@ -37,6 +37,17 @@ ruff = "^0.0.285"
 pydantic = "^2.4"
 pytest-cov = "^4.1.0"
 
+
+[tool.poetry.group.docs.dependencies]
+mkdocs = "^1.5.3"
+mkdocs-mermaid2-plugin = "^1.1.1"
+mkdocs-material = "^9.4.6"
+mkdocs-diagrams = "^1.0.0"
+pymdown-extensions = "^10.3.1"
+mkdocstrings = {extras = ["python"], version = "^0.23.0"}
+mkdocs-alias-plugin = "^0.6.0"
+mkdocs-macros-plugin = "^1.0.4"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"

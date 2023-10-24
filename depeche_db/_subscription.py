@@ -1,5 +1,4 @@
 import dataclasses as _dc
-import enum as _enum
 import inspect as _inspect
 import logging as _logging
 import typing as _typing
@@ -10,9 +9,11 @@ from ._aggregated_stream import AggregatedStream
 from ._compat import UNION_TYPES, issubclass_with_union
 from ._interfaces import (
     CallMiddleware,
+    ErrorAction,
     LockProvider,
     MessageProtocol,
     StoredMessage,
+    SubscriptionErrorHandler,
     SubscriptionMessage,
     SubscriptionStateProvider,
 )
@@ -22,20 +23,11 @@ E = TypeVar("E", bound=MessageProtocol)
 DEPECHE_LOGGER = _logging.getLogger("depeche_db")
 
 
-class SubscriptionErrorHandler(Generic[E]):
-    class Action(_enum.Enum):
-        IGNORE = "ignore"
-        EXIT = "exit"
-
-    def handle_error(self, error: Exception, message: SubscriptionMessage[E]) -> Action:
-        raise NotImplementedError
-
-
 class ExitSubscriptionErrorHandler(SubscriptionErrorHandler):
     def handle_error(
         self, error: Exception, message: SubscriptionMessage[E]
-    ) -> SubscriptionErrorHandler.Action:
-        return SubscriptionErrorHandler.Action.EXIT
+    ) -> ErrorAction:
+        return ErrorAction.EXIT
 
 
 class LogAndIgnoreSubscriptionErrorHandler(SubscriptionErrorHandler):
@@ -46,11 +38,11 @@ class LogAndIgnoreSubscriptionErrorHandler(SubscriptionErrorHandler):
 
     def handle_error(
         self, error: Exception, message: SubscriptionMessage[E]
-    ) -> SubscriptionErrorHandler.Action:
+    ) -> ErrorAction:
         self._logger.exception(
             "Error while handling message {message.stored_message.message_id}:{message.stored_message.message.__class__.__name__}"
         )
-        return SubscriptionErrorHandler.Action.IGNORE
+        return ErrorAction.IGNORE
 
 
 class Subscription(Generic[E]):
@@ -65,6 +57,17 @@ class Subscription(Generic[E]):
         # TODO start at time
         # TODO start at "next message"
     ):
+        """
+        A subscription is a way to read messages from an aggregated stream.
+
+        Args:
+            name: Name of the subscription
+            stream: Stream to read from
+            state_provider: Provider for the subscription state
+            lock_provider: Provider for the locks
+            error_handler: Error handler
+            call_middleware: Middleware for calling the handlers
+        """
         assert name.isidentifier(), "Group name must be a valid identifier"
         self.name = name
         self._stream = stream
@@ -156,6 +159,17 @@ class SubscriptionHandler(Generic[E]):
         error_handler: Optional[SubscriptionErrorHandler] = None,
         call_middleware: Optional[CallMiddleware] = None,
     ):
+        """
+        Handles messages from a subscription
+
+        Implements: [RunOnNotification][depeche_db.RunOnNotification]
+
+        Args:
+            subscription: The subscription to handle
+            error_handler: The error handler to use
+            call_middleware: The middleware to call before calling the handler
+
+        """
         self._subscription = subscription
         self._handlers: Dict[Type[E], _Handler] = {}
         self._batch_size = 100
@@ -241,7 +255,7 @@ class SubscriptionHandler(Generic[E]):
                     error_handling_result = self._error_handler.handle_error(
                         error=error, message=message
                     )
-                    if error_handling_result == SubscriptionErrorHandler.Action.EXIT:
+                    if error_handling_result == ErrorAction.EXIT:
                         raise
                 return
 

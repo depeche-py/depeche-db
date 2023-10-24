@@ -27,6 +27,19 @@ class AggregatedStream(Generic[E]):
         partitioner: MessagePartitioner[E],
         stream_wildcards: List[str],
     ) -> None:
+        """
+        AggregatedStream is a stream that is used to aggregate multiple streams into one.
+
+        Args:
+            name: Stream name
+            store: Message store
+            partitioner: Message partitioner
+            stream_wildcards: List of stream wildcards
+
+        Attributes:
+            name (str): Stream name
+            projector (StreamProjector): Stream projector
+        """
         assert name.isidentifier(), "name must be a valid identifier"
         self.name = name
         self._store = store
@@ -93,13 +106,10 @@ class AggregatedStream(Generic[E]):
             stream_wildcards=stream_wildcards,
         )
 
-    def has_message(self, conn: SAConnection, message_id: _uuid.UUID) -> bool:
-        result: bool = conn.execute(
-            _sa.select(_sa.exists().where(self._table.c.message_id == message_id))
-        ).scalar()
-        return result
-
     def truncate(self, conn: SAConnection):
+        """
+        Truncate aggregated stream.
+        """
         conn.execute(self._table.delete())
 
     def add(
@@ -126,6 +136,13 @@ class AggregatedStream(Generic[E]):
     def read(
         self, conn: SAConnection, partition: int
     ) -> Iterator[AggregatedStreamMessage]:
+        """
+        Read all messages from a partition of the aggregated stream.
+
+        Args:
+            conn: Database connection
+            partition: Partition number
+        """
         for row in conn.execute(
             _sa.select(self._table.c.message_id, self._table.c.position)
             .where(self._table.c.partition == partition)
@@ -138,6 +155,14 @@ class AggregatedStream(Generic[E]):
     def read_slice(
         self, partition: int, start: int, count: int
     ) -> Iterator[AggregatedStreamMessage]:
+        """
+        Read a slice of messages from a partition of the aggregated stream.
+
+        Args:
+            partition: Partition number
+            start: Start position
+            count: Number of messages to read
+        """
         with self._connection() as conn:
             for row in conn.execute(
                 _sa.select(self._table.c.message_id, self._table.c.position)
@@ -169,6 +194,9 @@ class AggregatedStream(Generic[E]):
         position_limits: Dict[int, int] = None,
         result_limit: Optional[int] = None,
     ) -> Iterator[StreamPartitionStatistic]:
+        """
+        Get partition statistics for deciding which partitions to read from.
+        """
         with self._connection() as conn:
             position_limits = position_limits or {-1: -1}
             tbl = self._table.alias()
@@ -229,6 +257,11 @@ class StreamProjector(Generic[E]):
         partitioner: MessagePartitioner[E],
         stream_wildcards: List[str],
     ):
+        """
+        Stream projector is responsible for updating an aggregated stream.
+
+        Implements: [RunOnNotification][depeche_db.RunOnNotification]
+        """
         self.stream = stream
         self.stream_wildcards = stream_wildcards
         self.partitioner = partitioner
@@ -236,18 +269,30 @@ class StreamProjector(Generic[E]):
 
     @property
     def notification_channel(self) -> str:
+        """
+        Returns the notification channel name for this projector.
+        """
         return self.stream._store._storage.notification_channel
 
     def run(self):
+        """
+        Runs the projector once.
+        """
         try:
             self.update_full()
         except _AlreadyUpdating:
             pass
 
     def stop(self):
+        """
+        No-Op on this class.
+        """
         pass
 
     def update_full(self) -> int:
+        """
+        Updates the projection from the last known position to the current position.
+        """
         result = 0
         with self.stream._store.engine.connect() as conn:
             cutoff = self.stream._store._storage.get_global_position(conn)
@@ -317,10 +362,10 @@ class StreamProjector(Generic[E]):
             .limit(self.batch_size)
         )
         messages = list(conn.execute(q))
-        self.add(conn, messages)
+        self._add(conn, messages)
         return len(messages)
 
-    def add(self, conn, messages):
+    def _add(self, conn, messages):
         positions = {
             row.partition: row.max_position
             for row in conn.execute(

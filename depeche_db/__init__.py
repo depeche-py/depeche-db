@@ -1,7 +1,9 @@
-from ._aggregated_stream import AggregatedStream  # noqa: F401
+from ._aggregated_stream import AggregatedStream, StreamProjector  # noqa: F401
 from ._executor import Executor  # noqa: F401
 from ._interfaces import (  # noqa: F401
     CallMiddleware,
+    ErrorAction,
+    LockProvider,
     MessagePartitioner,
     MessagePosition,
     MessageProtocol,
@@ -9,6 +11,7 @@ from ._interfaces import (  # noqa: F401
     RunOnNotification,
     StoredMessage,
     StreamPartitionStatistic,
+    SubscriptionErrorHandler,
     SubscriptionMessage,
     SubscriptionState,
     SubscriptionStateProvider,
@@ -16,9 +19,8 @@ from ._interfaces import (  # noqa: F401
 from ._message_store import MessageStore, MessageStoreReader  # noqa: F401
 from ._storage import Storage  # noqa: F401
 from ._subscription import (  # noqa: F401
-    ExitSubscriptionErrorHandler,
-    LogAndIgnoreSubscriptionErrorHandler,
+    ExitSubscriptionErrorHandler,  # move somewhere else
+    LogAndIgnoreSubscriptionErrorHandler,  # move somewhere else
     Subscription,
-    SubscriptionErrorHandler,
     SubscriptionHandler,
 )

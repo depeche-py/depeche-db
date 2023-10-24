@@ -21,6 +21,12 @@ nav:
   - Concepts:
     - Data model: concepts/data-model.md
     - Subscriptions: concepts/subscriptions.md
+  - API Docs:
+    - MessageStore: api/message_store.md
+    - AggregatedStream: api/aggregated_stream.md
+    - Subscription: api/subscription.md
+    - Executor: api/executor.md
+    - datastructures: api/datastructures.md
 plugins:
   - mermaid2:
       version: 9.3.0
@@ -28,6 +34,19 @@ plugins:
   - diagrams
   - alias
   - macros
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            show_docstring_attributes: true
+            show_root_heading: true
+            show_source: false
+            docstring_options:
+              ignore_init_summary: false
+            merge_init_into_class: true
+            show_signature: true
+            show_signature_annotations: false
 theme:
   name: material
   favicon: assets/logo-bg256.png
@@ -41,6 +60,8 @@ theme:
 markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true
+      use_pygments: true
+      pygments_lang_class: true
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.superfences:

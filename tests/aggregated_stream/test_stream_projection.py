@@ -47,7 +47,7 @@ def test_stream_projector_cutoff(db_engine, store_factory, stream_factory, accou
     account.credit(100)
     account_repo.save(account, expected_version=0)
 
-    orig_projector_add = subject.projector.add
+    orig_projector_add = subject.projector._add
 
     def slow_projector_add(conn, messages):
         import time
@@ -55,7 +55,7 @@ def test_stream_projector_cutoff(db_engine, store_factory, stream_factory, accou
         time.sleep(0.2)
         orig_projector_add(conn, messages)
 
-    subject.projector.add = slow_projector_add
+    subject.projector._add = slow_projector_add
 
     # start update_full in another thread
     thread = _threading.Thread(target=subject.projector.update_full)
