@@ -27,6 +27,7 @@ nav:
     - Subscription: api/subscription.md
     - Executor: api/executor.md
     - datastructures: api/datastructures.md
+  - Changelog: CHANGELOG.md
 plugins:
   - mermaid2:
       version: 9.3.0

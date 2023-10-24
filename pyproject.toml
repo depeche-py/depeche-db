@@ -17,6 +17,9 @@ classifiers = [
 "Topic :: Software Development :: Libraries",
 ]
 
+[tool.poetry.urls]
+Changelog = "https://depeche-py.github.io/depeche-db/CHANGELOG/"
+
 [tool.poetry.dependencies]
 python = "^3.9"
 sqlalchemy = ">=1.4.30"
