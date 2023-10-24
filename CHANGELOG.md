@@ -6,6 +6,8 @@
   * `MessageHandlerRegister` allows registering and retrieving handlers using type hints
   * `SubscriptionMessageHandler` uses register to message handling (including call middleware & error handling)
   * `SubscriptionRunner` allows contionously running the message handler on a `Subscription`
+* Add class-based `MessageHandler` which wraps a `MessageHandlerRegister` and
+  implements the same interface
 
 
 # 0.4.5
