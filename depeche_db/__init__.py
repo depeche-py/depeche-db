@@ -16,12 +16,12 @@ from ._interfaces import (  # noqa: F401
     SubscriptionState,
     SubscriptionStateProvider,
 )
+from ._message_handler import MessageHandlerRegister  # noqa: F401
 from ._message_store import MessageStore, MessageStoreReader  # noqa: F401
 from ._storage import Storage  # noqa: F401
 from ._subscription import (  # noqa: F401
     ExitSubscriptionErrorHandler,  # move somewhere else
     LogAndIgnoreSubscriptionErrorHandler,  # move somewhere else
-    MessageHandlerRegister,
     Subscription,
     SubscriptionMessageHandler,
     SubscriptionRunner,
