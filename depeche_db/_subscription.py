@@ -14,13 +14,13 @@ from ._interfaces import (
     CallMiddleware,
     ErrorAction,
     LockProvider,
+    MessageHandlerRegisterProtocol,
     MessageProtocol,
     StoredMessage,
     SubscriptionErrorHandler,
     SubscriptionMessage,
     SubscriptionStateProvider,
 )
-from ._message_handler import MessageHandlerRegister
 
 E = TypeVar("E", bound=MessageProtocol)
 
@@ -140,7 +140,7 @@ class Subscription(Generic[E]):
 class SubscriptionMessageHandler(Generic[E]):
     def __init__(
         self,
-        handler_register: MessageHandlerRegister[E],
+        handler_register: MessageHandlerRegisterProtocol[E],
         error_handler: Optional[SubscriptionErrorHandler] = None,
         call_middleware: Optional[CallMiddleware] = None,
     ):
@@ -158,7 +158,7 @@ class SubscriptionMessageHandler(Generic[E]):
         self._call_middleware = call_middleware
 
         if not self._call_middleware and any(
-            handler.requires_middleware for handler in self._register._handlers.values()
+            handler.requires_middleware for handler in self._register.get_all_handlers()
         ):
             raise ValueError(
                 "If handler has more than one parameter, a call_middleware must be provided"
@@ -193,7 +193,7 @@ class SubscriptionRunner(Generic[E]):
     def create(
         cls,
         subscription: Subscription[E],
-        handlers: MessageHandlerRegister[E],
+        handlers: MessageHandlerRegisterProtocol[E],
         call_middleware: Optional[CallMiddleware[E]] = None,
         error_handler: Optional[SubscriptionErrorHandler[E]] = None,
     ) -> "SubscriptionRunner[E]":

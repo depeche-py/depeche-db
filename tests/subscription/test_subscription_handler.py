@@ -6,6 +6,7 @@ import pytest
 from depeche_db import (
     ExitSubscriptionErrorHandler,
     LogAndIgnoreSubscriptionErrorHandler,
+    MessageHandler,
     MessageHandlerRegister,
     StoredMessage,
     Subscription,
@@ -60,6 +61,20 @@ def test_passes_stored_message():
     def handle_account_credited(event: StoredMessage[AccountCreditedEvent]):
         seen.append(event)
 
+    subject = SubscriptionMessageHandler(register)
+    subject.handle(SUB_MSG)
+    assert [type(obj) for obj in seen] == [StoredMessage]
+
+
+def test_accepts_class_based_handlers():
+    seen: List[StoredMessage[AccountCreditedEvent]] = []
+
+    class Handler(MessageHandler[AccountEvent]):
+        @MessageHandler.register
+        def handle(self, event: StoredMessage[AccountCreditedEvent]):
+            seen.append(event)
+
+    register = Handler()
     subject = SubscriptionMessageHandler(register)
     subject.handle(SUB_MSG)
     assert [type(obj) for obj in seen] == [StoredMessage]

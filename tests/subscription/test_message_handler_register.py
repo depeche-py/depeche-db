@@ -1,13 +1,12 @@
-from typing import Any
+from typing import Any, List
 
 import pytest
 
-from depeche_db import (
-    MessageHandlerRegister,
-)
+from depeche_db import MessageHandler, MessageHandlerRegister
 from tests._account_example import (
     AccountCreditedEvent,
     AccountEvent,
+    AccountRegisteredEvent,
 )
 
 
@@ -62,3 +61,19 @@ def test_register_overlap_direct():
         @subject.register
         def handler2(event: AccountCreditedEvent):
             pass
+
+
+def test_class_based_handler():
+    seen: List[AccountEvent] = []
+
+    class MyClassBasedHandler(MessageHandler[AccountEvent]):
+        @MessageHandler.register
+        def handler(self, event: AccountCreditedEvent):
+            seen.append(event)
+
+    subject = MyClassBasedHandler()
+    assert subject.get_handler(AccountCreditedEvent) is not None
+    assert subject.get_handler(AccountRegisteredEvent) is None
+
+    subject.get_handler(AccountCreditedEvent).handler(1)
+    assert len(seen) == 1

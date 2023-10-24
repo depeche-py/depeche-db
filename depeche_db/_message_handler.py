@@ -1,4 +1,3 @@
-import dataclasses as _dc
 import inspect as _inspect
 import typing as _typing
 from typing import (
@@ -8,56 +7,17 @@ from typing import (
     Optional,
     Type,
     TypeVar,
-    Union,
-    no_type_check,
 )
 
 from ._compat import UNION_TYPES, issubclass_with_union
 from ._interfaces import (
+    HandlerDescriptor,
     MessageProtocol,
     StoredMessage,
     SubscriptionMessage,
 )
 
 E = TypeVar("E", bound=MessageProtocol)
-
-
-@_dc.dataclass
-class _Handler:
-    handler: Callable
-    pass_subscription_message: bool
-    pass_stored_message: bool
-    requires_middleware: bool
-
-    @no_type_check
-    def adapt_message_type(
-        self, message: Union[SubscriptionMessage[E], StoredMessage[E], E]
-    ) -> Union[SubscriptionMessage[E], StoredMessage[E], E]:
-        if isinstance(message, SubscriptionMessage):
-            if self.pass_subscription_message:
-                return message
-            elif self.pass_stored_message:
-                return message.stored_message
-            else:
-                return message.stored_message.message
-        elif isinstance(message, StoredMessage):
-            if self.pass_subscription_message:
-                raise ValueError(
-                    "SubscriptionMessage was requested, but StoredMessage was provided"
-                )
-            elif self.pass_stored_message:
-                return message.stored_message
-            else:
-                return message.stored_message.message
-        else:
-            if self.pass_subscription_message or self.pass_stored_message:
-                raise ValueError(
-                    "SubscriptionMessage or StoredMessage was requested, but plain message was provided"
-                )
-            else:
-                return message
-
-
 H = TypeVar("H", bound=Callable)
 
 
@@ -65,7 +25,7 @@ class MessageHandlerRegister(Generic[E]):
     def __init__(
         self,
     ):
-        self._handlers: Dict[Type[E], _Handler] = {}
+        self._handlers: Dict[Type[E], HandlerDescriptor] = {}
 
     def register(self, handler: H) -> H:
         signature = _inspect.signature(handler)
@@ -89,7 +49,7 @@ class MessageHandlerRegister(Generic[E]):
             )
 
         self.assert_not_registered(handled_type)
-        self._handlers[handled_type] = _Handler(
+        self._handlers[handled_type] = HandlerDescriptor(
             handler=handler,
             pass_subscription_message=pass_subscription_message,
             pass_stored_message=pass_stored_message,
@@ -108,8 +68,33 @@ class MessageHandlerRegister(Generic[E]):
                         f"Handler for {handled_type} is already registered for {registered_type}"
                     )
 
-    def get_handler(self, message_type: Type[E]) -> Optional[_Handler]:
+    def get_handler(self, message_type: Type[E]) -> Optional[HandlerDescriptor[E]]:
         for handled_type, handler in self._handlers.items():
             if issubclass_with_union(message_type, handled_type):
                 return handler
         return None
+
+    def get_all_handlers(self) -> _typing.Iterator[HandlerDescriptor[E]]:
+        yield from self._handlers.values()
+
+
+class MessageHandler(Generic[E]):
+    _register: MessageHandlerRegister[E]
+
+    def __init__(self):
+        self._register = MessageHandlerRegister()
+        for attrname in dir(self):
+            attr = getattr(self, attrname)
+            if getattr(attr, "__message_handler__", False):
+                self._register.register(attr)
+
+    @staticmethod
+    def register(handler: H) -> H:
+        handler.__message_handler__ = True  # type: ignore
+        return handler
+
+    def get_handler(self, message_type: Type[E]) -> Optional[HandlerDescriptor[E]]:
+        return self._register.get_handler(message_type)
+
+    def get_all_handlers(self) -> _typing.Iterator[HandlerDescriptor[E]]:
+        yield from self._register.get_all_handlers()

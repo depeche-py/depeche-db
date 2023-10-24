@@ -2,7 +2,18 @@ import dataclasses as _dc
 import datetime as _dt
 import enum as _enum
 import uuid as _uuid
-from typing import Callable, Dict, Generic, Protocol, TypeVar, Union
+from typing import (
+    Callable,
+    Dict,
+    Generic,
+    Iterator,
+    Optional,
+    Protocol,
+    Type,
+    TypeVar,
+    Union,
+    no_type_check,
+)
 
 
 class MessageProtocol:
@@ -287,5 +298,59 @@ class SubscriptionErrorHandler(Generic[E]):
 
         Returns:
             Action to be taken
+        """
+        raise NotImplementedError
+
+
+@_dc.dataclass
+class HandlerDescriptor(Generic[E]):
+    handler: Callable
+    pass_subscription_message: bool
+    pass_stored_message: bool
+    requires_middleware: bool
+
+    @no_type_check
+    def adapt_message_type(
+        self, message: Union[SubscriptionMessage[E], StoredMessage[E], E]
+    ) -> Union[SubscriptionMessage[E], StoredMessage[E], E]:
+        if isinstance(message, SubscriptionMessage):
+            if self.pass_subscription_message:
+                return message
+            elif self.pass_stored_message:
+                return message.stored_message
+            else:
+                return message.stored_message.message
+        elif isinstance(message, StoredMessage):
+            if self.pass_subscription_message:
+                raise ValueError(
+                    "SubscriptionMessage was requested, but StoredMessage was provided"
+                )
+            elif self.pass_stored_message:
+                return message.stored_message
+            else:
+                return message.stored_message.message
+        else:
+            if self.pass_subscription_message or self.pass_stored_message:
+                raise ValueError(
+                    "SubscriptionMessage or StoredMessage was requested, but plain message was provided"
+                )
+            else:
+                return message
+
+
+class MessageHandlerRegisterProtocol(Protocol, Generic[E]):
+    """
+    Message handler register protocol is used by runners to find handlers for messages.
+    """
+
+    def get_all_handlers(self) -> Iterator[HandlerDescriptor[E]]:
+        """
+        Returns all registered handlers.
+        """
+        raise NotImplementedError
+
+    def get_handler(self, message_type: Type[E]) -> Optional[HandlerDescriptor[E]]:
+        """
+        Returns a handler for a given message type.
         """
         raise NotImplementedError
