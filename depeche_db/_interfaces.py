@@ -230,7 +230,7 @@ class RunOnNotification(Protocol):
 
     Implemented by:
 
-    - [SubscriptionHandler][depeche_db.SubscriptionHandler]
+    - [SubscriptionRunner][depeche_db.SubscriptionRunner]
     - [StreamProjector][depeche_db.StreamProjector]
     """
 

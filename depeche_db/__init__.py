@@ -21,6 +21,8 @@ from ._storage import Storage  # noqa: F401
 from ._subscription import (  # noqa: F401
     ExitSubscriptionErrorHandler,  # move somewhere else
     LogAndIgnoreSubscriptionErrorHandler,  # move somewhere else
+    MessageHandlerRegister,
     Subscription,
-    SubscriptionHandler,
+    SubscriptionMessageHandler,
+    SubscriptionRunner,
 )

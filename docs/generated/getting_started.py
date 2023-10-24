@@ -187,15 +187,18 @@ doc.md(
 
 from depeche_db import Subscription
 
-subscription = Subscription(
+subscription = Subscription[EventA | EventB](
     name="sub_example_docs_aggregate_me2",
     stream=aggregated_stream,
 )
 
 doc.md(
     """\
-    You can read from a subscription directly (but you would probably want to use
-    a `SubscriptionHandler` as shown next).
+    You can read from a subscription directly but you will usually want to use
+    a `SubscriptionRunner` to do that for you. Whenever `get_next_messages` emits
+    a message, it will update the position of the subscription, so that the next
+    call will return the next message.
+
     The emitted message is wrapped in a `SubscriptionMessage` object which contains
     the metadata about the message in the context of the subscription/aggregated stream.
     """
@@ -221,15 +224,24 @@ for message in subscription.get_next_messages(count=1):
 
 doc.md(
     """\
-    In order to continously handle messages on a subscription we would use the
-    `SubscriptionHandler`:
+    In order to continously handle messages on a subscription we use a
+    `MessageHandlerRegister` and a `SubscriptionRunner`.
+
+    First we create a `MessageHandlerRegister` and register a handler for the
+    message type we are interested in.
+    You can register multiple handlers for different message types but the handled
+    message types must not overlap. Given your message type `E`, you can request
+    `SubscriptionMessage[E]`, `StoredMessage[E]` or `E` as the type of the
+    argument to the handler by using type hints.
     """
 )
 
-from depeche_db import SubscriptionMessage
+from depeche_db import SubscriptionMessage, MessageHandlerRegister
+
+handlers = MessageHandlerRegister[EventA | EventB]()
 
 
-@subscription.handler.register
+@handlers.register
 def handle_event_a(msg: SubscriptionMessage[EventA]):
     real_message = msg.stored_message.message
     doc.show(f"num={real_message.num} (partition {msg.partition} at {msg.position})")
@@ -237,16 +249,19 @@ def handle_event_a(msg: SubscriptionMessage[EventA]):
 
 doc.md(
     """\
-    You can register multiple handlers for different message types. The handled
-    message types must not overlap. Given your event type `E`, you can request
-    `SubscriptionMessage[E]`, `StoredMessage[E]` or `E` as the type of the
-    argument to the handler by using type hints.
+    Now we can create a `SubscriptionRunner` and run it.
     """
 )
 
+from depeche_db import SubscriptionRunner
+
+subscription_runner = SubscriptionRunner.create(
+    subscription=subscription,
+    handlers=handlers,
+)
 
 doc.begin_show()
-subscription.handler.run_once()
+subscription_runner.run_once()
 doc.end_show()
 # > num=111 (partition 0 at 0)
 # > num=199 (partition 1 at 0)

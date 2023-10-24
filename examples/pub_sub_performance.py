@@ -16,6 +16,9 @@ from depeche_db import (
     StoredMessage,
     Subscription,
     SubscriptionMessage,
+    SubscriptionMessageHandler,
+    SubscriptionRunner,
+    MessageHandlerRegister,
 )
 from depeche_db.tools import (
     DbLockProvider,
@@ -58,24 +61,23 @@ stream = AggregatedStream[MyMessage](
     stream_wildcards=["aggregate-me-%"],
 )
 
-subscription = Subscription(
-    name="example_pub_sub",
-    stream=stream,
-    state_provider=DbSubscriptionStateProvider(
-        name="sub_state2",
-        engine=db_engine,
-    ),
-    lock_provider=DbLockProvider(name="locks1", engine=db_engine),
-)
-
 HANDLED = 0
+handlers = MessageHandlerRegister[MyMessage]()
 
 
-@subscription.handler.register
+@handlers.register
 def handle_event_a(message: SubscriptionMessage[MyMessage]):
-    global HANDLED
-    HANDLED += 1
     real_message = message.stored_message.message
+    print(
+        f"Got message #{real_message.content} at {message.partition}:{message.position}"
+    )
+    time.sleep(0.05)
+
+
+subscription = Subscription(name="example_pub_sub", stream=stream)
+subscription_runner = SubscriptionRunner(
+    subscription=subscription, handler=SubscriptionMessageHandler(handlers)
+)
 
 
 def pub():
@@ -96,7 +98,7 @@ def sub():
     print("Subscribing to messages")
     executor = Executor(db_dsn=DB_DSN)
     executor.register(stream.projector)
-    executor.register(subscription.handler)
+    executor.register(subscription_runner)
     start = time.time()
     executor.run()
     print(f"Subscriber handled {HANDLED / (time.time() - start):.2f} mgs/s")

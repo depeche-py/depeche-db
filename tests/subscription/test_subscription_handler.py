@@ -1,15 +1,17 @@
 import uuid as _uuid
-from typing import List
+from typing import Any, List
 
 import pytest
 
 from depeche_db import (
     ExitSubscriptionErrorHandler,
     LogAndIgnoreSubscriptionErrorHandler,
+    MessageHandlerRegister,
     StoredMessage,
     Subscription,
-    SubscriptionHandler,
     SubscriptionMessage,
+    SubscriptionMessageHandler,
+    SubscriptionRunner,
 )
 from tests._account_example import (
     AccountCreditedEvent,
@@ -18,9 +20,8 @@ from tests._account_example import (
 )
 
 
-def test_register_negative_cases(stream_with_events, subscription_factory):
-    subscription: Subscription = subscription_factory(stream_with_events)
-    subject = subscription.handler
+def test_register_negative_cases():
+    subject: MessageHandlerRegister[Any] = MessageHandlerRegister()
 
     with pytest.raises(ValueError):
         subject.register(lambda: None)
@@ -38,9 +39,8 @@ def test_register_negative_cases(stream_with_events, subscription_factory):
             pass
 
 
-def test_register_overlap_union(stream_with_events, subscription_factory):
-    subscription: Subscription = subscription_factory(stream_with_events)
-    subject = subscription.handler
+def test_register_overlap_union():
+    subject: MessageHandlerRegister[Any] = MessageHandlerRegister()
 
     @subject.register
     def handler1(event: AccountEvent):
@@ -59,9 +59,8 @@ def test_register_overlap_union(stream_with_events, subscription_factory):
             pass
 
 
-def test_register_overlap_direct(stream_with_events, subscription_factory):
-    subscription: Subscription = subscription_factory(stream_with_events)
-    subject = subscription.handler
+def test_register_overlap_direct():
+    subject: MessageHandlerRegister[Any] = MessageHandlerRegister()
 
     @subject.register
     def handler1(event: AccountCreditedEvent):
@@ -94,66 +93,71 @@ SUB_MSG = SubscriptionMessage(
 
 
 def test_passes_undecorated_type():
-    subject = SubscriptionHandler(None, None)  # type: ignore
-
+    register: MessageHandlerRegister[Any] = MessageHandlerRegister()
     seen: List[AccountEvent] = []
 
-    @subject.register
+    @register.register
     def handle_account_credited(event: AccountCreditedEvent):
         seen.append(event)
 
+    subject = SubscriptionMessageHandler(register)
     subject.handle(SUB_MSG)
     assert [type(obj) for obj in seen] == [AccountCreditedEvent]
 
 
 def test_passes_stored_message():
-    subject = SubscriptionHandler(None, None)  # type: ignore
+    register: MessageHandlerRegister[Any] = MessageHandlerRegister()
 
     seen: List[StoredMessage[AccountCreditedEvent]] = []
 
-    @subject.register
+    @register.register
     def handle_account_credited(event: StoredMessage[AccountCreditedEvent]):
         seen.append(event)
 
+    subject = SubscriptionMessageHandler(register)
     subject.handle(SUB_MSG)
     assert [type(obj) for obj in seen] == [StoredMessage]
 
 
 def test_passes_subscription_message():
-    subject = SubscriptionHandler(None, None)  # type: ignore
+    register: MessageHandlerRegister[Any] = MessageHandlerRegister()
 
     seen: List[SubscriptionMessage[AccountCreditedEvent]] = []
 
-    @subject.register
+    @register.register
     def handle_account_credited(event: SubscriptionMessage[AccountCreditedEvent]):
         seen.append(event)
 
+    subject = SubscriptionMessageHandler(register)
     subject.handle(SUB_MSG)
     assert [type(obj) for obj in seen] == [SubscriptionMessage]
 
 
 def test_register_with_additional_params_requires_call_middleware():
-    subject = SubscriptionHandler(None, None)  # type: ignore
+    register: MessageHandlerRegister[Any] = MessageHandlerRegister()
 
-    with pytest.raises(ValueError):
-
-        @subject.register
-        def handle_account_credited(event: AccountCreditedEvent, foo: int):
-            pass
-
-
-def test_register_with_additional_params_is_ok():
-    subject = SubscriptionHandler(None, None, call_middleware="dummy")  # type: ignore
-
-    @subject.register
+    @register.register
     def handle_account_credited(event: AccountCreditedEvent, foo: int):
         pass
 
-    @subject.register
+    with pytest.raises(ValueError):
+        SubscriptionMessageHandler(register)
+
+
+def test_register_with_additional_params_is_ok():
+    register: MessageHandlerRegister[Any] = MessageHandlerRegister()
+
+    @register.register
+    def handle_account_credited(event: AccountCreditedEvent, foo: int):
+        pass
+
+    @register.register
     def handle_account_registered(
         event: SubscriptionMessage[AccountRegisteredEvent], foo: int
     ):
         pass
+
+    SubscriptionMessageHandler(register, call_middleware="dummy")  # type: ignore[arg-type]
 
 
 def test_uses_call_middleware():
@@ -161,49 +165,58 @@ def test_uses_call_middleware():
         def call(self, handler, message):
             return handler(message, 123)
 
-    subject = SubscriptionHandler(None, ExitSubscriptionErrorHandler(), call_middleware=Middleware())  # type: ignore
-
+    register: MessageHandlerRegister[Any] = MessageHandlerRegister()
     seen: List[int] = []
 
-    @subject.register
+    @register.register
     def handle_account_credited(event: AccountCreditedEvent, foo: int):
         seen.append(foo)
 
+    subject = SubscriptionMessageHandler(register, call_middleware=Middleware())  # type: ignore
     subject.handle(SUB_MSG)
     assert seen == [123]
 
 
 def test_exhausts_the_aggregated_stream(stream_with_events, subscription_factory):
-    subscription: Subscription = subscription_factory(stream_with_events)
-    subject = subscription.handler
-
+    register: MessageHandlerRegister[Any] = MessageHandlerRegister()
     seen: List[AccountEvent] = []
 
-    @subject.register
+    @register.register
     def handle(event: AccountEvent):
         seen.append(event)
+
+    subscription: Subscription = subscription_factory(stream_with_events)
+    subject = SubscriptionRunner(
+        subscription=subscription, handler=SubscriptionMessageHandler(register)
+    )
 
     subject.run_once()
     assert len(seen) == 5
 
 
 def test_ignores_exception():
-    subject = SubscriptionHandler(None, error_handler=LogAndIgnoreSubscriptionErrorHandler("foo"))  # type: ignore
+    register: MessageHandlerRegister[Any] = MessageHandlerRegister()
 
-    @subject.register
+    @register.register
     def handle_account_credited(event: SubscriptionMessage[AccountCreditedEvent]):
         raise ValueError("foo")
 
+    subject = SubscriptionMessageHandler(
+        register, error_handler=LogAndIgnoreSubscriptionErrorHandler("foo")
+    )
     subject.handle(SUB_MSG)
     # No exception raised
 
 
 def test_reraises_exception():
-    subject = SubscriptionHandler(None, error_handler=ExitSubscriptionErrorHandler())  # type: ignore
+    register: MessageHandlerRegister[Any] = MessageHandlerRegister()
 
-    @subject.register
+    @register.register
     def handle_account_credited(event: SubscriptionMessage[AccountCreditedEvent]):
         raise ValueError("foo")
 
+    subject = SubscriptionMessageHandler(
+        register, error_handler=ExitSubscriptionErrorHandler()
+    )
     with pytest.raises(ValueError):
         subject.handle(SUB_MSG)

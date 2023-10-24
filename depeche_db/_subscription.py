@@ -2,7 +2,17 @@ import dataclasses as _dc
 import inspect as _inspect
 import logging as _logging
 import typing as _typing
-from typing import Callable, Dict, Generic, Iterator, Optional, Type, TypeVar, Union
+from typing import (
+    Callable,
+    Dict,
+    Generic,
+    Iterator,
+    Optional,
+    Type,
+    TypeVar,
+    Union,
+    no_type_check,
+)
 
 from . import tools as _tools
 from ._aggregated_stream import AggregatedStream
@@ -52,8 +62,6 @@ class Subscription(Generic[E]):
         stream: AggregatedStream[E],
         state_provider: Optional[SubscriptionStateProvider] = None,
         lock_provider: Optional[LockProvider] = None,
-        error_handler: Optional[SubscriptionErrorHandler] = None,
-        call_middleware: Optional[CallMiddleware] = None,
         # TODO start at time
         # TODO start at "next message"
     ):
@@ -65,8 +73,6 @@ class Subscription(Generic[E]):
             stream: Stream to read from
             state_provider: Provider for the subscription state
             lock_provider: Provider for the locks
-            error_handler: Error handler
-            call_middleware: Middleware for calling the handlers
         """
         assert name.isidentifier(), "Group name must be a valid identifier"
         self.name = name
@@ -76,11 +82,6 @@ class Subscription(Generic[E]):
         )
         self._state_provider = state_provider or _tools.DbSubscriptionStateProvider(
             name, self._stream._store.engine
-        )
-        self.handler = SubscriptionHandler(
-            subscription=self,
-            error_handler=error_handler,
-            call_middleware=call_middleware,
         )
 
     def get_next_messages(self, count: int) -> Iterator[SubscriptionMessage[E]]:
@@ -147,44 +148,50 @@ class _Handler:
     handler: Callable
     pass_subscription_message: bool
     pass_stored_message: bool
+    requires_middleware: bool
+
+    @no_type_check
+    def adapt_message_type(
+        self, message: Union[SubscriptionMessage[E], StoredMessage[E], E]
+    ) -> Union[SubscriptionMessage[E], StoredMessage[E], E]:
+        if isinstance(message, SubscriptionMessage):
+            if self.pass_subscription_message:
+                return message
+            elif self.pass_stored_message:
+                return message.stored_message
+            else:
+                return message.stored_message.message
+        elif isinstance(message, StoredMessage):
+            if self.pass_subscription_message:
+                raise ValueError(
+                    "SubscriptionMessage was requested, but StoredMessage was provided"
+                )
+            elif self.pass_stored_message:
+                return message.stored_message
+            else:
+                return message.stored_message.message
+        else:
+            if self.pass_subscription_message or self.pass_stored_message:
+                raise ValueError(
+                    "SubscriptionMessage or StoredMessage was requested, but plain message was provided"
+                )
+            else:
+                return message
 
 
 H = TypeVar("H", bound=Callable)
 
 
-class SubscriptionHandler(Generic[E]):
+class MessageHandlerRegister(Generic[E]):
     def __init__(
         self,
-        subscription: Subscription[E],
-        error_handler: Optional[SubscriptionErrorHandler] = None,
-        call_middleware: Optional[CallMiddleware] = None,
     ):
-        """
-        Handles messages from a subscription
-
-        Implements: [RunOnNotification][depeche_db.RunOnNotification]
-
-        Args:
-            subscription: The subscription to handle
-            error_handler: The error handler to use
-            call_middleware: The middleware to call before calling the handler
-
-        """
-        self._subscription = subscription
         self._handlers: Dict[Type[E], _Handler] = {}
-        self._batch_size = 100
-        self._error_handler = error_handler or ExitSubscriptionErrorHandler()
-        self._call_middleware = call_middleware
-        self._keep_running = True
 
     def register(self, handler: H) -> H:
         signature = _inspect.signature(handler)
         if len(signature.parameters) < 1:
             raise ValueError("Handler must have at least one parameter")
-        if len(signature.parameters) > 1 and not self._call_middleware:
-            raise ValueError(
-                "If handler has more than one parameter, a call_middleware must be provided"
-            )
 
         pass_subscription_message = False
         pass_stored_message = False
@@ -207,6 +214,7 @@ class SubscriptionHandler(Generic[E]):
             handler=handler,
             pass_subscription_message=pass_subscription_message,
             pass_stored_message=pass_stored_message,
+            requires_middleware=len(signature.parameters) > 1,
         )
         return handler
 
@@ -221,14 +229,106 @@ class SubscriptionHandler(Generic[E]):
                         f"Handler for {handled_type} is already registered for {registered_type}"
                     )
 
+    def get_handler(self, message_type: Type[E]) -> Optional[_Handler]:
+        for handled_type, handler in self._handlers.items():
+            if issubclass_with_union(message_type, handled_type):
+                return handler
+        return None
+
+
+class SubscriptionMessageHandler(Generic[E]):
+    def __init__(
+        self,
+        handler_register: MessageHandlerRegister[E],
+        error_handler: Optional[SubscriptionErrorHandler] = None,
+        call_middleware: Optional[CallMiddleware] = None,
+    ):
+        """
+        Handles messages
+
+        Args:
+            handler_register: The handler register to use
+            error_handler: The error handler to use
+            call_middleware: The middleware to call before calling the handler
+
+        """
+        self._register = handler_register
+        self._error_handler = error_handler or ExitSubscriptionErrorHandler()
+        self._call_middleware = call_middleware
+
+        if not self._call_middleware and any(
+            handler.requires_middleware for handler in self._register._handlers.values()
+        ):
+            raise ValueError(
+                "If handler has more than one parameter, a call_middleware must be provided"
+            )
+
+    def handle(self, message: SubscriptionMessage):
+        handler = self._register.get_handler(type(message.stored_message.message))
+        if handler:
+            try:
+                self._exec(handler.handler, handler.adapt_message_type(message))
+            except Exception as error:
+                error_handling_result = self._error_handler.handle_error(
+                    error=error, message=message
+                )
+                if error_handling_result == ErrorAction.EXIT:
+                    raise
+        # TODO else raise error?
+
+    def _exec(
+        self,
+        handler: Callable[..., None],
+        message: Union[SubscriptionMessage[E], StoredMessage[E], E],
+    ) -> None:
+        if self._call_middleware:
+            self._call_middleware.call(handler, message)
+        else:
+            handler(message)
+
+
+class SubscriptionRunner(Generic[E]):
+    @classmethod
+    def create(
+        cls,
+        subscription: Subscription[E],
+        handlers: MessageHandlerRegister[E],
+        call_middleware: Optional[CallMiddleware[E]] = None,
+        error_handler: Optional[SubscriptionErrorHandler[E]] = None,
+    ) -> "SubscriptionRunner[E]":
+        return cls(
+            subscription=subscription,
+            handler=SubscriptionMessageHandler(
+                handler_register=handlers,
+                call_middleware=call_middleware,
+                error_handler=error_handler,
+            ),
+        )
+
+    def __init__(
+        self,
+        subscription: Subscription[E],
+        handler: SubscriptionMessageHandler,
+    ):
+        """
+        Handles messages from a subscription using a handler
+
+        Implements: [RunOnNotification][depeche_db.RunOnNotification]
+
+        Args:
+            subscription: The subscription to handle
+            handler: The handler to use
+        """
+        self._subscription = subscription
+        self._batch_size = 100
+        self._keep_running = True
+        self._handler = handler
+
     @property
     def notification_channel(self) -> str:
         return self._subscription._stream.notification_channel
 
     def run(self):
-        assert (
-            self._subscription.handler is self
-        ), "A subscription can only have one handler"
         self.run_once()
 
     def stop(self):
@@ -244,37 +344,4 @@ class SubscriptionHandler(Generic[E]):
                 break
 
     def handle(self, message: SubscriptionMessage):
-        message_type = type(message.stored_message.message)
-        for handled_type, handler in self._handlers.items():
-            if issubclass_with_union(message_type, handled_type):
-                try:
-                    self._exec(
-                        handler.handler, self._adapt_message_type(handler, message)
-                    )
-                except Exception as error:
-                    error_handling_result = self._error_handler.handle_error(
-                        error=error, message=message
-                    )
-                    if error_handling_result == ErrorAction.EXIT:
-                        raise
-                return
-
-    def _exec(
-        self,
-        handler: Callable[..., None],
-        message: Union[SubscriptionMessage[E], StoredMessage[E], E],
-    ) -> None:
-        if self._call_middleware:
-            self._call_middleware.call(handler, message)
-        else:
-            handler(message)
-
-    def _adapt_message_type(
-        self, handler: _Handler, message: SubscriptionMessage[E]
-    ) -> Union[SubscriptionMessage[E], StoredMessage[E], E]:
-        if handler.pass_subscription_message:
-            return message
-        elif handler.pass_stored_message:
-            return message.stored_message
-        else:
-            return message.stored_message.message
+        self._handler.handle(message)

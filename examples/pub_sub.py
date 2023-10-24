@@ -15,7 +15,10 @@ from depeche_db import (
     MessageStore,
     StoredMessage,
     Subscription,
+    MessageHandlerRegister,
     SubscriptionMessage,
+    SubscriptionMessageHandler,
+    SubscriptionRunner,
 )
 from depeche_db.tools import PydanticMessageSerializer
 
@@ -54,16 +57,23 @@ stream = AggregatedStream[MyMessage](
     stream_wildcards=["aggregate-me-%"],
 )
 
-subscription = Subscription(name="example_pub_sub", stream=stream)
+
+handlers = MessageHandlerRegister[MyMessage]()
 
 
-@subscription.handler.register
+@handlers.register
 def handle_event_a(message: SubscriptionMessage[MyMessage]):
     real_message = message.stored_message.message
     print(
         f"Got message #{real_message.content} at {message.partition}:{message.position}"
     )
     time.sleep(0.05)
+
+
+subscription = Subscription(name="example_pub_sub", stream=stream)
+subscription_runner = SubscriptionRunner(
+    subscription=subscription, handler=SubscriptionMessageHandler(handlers)
+)
 
 
 def pub():
@@ -81,7 +91,7 @@ def pub():
 def sub():
     executor = Executor(db_dsn=DB_DSN)
     executor.register(stream.projector)
-    executor.register(subscription.handler)
+    executor.register(subscription_runner)
     executor.run()
 
 

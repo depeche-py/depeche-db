@@ -1,5 +1,6 @@
 ::: depeche_db.Subscription
-::: depeche_db.SubscriptionHandler
+::: depeche_db.SubscriptionMessageHandler
+::: depeche_db.SubscriptionRunner
 ::: depeche_db.LockProvider
     options:
       show_signature_annotations: true
