@@ -781,6 +781,26 @@
 
               
             
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../exceptions/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Exceptions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -988,6 +1008,15 @@
           <p class="doc doc-class-bases">
             Bases: <code><span title="typing.Generic">Generic</span>[<span title="depeche_db._factories.E">E</span>]</code></p>
 
+  
+      <p>This factory is accessible on the message store:</p>
+<div class="language-text highlight"><pre><span></span><code>store = MessageStore(...)
+stream = store.aggregated_stream(
+    name=&quot;stream_name&quot;,
+    partitioner=...,
+    stream_wildcards=[&quot;stream_%&quot;]
+)
+</code></pre></div>
 
 
   
@@ -1009,7 +1038,7 @@
 
 
 <h3 id="depeche_db.AggregatedStreamFactory.__call__" class="doc doc-heading">
-          <code class="highlight language-python"><span class="fm">__call__</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">partitioner</span><span class="p">,</span> <span class="n">stream_wildcards</span><span class="p">)</span></code>
+          <code class="highlight language-python"><span class="fm">__call__</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">partitioner</span><span class="p">,</span> <span class="n">stream_wildcards</span><span class="p">,</span> <span class="n">update_batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 </h3>
 
@@ -1038,7 +1067,7 @@
           </td>
           <td>
             <div class="doc-md-description">
-              <p>The name of the stream</p>
+              <p>The name of the stream, needs to be a valid python identifier</p>
             </div>
           </td>
           <td>
@@ -1066,11 +1095,25 @@
           </td>
           <td>
             <div class="doc-md-description">
-              <p>A list of stream wildcards to be aggregated</p>
+              <p>A list of stream wildcards</p>
             </div>
           </td>
           <td>
               <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>update_batch_size</code></td>
+          <td>
+                <code><span title="typing.Optional">Optional</span>[int]</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>The batch size for updating the stream</p>
+            </div>
+          </td>
+          <td>
+                <code>None</code>
           </td>
         </tr>
     </tbody>
@@ -1086,7 +1129,8 @@
 
   </div>
 
-</div>
+</div><hr />
+
 
 <div class="doc doc-object doc-class">
 
@@ -1094,7 +1138,7 @@
 
 
 <h2 id="depeche_db.AggregatedStream" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">depeche_db</span><span class="o">.</span><span class="n">AggregatedStream</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">store</span><span class="p">,</span> <span class="n">partitioner</span><span class="p">,</span> <span class="n">stream_wildcards</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">depeche_db</span><span class="o">.</span><span class="n">AggregatedStream</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">store</span><span class="p">,</span> <span class="n">partitioner</span><span class="p">,</span> <span class="n">stream_wildcards</span><span class="p">,</span> <span class="n">update_batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 </h2>
 
@@ -1104,7 +1148,11 @@
             Bases: <code><span title="typing.Generic">Generic</span>[<span title="depeche_db._aggregated_stream.E">E</span>]</code></p>
 
   
-      <p>AggregatedStream is a stream that is used to aggregate multiple streams into one.</p>
+      <p>AggregatedStream aggregates multiple streams into one (partitioned) stream.</p>
+<p>Read more about aggregated streams under <a href="../../concepts/data-model/#aggregated-streams">Data Model</a>.</p>
+<p>The <code>update_batch_size</code> argument can be used to control the batch size of the
+update process. Higher numbers will result in less database roundtrips but
+also in higher memory usage.</p>
 
 
 
@@ -1126,7 +1174,7 @@
           </td>
           <td>
             <div class="doc-md-description">
-              <p>Stream name</p>
+              <p>Stream name, needs to be a valid python identifier</p>
             </div>
           </td>
           <td>
@@ -1175,6 +1223,20 @@
               <em>required</em>
           </td>
         </tr>
+        <tr>
+          <td><code>update_batch_size</code></td>
+          <td>
+                <code><span title="typing.Optional">Optional</span>[int]</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>Batch size for updating the stream, defaults to 100</p>
+            </div>
+          </td>
+          <td>
+                <code>None</code>
+          </td>
+        </tr>
     </tbody>
   </table>
 
@@ -1219,7 +1281,7 @@
           </td>
           <td>
             <div class="doc-md-description">
-              <p>Factory to create subscriptions</p>
+              <p>Factory to create subscriptions on this stream</p>
             </div>
           </td>
         </tr>
@@ -1253,7 +1315,8 @@
 
   <div class="doc doc-contents ">
   
-      <p>Get partition statistics for deciding which partitions to read from.</p>
+      <p>Get partition statistics for deciding which partitions to read from. This
+is used by subscriptions.</p>
 
   </div>
 
@@ -1413,7 +1476,8 @@
 
   </div>
 
-</div>
+</div><hr />
+
 
 <div class="doc doc-object doc-class">
 
@@ -1421,7 +1485,7 @@
 
 
 <h2 id="depeche_db.StreamProjector" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">depeche_db</span><span class="o">.</span><span class="n">StreamProjector</span><span class="p">(</span><span class="n">stream</span><span class="p">,</span> <span class="n">partitioner</span><span class="p">,</span> <span class="n">stream_wildcards</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">depeche_db</span><span class="o">.</span><span class="n">StreamProjector</span><span class="p">(</span><span class="n">stream</span><span class="p">,</span> <span class="n">partitioner</span><span class="p">,</span> <span class="n">stream_wildcards</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 </h2>
 
@@ -1432,6 +1496,8 @@
 
   
       <p>Stream projector is responsible for updating an aggregated stream.</p>
+<p>The update process is locked to prevent concurrent updates. Thus, it is
+fine to run the projector in multiple processes.</p>
 <p>Implements: <a class="autorefs autorefs-internal" href="../executor/#depeche_db.RunOnNotification">RunOnNotification</a></p>
 
 
@@ -1535,7 +1601,8 @@
 
   </div>
 
-</div>
+</div><hr />
+
 
 <div class="doc doc-object doc-class">
 

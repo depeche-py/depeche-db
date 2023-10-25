@@ -665,6 +665,20 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#depeche_db.ExitSubscriptionErrorHandler" class="md-nav__link">
+    ExitSubscriptionErrorHandler
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#depeche_db.LogAndIgnoreSubscriptionErrorHandler" class="md-nav__link">
+    LogAndIgnoreSubscriptionErrorHandler
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#depeche_db.SubscriptionMessageHandler" class="md-nav__link">
     SubscriptionMessageHandler
   </a>
@@ -801,6 +815,26 @@
 
               
             
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../exceptions/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Exceptions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -926,6 +960,20 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#depeche_db.ExitSubscriptionErrorHandler" class="md-nav__link">
+    ExitSubscriptionErrorHandler
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#depeche_db.LogAndIgnoreSubscriptionErrorHandler" class="md-nav__link">
+    LogAndIgnoreSubscriptionErrorHandler
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#depeche_db.SubscriptionMessageHandler" class="md-nav__link">
     SubscriptionMessageHandler
   </a>
@@ -1028,6 +1076,18 @@
           <p class="doc doc-class-bases">
             Bases: <code><span title="typing.Generic">Generic</span>[<span title="depeche_db._factories.E">E</span>]</code></p>
 
+  
+      <p>This factory is accessible on the aggregated stream:</p>
+<div class="language-text highlight"><pre><span></span><code>stream : AggregatedStream = ...
+subscription = stream.subscription(
+    name=&quot;subscription_name&quot;,
+    handlers=...,
+    call_middleware=...,
+    error_handler=...,
+    state_provider=...,
+    lock_provider=...,
+)
+</code></pre></div>
 
 
   
@@ -1049,7 +1109,7 @@
 
 
 <h3 id="depeche_db.SubscriptionFactory.__call__" class="doc doc-heading">
-          <code class="highlight language-python"><span class="fm">__call__</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">handlers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">call_middleware</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">error_handler</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">state_provider</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lock_provider</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+          <code class="highlight language-python"><span class="fm">__call__</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">handlers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">call_middleware</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">error_handler</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">state_provider</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lock_provider</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 </h3>
 
@@ -1078,7 +1138,7 @@
           </td>
           <td>
             <div class="doc-md-description">
-              <p>The name of the subscription</p>
+              <p>The name of the subscription, needs to be a valid python identifier</p>
             </div>
           </td>
           <td>
@@ -1088,11 +1148,25 @@
         <tr>
           <td><code>handlers</code></td>
           <td>
-                <code><a class="autorefs autorefs-internal" title="depeche_db._interfaces.MessageHandlerRegisterProtocol" href="../message_handlers/#depeche_db.MessageHandlerRegisterProtocol">MessageHandlerRegisterProtocol</a>[<span title="depeche_db._factories.E">E</span>]</code>
+                <code><span title="typing.Optional">Optional</span>[<a class="autorefs autorefs-internal" title="depeche_db._interfaces.MessageHandlerRegisterProtocol" href="../message_handlers/#depeche_db.MessageHandlerRegisterProtocol">MessageHandlerRegisterProtocol</a>[<span title="depeche_db._factories.E">E</span>]]</code>
           </td>
           <td>
             <div class="doc-md-description">
-              <p>Handlers to be called when a message is received</p>
+              <p>Handlers to be called when a message is received, defaults to an empty register</p>
+            </div>
+          </td>
+          <td>
+                <code>None</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>batch_size</code></td>
+          <td>
+                <code><span title="typing.Optional">Optional</span>[int]</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>Number of messages to read at once, defaults to 10, read more <a class="autorefs autorefs-internal" href="#depeche_db.SubscriptionRunner">here</a></p>
             </div>
           </td>
           <td>
@@ -1106,7 +1180,7 @@
           </td>
           <td>
             <div class="doc-md-description">
-              <p>A middleware to be called before the handlers</p>
+              <p>A middleware to customize the call to the handlers</p>
             </div>
           </td>
           <td>
@@ -1120,7 +1194,7 @@
           </td>
           <td>
             <div class="doc-md-description">
-              <p>A handler for errors raised by the handlers</p>
+              <p>A handler for errors raised by the handlers, defaults to handler that will exit the subscription</p>
             </div>
           </td>
           <td>
@@ -1134,7 +1208,7 @@
           </td>
           <td>
             <div class="doc-md-description">
-              <p>A provider for the subscription state</p>
+              <p>Provider for the subscription state, defaults to a PostgreSQL provider</p>
             </div>
           </td>
           <td>
@@ -1148,7 +1222,7 @@
           </td>
           <td>
             <div class="doc-md-description">
-              <p>A provider for the subscription locks</p>
+              <p>Provider for the locks, defaults to a PostgreSQL provider</p>
             </div>
           </td>
           <td>
@@ -1168,7 +1242,8 @@
 
   </div>
 
-</div>
+</div><hr />
+
 
 <div class="doc doc-object doc-class">
 
@@ -1176,7 +1251,7 @@
 
 
 <h2 id="depeche_db.Subscription" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">depeche_db</span><span class="o">.</span><span class="n">Subscription</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">stream</span><span class="p">,</span> <span class="n">message_handler</span><span class="p">,</span> <span class="n">state_provider</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lock_provider</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">depeche_db</span><span class="o">.</span><span class="n">Subscription</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">stream</span><span class="p">,</span> <span class="n">message_handler</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">state_provider</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lock_provider</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 </h2>
 
@@ -1187,6 +1262,7 @@
 
   
       <p>A subscription is a way to read messages from an aggregated stream.</p>
+<p>Read more about the subscription in the <a href="../../concepts/subscriptions/">concepts section</a>.</p>
 
 
 
@@ -1208,21 +1284,7 @@
           </td>
           <td>
             <div class="doc-md-description">
-              <p>Name of the subscription</p>
-            </div>
-          </td>
-          <td>
-              <em>required</em>
-          </td>
-        </tr>
-        <tr>
-          <td><code>message_handler</code></td>
-          <td>
-                <code><a class="autorefs autorefs-internal" title="depeche_db._subscription.SubscriptionMessageHandler" href="#depeche_db.SubscriptionMessageHandler">SubscriptionMessageHandler</a>[<span title="depeche_db._subscription.E">E</span>]</code>
-          </td>
-          <td>
-            <div class="doc-md-description">
-              <p>Handler for the messages</p>
+              <p>Name of the subscription, needs to be a valid python identifier</p>
             </div>
           </td>
           <td>
@@ -1244,13 +1306,41 @@
           </td>
         </tr>
         <tr>
+          <td><code>message_handler</code></td>
+          <td>
+                <code><a class="autorefs autorefs-internal" title="depeche_db._subscription.SubscriptionMessageHandler" href="#depeche_db.SubscriptionMessageHandler">SubscriptionMessageHandler</a>[<span title="depeche_db._subscription.E">E</span>]</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>Handler for the messages</p>
+            </div>
+          </td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>batch_size</code></td>
+          <td>
+                <code><span title="typing.Optional">Optional</span>[int]</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>Number of messages to read at once, defaults to 10, read more <a class="autorefs autorefs-internal" href="#depeche_db.SubscriptionRunner">here</a></p>
+            </div>
+          </td>
+          <td>
+                <code>None</code>
+          </td>
+        </tr>
+        <tr>
           <td><code>state_provider</code></td>
           <td>
                 <code><span title="typing.Optional">Optional</span>[<a class="autorefs autorefs-internal" title="depeche_db._interfaces.SubscriptionStateProvider" href="#depeche_db.SubscriptionStateProvider">SubscriptionStateProvider</a>]</code>
           </td>
           <td>
             <div class="doc-md-description">
-              <p>Provider for the subscription state</p>
+              <p>Provider for the subscription state, defaults to a PostgreSQL provider</p>
             </div>
           </td>
           <td>
@@ -1264,7 +1354,7 @@
           </td>
           <td>
             <div class="doc-md-description">
-              <p>Provider for the locks</p>
+              <p>Provider for the locks, defaults to a PostgreSQL provider</p>
             </div>
           </td>
           <td>
@@ -1293,7 +1383,8 @@
 
   </div>
 
-</div>
+</div><hr />
+
 
 <div class="doc doc-object doc-class">
 
@@ -1351,6 +1442,8 @@
   <div class="doc doc-contents ">
   
       <p>Calls a handler with a given message.</p>
+<p>The type of the message depends on the type annotation of the handler function.
+See <a class="autorefs autorefs-internal" href="../message_handlers/#depeche_db.MessageHandlerRegister">MessageHandlerRegister</a> for more details.</p>
 
 
 
@@ -1406,7 +1499,8 @@
 
   </div>
 
-</div>
+</div><hr />
+
 
 <div class="doc doc-object doc-class">
 
@@ -1534,7 +1628,8 @@
 
   </div>
 
-</div>
+</div><hr />
+
 
 <div class="doc doc-object doc-class">
 
@@ -1609,7 +1704,89 @@
 
   </div>
 
-</div>
+</div><hr />
+
+
+<div class="doc doc-object doc-class">
+
+
+
+
+<h2 id="depeche_db.ExitSubscriptionErrorHandler" class="doc doc-heading">
+          <code>depeche_db.ExitSubscriptionErrorHandler</code>
+
+
+</h2>
+
+
+  <div class="doc doc-contents first">
+          <p class="doc doc-class-bases">
+            Bases: <code><a class="autorefs autorefs-internal" title="depeche_db._interfaces.SubscriptionErrorHandler" href="#depeche_db.SubscriptionErrorHandler">SubscriptionErrorHandler</a></code></p>
+
+  
+      <p>Exit the subscription on error</p>
+
+
+  
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+  </div>
+
+</div><hr />
+
+
+<div class="doc doc-object doc-class">
+
+
+
+
+<h2 id="depeche_db.LogAndIgnoreSubscriptionErrorHandler" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">depeche_db</span><span class="o">.</span><span class="n">LogAndIgnoreSubscriptionErrorHandler</span><span class="p">(</span><span class="n">subscription_name</span><span class="p">)</span></code>
+
+</h2>
+
+
+  <div class="doc doc-contents first">
+          <p class="doc doc-class-bases">
+            Bases: <code><a class="autorefs autorefs-internal" title="depeche_db._interfaces.SubscriptionErrorHandler" href="#depeche_db.SubscriptionErrorHandler">SubscriptionErrorHandler</a></code></p>
+
+  
+      <p>Log the error and ignore the message</p>
+
+
+  
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+  </div>
+
+</div><hr />
+
 
 <div class="doc doc-object doc-class">
 
@@ -1663,7 +1840,7 @@
           </td>
           <td>
             <div class="doc-md-description">
-              <p>The error handler to use</p>
+              <p>A handler for errors raised by the handlers, defaults to handler that will exit the subscription</p>
             </div>
           </td>
           <td>
@@ -1706,7 +1883,8 @@
 
   </div>
 
-</div>
+</div><hr />
+
 
 <div class="doc doc-object doc-class">
 
@@ -1714,7 +1892,7 @@
 
 
 <h2 id="depeche_db.SubscriptionRunner" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">depeche_db</span><span class="o">.</span><span class="n">SubscriptionRunner</span><span class="p">(</span><span class="n">subscription</span><span class="p">,</span> <span class="n">message_handler</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">depeche_db</span><span class="o">.</span><span class="n">SubscriptionRunner</span><span class="p">(</span><span class="n">subscription</span><span class="p">,</span> <span class="n">message_handler</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 </h2>
 
@@ -1725,6 +1903,14 @@
 
   
       <p>Handles messages from a subscription using a handler</p>
+<p>The <code>batch_size</code> argument controls how many messages to handle in each
+batch. If not provided, the default is 10. A larger batch size will
+result less round trips to the database, but will also make it more
+likely that messages from <em>different partitions</em> will be processed out of
+the order defined by their <code>global_position</code> on the message store.</p>
+<p>A batch size of 1 will ensure that messages are processed in order
+regarding to their <code>global_position</code>.
+Messages in the same partition will always be processed in order.</p>
 <p>Implements: <a class="autorefs autorefs-internal" href="../executor/#depeche_db.RunOnNotification">RunOnNotification</a></p>
 
 
@@ -1768,6 +1954,20 @@
               <em>required</em>
           </td>
         </tr>
+        <tr>
+          <td><code>batch_size</code></td>
+          <td>
+                <code><span title="typing.Optional">Optional</span>[int]</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>The number of messages to handle in each batch, defaults to 10</p>
+            </div>
+          </td>
+          <td>
+                <code>None</code>
+          </td>
+        </tr>
     </tbody>
   </table>
 
@@ -1790,7 +1990,8 @@
 
   </div>
 
-</div>
+</div><hr />
+
 
 <div class="doc doc-object doc-class">
 
@@ -1871,7 +2072,8 @@ This method must not block!</p>
 
   </div>
 
-</div>
+</div><hr />
+
 
 <div class="doc doc-object doc-class">
 

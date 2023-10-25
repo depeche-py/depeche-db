@@ -9,10 +9,10 @@
       
       
       
-        <link rel="prev" href="../data-model/">
+        <link rel="prev" href="../datastructures/">
       
       
-        <link rel="next" href="../../api/message_store/">
+        <link rel="next" href="../../CHANGELOG/">
       
       
       <link rel="icon" href="../../assets/logo-bg256.png">
@@ -20,7 +20,7 @@
     
     
       
-        <title>Subscriptions - Depeche DB</title>
+        <title>Exceptions - Depeche DB</title>
       
     
     
@@ -73,7 +73,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#subscriptions" class="md-skip">
+        <a href="#depeche_db.MessageNotFound" class="md-skip">
           Skip to content
         </a>
       
@@ -108,7 +108,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Subscriptions
+              Exceptions
             
           </span>
         </div>
@@ -384,20 +384,20 @@
       
   
   
-    
-  
   
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
         
           
           <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
@@ -411,7 +411,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             Concepts
@@ -424,11 +424,196 @@
   
   
     <li class="md-nav__item">
-      <a href="../data-model/" class="md-nav__link">
+      <a href="../../concepts/data-model/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
     Data model
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../concepts/subscriptions/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Subscriptions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  <span class="md-ellipsis">
+    API Docs
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            API Docs
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../message_store/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    MessageStore
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../aggregated_stream/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    AggregatedStream
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../subscription/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Subscription
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../executor/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Executor
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../message_handlers/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Message handlers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datastructures/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Data structures
   </span>
   
 
@@ -450,14 +635,12 @@
       <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
       
       
-        
-      
       
         <label class="md-nav__link md-nav__link--active" for="__toc">
           
   
   <span class="md-ellipsis">
-    Subscriptions
+    Exceptions
   </span>
   
 
@@ -468,7 +651,7 @@
         
   
   <span class="md-ellipsis">
-    Subscriptions
+    Exceptions
   </span>
   
 
@@ -480,8 +663,6 @@
   
   
   
-    
-  
   
     <label class="md-nav__title" for="__toc">
       <span class="md-nav__icon md-icon"></span>
@@ -490,29 +671,16 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#services-required-by-subscriptions" class="md-nav__link">
-    Services required by subscriptions
-  </a>
-  
-    <nav class="md-nav" aria-label="Services required by subscriptions">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#state" class="md-nav__link">
-    State
+  <a href="#depeche_db.MessageNotFound" class="md-nav__link">
+    MessageNotFound
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#locks" class="md-nav__link">
-    Locks
+      
+        <li class="md-nav__item">
+  <a href="#depeche_db.OptimisticConcurrencyError" class="md-nav__link">
+    OptimisticConcurrencyError
   </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -520,191 +688,6 @@
   
 </nav>
       
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-    
-    
-    
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_4" >
-        
-          
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
-            
-  
-  <span class="md-ellipsis">
-    API Docs
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4">
-            <span class="md-nav__icon md-icon"></span>
-            API Docs
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/message_store/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    MessageStore
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/aggregated_stream/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    AggregatedStream
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/subscription/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Subscription
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/executor/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Executor
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/message_handlers/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Message handlers
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/datastructures/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Data structures
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/exceptions/" class="md-nav__link">
-        
-  
-  <span class="md-ellipsis">
-    Exceptions
-  </span>
-  
-
-      </a>
     </li>
   
 
@@ -753,8 +736,6 @@
   
   
   
-    
-  
   
     <label class="md-nav__title" for="__toc">
       <span class="md-nav__icon md-icon"></span>
@@ -763,29 +744,16 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#services-required-by-subscriptions" class="md-nav__link">
-    Services required by subscriptions
-  </a>
-  
-    <nav class="md-nav" aria-label="Services required by subscriptions">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#state" class="md-nav__link">
-    State
+  <a href="#depeche_db.MessageNotFound" class="md-nav__link">
+    MessageNotFound
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#locks" class="md-nav__link">
-    Locks
+      
+        <li class="md-nav__item">
+  <a href="#depeche_db.OptimisticConcurrencyError" class="md-nav__link">
+    OptimisticConcurrencyError
   </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -807,54 +775,52 @@
   
 
 
-<h1 id="subscriptions">Subscriptions</h1>
-<p>Given an aggregated stream, we can create a number of subscriptions on it which
-are discriminated by a name. A subscription works roughly like this:</p>
-<ol>
-<li>Wait for a trigger</li>
-<li>Get the current state (pairs of partition number &amp; last processed position)</li>
-<li>For each partition that has messages after the known position (ordered by the
-   message time of the oldest unprocessed message)<ol>
-<li>Try to acquire a lock (subscription group name, partition)</li>
-<li>Re-validate the state (a parallel process might have advanced it already)</li>
-<li>Process the message(s) (depending on the batch size)</li>
-<li>Update the state with the new position</li>
-<li>Release the lock</li>
-</ol>
-</li>
-</ol>
-<p>This algorithm allows us to process messages concurrently while still honoring
-the ordering guarantees within a partition because only one instance can
-process messages from any given partition at any time. It can be described as
-an instance of the competing consumers pattern.</p>
-<p>The ordering done in step 3 is not necessary to keep any of the guarantees but
-helps to keep up with the expectation that messages in the system are processed
-roughly in the order given by their message time. It also helps with fairness,
-because it will favor processing older messages first.</p>
-<p>The order of steps 3c and 3d makes this a "at least once" delivery system,
-because the message is processed before the new position is recorded.</p>
-<h2 id="services-required-by-subscriptions">Services required by subscriptions</h2>
-<p>A subscription requires two services provided to it:</p>
-<ol>
-<li>Subscription state storage</li>
-<li>(Distributed) Locks</li>
-</ol>
-<p>Both of the services have a default implementation but it may be a good idea to
-check if you should customize/replace it to your needs. The interfaces of both
-services are pretty simple.</p>
-<h3 id="state">State</h3>
-<p>The best location for the subscription state is - especially in the context of
-transactionally safe storage - close to the state that is altered in the course
-of the application code handling messages.</p>
-<p>If you can manage to get the subscription state updates within the same
-transaction as the application state, you essentially implemented a
-"exactly-once" message processing mechanism.</p>
-<h3 id="locks">Locks</h3>
-<p>The default locking provider uses again PostgreSQL, namely advisory locks
-through the <code>pals</code> library. If for some reason your system is not actually
-distributed to multiple machines, you could replace if with a simpler &amp; faster
-locking system. Or maybe you already have a distributed locking infrastructure,
-then it might be worth a look to use it here too.</p>
+  <h1>Exceptions</h1>
+
+<div class="doc doc-object doc-class">
+
+
+
+
+<h2 id="depeche_db.MessageNotFound" class="doc doc-heading">
+          <code>depeche_db.MessageNotFound</code>
+
+
+</h2>
+
+
+  <div class="doc doc-contents first">
+          <p class="doc doc-class-bases">
+            Bases: <code>Exception</code></p>
+
+
+
+  </div>
+
+</div><hr />
+
+
+<div class="doc doc-object doc-class">
+
+
+
+
+<h2 id="depeche_db.OptimisticConcurrencyError" class="doc doc-heading">
+          <code>depeche_db.OptimisticConcurrencyError</code>
+
+
+</h2>
+
+
+  <div class="doc doc-contents first">
+          <p class="doc doc-class-bases">
+            Bases: <code>Exception</code></p>
+
+
+
+  </div>
+
+</div>
 
 
 

@@ -768,6 +768,26 @@
 
               
             
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../exceptions/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Exceptions
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1238,7 +1258,7 @@ messages to the stream that are not already in it.</p>
 <p>Optimistic concurrency control must used to ensure that the stream is
 not modified by another process between reading the last message and
 writing the new message. You have to give <code>expected_version</code>. If the
-stream has been modified, a <code>ValueError</code> will be raised.</p>
+stream has been modified, a <code>OptimisticConcurrencyError</code> will be raised.</p>
 <p>You can give a connection to use for the write as <code>conn</code>. If you don't
 give a connection, a new connection will be created and the write will
 be committed. You can use this to write messages and other data in a
@@ -1363,7 +1383,8 @@ commit the transaction yourself</strong>.</p>
 <p>Optimistic concurrency control can used to ensure that the stream is
 not modified by another process between reading the last message and
 writing the new message. You have to give <code>expected_version</code> to use it.
-If the stream has been modified, a <code>ValueError</code> will be raised.</p>
+If the stream has been modified, a <code>OptimisticConcurrencyError</code> will be
+raised.</p>
 <p>You can give a connection to use for the write as <code>conn</code>. If you don't
 give a connection, a new connection will be created and the write will
 be committed. You can use this to write messages and other data in a
@@ -1476,7 +1497,8 @@ commit the transaction yourself</strong>.</p>
 
   </div>
 
-</div>
+</div><hr />
+
 
 <div class="doc doc-object doc-class">
 
@@ -1721,7 +1743,8 @@ commit the transaction yourself</strong>.</p>
 
   </div>
 
-</div>
+</div><hr />
+
 
 <div class="doc doc-object doc-class">
 
