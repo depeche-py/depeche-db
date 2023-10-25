@@ -180,7 +180,6 @@ class SubscriptionMessageHandler(Generic[E]):
                 )
                 if error_handling_result == ErrorAction.EXIT:
                     raise
-        # TODO else raise error?
 
     def _exec(
         self,

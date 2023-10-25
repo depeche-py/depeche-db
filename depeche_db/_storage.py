@@ -11,6 +11,7 @@ from sqlalchemy.dialects.postgresql import JSONB as _PostgresJsonb
 from sqlalchemy_utils import UUIDType as _UUIDType
 
 from ._compat import SAConnection
+from ._exceptions import OptimisticConcurrencyError
 from ._interfaces import MessagePosition
 
 
@@ -93,7 +94,7 @@ class Storage:
                     )
                 )
         except _sa.exc.InternalError:
-            raise ValueError("optimistic concurrency failure")
+            raise OptimisticConcurrencyError("optimistic concurrency failure")
         row = result.fetchone()
         return MessagePosition(
             stream=stream,

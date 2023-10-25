@@ -2,6 +2,7 @@
 
 * Nicer interface to create `AggregatedStream` & `Subscription`
 * Move runner back onto `Subscription`
+* Improved exceptions
 
 # 0.5.0
 
