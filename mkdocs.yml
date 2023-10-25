@@ -28,6 +28,7 @@ nav:
     - Executor: api/executor.md
     - Message handlers: api/message_handlers.md
     - Data structures: api/datastructures.md
+    - Exceptions: api/exceptions.md
   - Changelog: CHANGELOG.md
 plugins:
   - mermaid2:
