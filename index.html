@@ -266,35 +266,29 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#features" class="md-nav__link">
-    Features
-  </a>
-  
-    <nav class="md-nav" aria-label="Features">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#message-store" class="md-nav__link">
-    Message store
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#subscriptions" class="md-nav__link">
-    Subscriptions
+  <a href="#use-cases" class="md-nav__link">
+    Use cases
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#background" class="md-nav__link">
-    Background
+  <a href="#documentation" class="md-nav__link">
+    Documentation
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#justification" class="md-nav__link">
+    Justification
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#background-prior-art" class="md-nav__link">
+    Background &amp; prior art
   </a>
   
 </li>
@@ -768,35 +762,29 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#features" class="md-nav__link">
-    Features
-  </a>
-  
-    <nav class="md-nav" aria-label="Features">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#message-store" class="md-nav__link">
-    Message store
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#subscriptions" class="md-nav__link">
-    Subscriptions
+  <a href="#use-cases" class="md-nav__link">
+    Use cases
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#background" class="md-nav__link">
-    Background
+  <a href="#documentation" class="md-nav__link">
+    Documentation
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#justification" class="md-nav__link">
+    Justification
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#background-prior-art" class="md-nav__link">
+    Background &amp; prior art
   </a>
   
 </li>
@@ -820,29 +808,46 @@
 
 
 <h1 id="depeche-db">Depeche DB</h1>
-<p>A library for building event-based systems on top of PostgreSQL</p>
-<h2 id="features">Features</h2>
-<p>Depeche DB has two main parts:</p>
-<h3 id="message-store">Message store</h3>
+<p>Depeche DB is modern Python library for building event-based systems</p>
+<p>Key features:</p>
 <ul>
-<li>store &amp; read messages</li>
-<li>multiple streams</li>
-<li>optimistic concurrency control</li>
+<li>Message store with optimistic concurrency control &amp; strong ordering guarantees</li>
+<li>Subscriptions with "at least once" semantics</li>
+<li>Parallel processing of (partitioned) subscriptions</li>
+<li>No database polling</li>
 </ul>
-<h2 id="subscriptions">Subscriptions</h2>
+<h2 id="use-cases">Use cases</h2>
+<p>Depeche DB can be used to cover the following:</p>
 <ul>
-<li>aggregate messages from multiple streams</li>
-<li>subscribe to aggregated stream</li>
-<li>no polling (uses PostgreSQL <code>NOTIFY</code>/<code>LISTEN</code>)</li>
-<li>tools for keeping track of subscription state</li>
-<li>concurrent processing (aggregated streams can be partioned)</li>
+<li>Building event-sourced systems</li>
+<li>Building pub-sub systems</li>
+<li>Asynchronous command handling</li>
+<li>Use as a transactional outbox when application state and event store need to be in-sync</li>
 </ul>
-<h2 id="background">Background</h2>
+<h2 id="documentation">Documentation</h2>
+<p>If you are interested in a quick tour of the features shown with example code,
+please have a look at the <a href="getting-started/installation/">Getting Started
+Guide</a>.</p>
+<p>More details on the data model and algorithms can be found on the
+<a href="concepts/data-model/">Concepts</a> pages.</p>
+<p>The <a href="api/message_store/">API Docs</a> give you all the details on how to use
+the library.</p>
+<h2 id="justification">Justification</h2>
+<p>You might ask "Why on earth use PostgreSQL to store events?". For many use
+cases, you are probably right to assume that this is not the best solution.</p>
+<p>The main driver behind the development of this library is simplicity. We want
+to use boring tools and benefit from the knowledge built over years. With a
+RDBMS like PostgreSQL, you know what you get. You have proven ways of scaling
+them. You know how a backup works. You known their limits.</p>
+<p>So, if an application does not generate or handle hundreds of events per second
+and will not accumulate millions of messages, maybe using a RDBMS might be a
+good choice.</p>
+<h2 id="background-prior-art">Background &amp; prior art</h2>
 <p>Depeche DB is obviously influenced by message stores like
 <a href="https://www.eventstore.com/">EventStoreDB</a> and takes some inspiration from
 <a href="https://kafka.apache.org/">Kafka</a>. More inspiration is taken from
-<a href="https://martendb.io/">Marten</a>, a project that implements an event store on top
-of PostgreSQL. Another strong influence has been the <a href="https://github.com/message-db/message-db">Message
+<a href="https://martendb.io/">Marten</a>, a project that also implements an event store
+on top of PostgreSQL. Another strong influence has been the <a href="https://github.com/message-db/message-db">Message
 DB</a> project which is pretty similar
 on the implementation side.</p>
 
