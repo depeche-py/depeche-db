@@ -3,6 +3,8 @@ import uuid as _uuid
 
 import pytest
 
+from depeche_db import OptimisticConcurrencyError
+
 
 def test_write(db_engine, storage):
     with db_engine.connect() as conn:
@@ -76,7 +78,7 @@ def test_write_concurrency_failure(db_engine, storage):
         assert result.version == 1
 
         id2 = _uuid.uuid4()
-        with pytest.raises(ValueError):
+        with pytest.raises(OptimisticConcurrencyError):
             result = subject.add(conn, "stream1", 0, id2, {"foo": "bar2"})
 
 

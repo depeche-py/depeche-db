@@ -2,7 +2,7 @@ import uuid as _uuid
 
 import pytest
 
-from depeche_db import MessagePosition
+from depeche_db import MessagePosition, OptimisticConcurrencyError
 
 from ._my_event import MyEvent
 
@@ -28,15 +28,15 @@ def test_write_with_connection(db_engine, subject, events):
 
 
 def test_write_concurrency_failure_empty(subject, events):
-    with pytest.raises(ValueError):
+    with pytest.raises(OptimisticConcurrencyError):
         subject.write(stream=STREAM, message=events[0], expected_version=1)
 
 
 def test_write_concurrency_failure(subject, events):
     subject.write(stream=STREAM, message=events[0], expected_version=0)
-    with pytest.raises(ValueError):
+    with pytest.raises(OptimisticConcurrencyError):
         subject.write(stream=STREAM, message=events[0], expected_version=0)
-    with pytest.raises(ValueError):
+    with pytest.raises(OptimisticConcurrencyError):
         subject.write(stream=STREAM, message=events[0], expected_version=2)
 
 
