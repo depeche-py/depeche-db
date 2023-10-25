@@ -54,9 +54,8 @@ class NumMessagePartitioner:
         return message.message.content % 10
 
 
-stream = AggregatedStream[MyMessage](
+stream = message_store.aggregated_stream(
     name="example_pub_sub1",
-    store=message_store,
     partitioner=NumMessagePartitioner(),
     stream_wildcards=["aggregate-me-%"],
 )
@@ -74,10 +73,7 @@ def handle_event_a(message: SubscriptionMessage[MyMessage]):
     time.sleep(0.05)
 
 
-subscription = Subscription(name="example_pub_sub", stream=stream)
-subscription_runner = SubscriptionRunner(
-    subscription=subscription, handler=SubscriptionMessageHandler(handlers)
-)
+subscription = stream.subscription(name="example_pub_sub", handlers=handlers)
 
 
 def pub():
@@ -98,7 +94,7 @@ def sub():
     print("Subscribing to messages")
     executor = Executor(db_dsn=DB_DSN)
     executor.register(stream.projector)
-    executor.register(subscription_runner)
+    executor.register(subscription.runner)
     start = time.time()
     executor.run()
     print(f"Subscriber handled {HANDLED / (time.time() - start):.2f} mgs/s")

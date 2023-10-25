@@ -13,10 +13,12 @@ from typing import (
     TypeVar,
     Union,
     no_type_check,
+    runtime_checkable,
 )
 
 
-class MessageProtocol:
+@runtime_checkable
+class MessageProtocol(Protocol):
     """
     Message protocol is a base class for all messages that are used in the system.
     """
@@ -240,9 +242,8 @@ class RunOnNotification(Protocol):
     can be registered with a [Executor][depeche_db.Executor] object.
 
     Implemented by:
-
-    - [SubscriptionRunner][depeche_db.SubscriptionRunner]
-    - [StreamProjector][depeche_db.StreamProjector]
+        - [SubscriptionRunner][depeche_db.SubscriptionRunner]
+        - [StreamProjector][depeche_db.StreamProjector]
     """
 
     @property
@@ -341,6 +342,10 @@ class HandlerDescriptor(Generic[E]):
 class MessageHandlerRegisterProtocol(Protocol, Generic[E]):
     """
     Message handler register protocol is used by runners to find handlers for messages.
+
+    Implemented by:
+        - [MessageHandlerRegister][depeche_db.MessageHandlerRegister]
+        - [MessageHandler][depeche_db.MessageHandler]
     """
 
     def get_all_handlers(self) -> Iterator[HandlerDescriptor[E]]:

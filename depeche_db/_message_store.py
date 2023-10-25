@@ -6,6 +6,7 @@ import sqlalchemy as _sa
 
 from ._compat import SAConnection
 from ._exceptions import MessageNotFound
+from ._factories import AggregatedStreamFactory
 from ._interfaces import (
     MessagePosition,
     MessageProtocol,
@@ -131,10 +132,14 @@ class MessageStore(Generic[E]):
                 the database objects that are created.
             engine (Engine): A SQLAlchemy engine.
             serializer (MessageSerializer): A serializer for the messages.
+
+        Attributes:
+            aggregated_stream (AggregatedStreamFactory): A factory for aggregated streams.
         """
         self.engine = engine
         self._storage = Storage(name=name, engine=engine)
         self._serializer = serializer
+        self.aggregated_stream = AggregatedStreamFactory(store=self)
 
     def _get_connection(self) -> SAConnection:
         return self.engine.connect()

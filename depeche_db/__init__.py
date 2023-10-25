@@ -1,10 +1,12 @@
 from ._aggregated_stream import AggregatedStream, StreamProjector  # noqa: F401
 from ._executor import Executor  # noqa: F401
+from ._factories import AggregatedStreamFactory, SubscriptionFactory  # noqa: F401
 from ._interfaces import (  # noqa: F401
     CallMiddleware,
     ErrorAction,
     HandlerDescriptor,
     LockProvider,
+    MessageHandlerRegisterProtocol,
     MessagePartitioner,
     MessagePosition,
     MessageProtocol,

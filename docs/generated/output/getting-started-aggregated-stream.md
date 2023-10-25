@@ -16,7 +16,7 @@ for _ in range(20):
 For our aggregated stream, we need to prepare a partition function (or rather class).
 
 ```python
-from depeche_db import AggregatedStream, StoredMessage
+from depeche_db import StoredMessage
 
 
 class NumMessagePartitioner:
@@ -29,9 +29,8 @@ class NumMessagePartitioner:
 Now we can put together the aggregated stream.
 
 ```python
-aggregated_stream = AggregatedStream[EventA | EventB](
+aggregated_stream = message_store.aggregated_stream(
     name="example_docs_aggregate_me2",
-    store=message_store,
     partitioner=NumMessagePartitioner(),
     stream_wildcards=["aggregate-me-%"],
 )
@@ -43,7 +42,21 @@ appended to the relevant partition of the aggregated stream in the right order.
 We will not have to call this manually though. We can use the
 [`Executor`](../../getting-started/executor.md) to do it for us.
 
+We can read from the aggregated stream directly:
 
-Usually, we do not read the aggregated stream directly, but we would use
+```python
+print(next(aggregated_stream.read(partition=2)))
+#  AggregatedStreamMessage(
+#      partition=2,
+#      position=0,
+#      message_id=UUID("1f804185-e63d-462e-b996-d6f16e5ff8af")
+#  )
+```
+
+The `AggregatedStreamMessage` object contains minimal metadata about the message
+in the context of the aggregated stream. It does not contain the original message
+though. To get that, we need to use the message store reader.
+
+Usually though we will not read the aggregated stream directly, but rather use
 a subscription to consume it. We will get to that in the [next
 chapter](getting-started-subscription.md).

@@ -1,3 +1,8 @@
+# 0.6.0 (unreleased)
+
+* Nicer interface to create `AggregatedStream` & `Subscription`
+* Move runner back onto `Subscription`
+
 # 0.5.0
 
 * Fix excessive CPU usage caused by `threading.Event.wait`

@@ -12,7 +12,6 @@ from depeche_db import (
     Subscription,
     SubscriptionMessage,
     SubscriptionMessageHandler,
-    SubscriptionRunner,
 )
 from tests._account_example import (
     AccountCreditedEvent,
@@ -138,7 +137,7 @@ def test_uses_call_middleware():
     assert seen == [123]
 
 
-def test_exhausts_the_aggregated_stream(stream_with_events, subscription_factory):
+def test_exhausts_the_aggregated_stream(identifier, stream_with_events):
     register: MessageHandlerRegister[Any] = MessageHandlerRegister()
     seen: List[AccountEvent] = []
 
@@ -146,12 +145,10 @@ def test_exhausts_the_aggregated_stream(stream_with_events, subscription_factory
     def handle(event: AccountEvent):
         seen.append(event)
 
-    subscription: Subscription = subscription_factory(stream_with_events)
-    subject = SubscriptionRunner(
-        subscription=subscription, handler=SubscriptionMessageHandler(register)
+    subscription: Subscription = stream_with_events.subscription(
+        name=identifier(), handlers=register
     )
-
-    subject.run_once()
+    subscription.runner.run_once()
     assert len(seen) == 5
 
 

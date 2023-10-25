@@ -6,13 +6,12 @@ def test_stream_statisitics(db_engine, store_with_events, stream_factory):
     subject = stream_factory(event_store)
     subject.projector.update_full()
 
-    with db_engine.connect() as conn:
-        assert [msg.message_id for msg in subject.read(conn, partition=1)] == [
-            evt.event_id for evt in account.events
-        ]
-        assert [msg.message_id for msg in subject.read(conn, partition=2)] == [
-            evt.event_id for evt in account2.events
-        ]
+    assert [msg.message_id for msg in subject.read(partition=1)] == [
+        evt.event_id for evt in account.events
+    ]
+    assert [msg.message_id for msg in subject.read(partition=2)] == [
+        evt.event_id for evt in account2.events
+    ]
 
     assert list(
         subject.get_partition_statistics(position_limits={1: 1}, result_limit=1)

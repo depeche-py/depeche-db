@@ -22,12 +22,47 @@ H = TypeVar("H", bound=Callable)
 
 
 class MessageHandlerRegister(Generic[E]):
+    """
+    Message handler register is a registry of message handlers.
+
+    Typical usage:
+
+        handlers = MessageHandlerRegister()
+
+        @handlers.register
+        def handle_message(message: MyMessage):
+            ...
+
+        @handlers.register
+        def handle_other_message(message: StoredMessage[MyOtherMessage]):
+            ...
+
+    Implements: [MessageHandlerRegisterProtocol][depeche_db.MessageHandlerRegisterProtocol]
+    """
+
     def __init__(
         self,
     ):
         self._handlers: Dict[Type[E], HandlerDescriptor] = {}
 
     def register(self, handler: H) -> H:
+        """
+        Registers a handler for a given message type.
+
+        The handler must have at least one parameter. The first parameter must
+        be of a message type. `E` being your message type, the parameter can be
+        of type `E`, `SubscriptionMessage[E]` or `StoredMessage[E]`. When a
+        handler is called, the message will be passed in the requested type.
+
+        Multiple handlers can be registered for non-overlapping types of
+        messages. Overlaps will cause a `ValueError`.
+
+        Args:
+            handler: A handler function.
+
+        Returns:
+            The unaltered handler function.
+        """
         signature = _inspect.signature(handler)
         if len(signature.parameters) < 1:
             raise ValueError("Handler must have at least one parameter")
@@ -79,6 +114,25 @@ class MessageHandlerRegister(Generic[E]):
 
 
 class MessageHandler(Generic[E]):
+    """
+    Message handler is a base class for message handlers.
+
+    This is basically a class-based version of the `MessageHandlerRegister`.
+
+    Typical usage (equivalent to the example in `MessageHandlerRegister`):
+
+        class MyMessageHandler(MessageHandler):
+            @MessageHandler.register
+            def handle_message(self, message: MyMessage):
+                ...
+
+            @MessageHandler.register
+            def handle_other_message(self, message: StoredMessage[MyOtherMessage]):
+                ...
+
+    Implements: [MessageHandlerRegisterProtocol][depeche_db.MessageHandlerRegisterProtocol]
+    """
+
     _register: MessageHandlerRegister[E]
 
     def __init__(self):

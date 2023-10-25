@@ -17,10 +17,8 @@ from uuid import UUID, uuid4
 
 import pydantic
 
-from depeche_db import MessageProtocol
 
-
-class MyEvent(pydantic.BaseModel, MessageProtocol):
+class MyEvent(pydantic.BaseModel):
     event_id: UUID = pydantic.Field(default_factory=uuid4)
     happened_at: datetime = pydantic.Field(default_factory=datetime.utcnow)
 

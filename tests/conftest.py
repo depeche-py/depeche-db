@@ -11,7 +11,6 @@ from depeche_db import (
     MessagePartitioner,
     MessageStore,
     StoredMessage,
-    Subscription,
     SubscriptionState,
 )
 from tests._account_example import (
@@ -147,9 +146,8 @@ def stream_with_events(identifier, db_engine, store_with_events, stream_factory)
 @pytest.fixture
 def subscription_factory(identifier, lock_provider):
     def _inner(stream):
-        return Subscription(
+        return stream.subscription(
             name=identifier(),
-            stream=stream,
             lock_provider=lock_provider,
             state_provider=MyStateProvider(),
         )

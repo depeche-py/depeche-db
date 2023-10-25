@@ -8,6 +8,7 @@ from psycopg2.errors import LockNotAvailable
 from sqlalchemy_utils import UUIDType as _UUIDType
 
 from ._compat import SAConnection
+from ._factories import SubscriptionFactory
 from ._interfaces import (
     AggregatedStreamMessage,
     MessagePartitioner,
@@ -39,9 +40,11 @@ class AggregatedStream(Generic[E]):
         Attributes:
             name (str): Stream name
             projector (StreamProjector): Stream projector
+            subscription (SubscriptionFactory): Factory to create subscriptions
         """
         assert name.isidentifier(), "name must be a valid identifier"
         self.name = name
+        self.subscription = SubscriptionFactory(self)
         self._store = store
         self._metadata = _sa.MetaData()
         self._table = _sa.Table(
@@ -133,24 +136,24 @@ class AggregatedStream(Generic[E]):
             )
         )
 
-    def read(
-        self, conn: SAConnection, partition: int
-    ) -> Iterator[AggregatedStreamMessage]:
+    def read(self, partition: int) -> Iterator[AggregatedStreamMessage]:
         """
         Read all messages from a partition of the aggregated stream.
 
         Args:
-            conn: Database connection
             partition: Partition number
         """
-        for row in conn.execute(
-            _sa.select(self._table.c.message_id, self._table.c.position)
-            .where(self._table.c.partition == partition)
-            .order_by(self._table.c.position)
-        ):
-            yield AggregatedStreamMessage(
-                message_id=row.message_id, position=row.position, partition=partition
-            )
+        with self._connection() as conn:
+            for row in conn.execute(
+                _sa.select(self._table.c.message_id, self._table.c.position)
+                .where(self._table.c.partition == partition)
+                .order_by(self._table.c.position)
+            ):
+                yield AggregatedStreamMessage(
+                    message_id=row.message_id,
+                    position=row.position,
+                    partition=partition,
+                )
 
     def read_slice(
         self, partition: int, start: int, count: int

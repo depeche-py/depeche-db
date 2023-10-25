@@ -15,7 +15,7 @@ from depeche_db import (
 E = TypeVar("E", bound=MessageProtocol)
 
 
-class Event(_pydantic.BaseModel, MessageProtocol):
+class Event(_pydantic.BaseModel):
     event_id: _uuid.UUID = _pydantic.Field(default_factory=_uuid.uuid4)
     occurred_at: _dt.datetime = _pydantic.Field(default_factory=_dt.datetime.utcnow)
 

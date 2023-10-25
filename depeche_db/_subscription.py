@@ -54,6 +54,7 @@ class Subscription(Generic[E]):
         self,
         name: str,
         stream: AggregatedStream[E],
+        message_handler: "SubscriptionMessageHandler[E]",
         state_provider: Optional[SubscriptionStateProvider] = None,
         lock_provider: Optional[LockProvider] = None,
         # TODO start at time
@@ -64,6 +65,7 @@ class Subscription(Generic[E]):
 
         Args:
             name: Name of the subscription
+            message_handler: Handler for the messages
             stream: Stream to read from
             state_provider: Provider for the subscription state
             lock_provider: Provider for the locks
@@ -76,6 +78,10 @@ class Subscription(Generic[E]):
         )
         self._state_provider = state_provider or _tools.DbSubscriptionStateProvider(
             name, self._stream._store.engine
+        )
+        self.runner = SubscriptionRunner(
+            subscription=self,
+            message_handler=message_handler,
         )
 
     def get_next_messages(self, count: int) -> Iterator[SubscriptionMessage[E]]:
@@ -151,7 +157,6 @@ class SubscriptionMessageHandler(Generic[E]):
             handler_register: The handler register to use
             error_handler: The error handler to use
             call_middleware: The middleware to call before calling the handler
-
         """
         self._register = handler_register
         self._error_handler = error_handler or ExitSubscriptionErrorHandler()
@@ -199,7 +204,7 @@ class SubscriptionRunner(Generic[E]):
     ) -> "SubscriptionRunner[E]":
         return cls(
             subscription=subscription,
-            handler=SubscriptionMessageHandler(
+            message_handler=SubscriptionMessageHandler(
                 handler_register=handlers,
                 call_middleware=call_middleware,
                 error_handler=error_handler,
@@ -209,7 +214,7 @@ class SubscriptionRunner(Generic[E]):
     def __init__(
         self,
         subscription: Subscription[E],
-        handler: SubscriptionMessageHandler,
+        message_handler: SubscriptionMessageHandler,
     ):
         """
         Handles messages from a subscription using a handler
@@ -218,12 +223,12 @@ class SubscriptionRunner(Generic[E]):
 
         Args:
             subscription: The subscription to handle
-            handler: The handler to use
+            message_handler: The handler to use
         """
         self._subscription = subscription
         self._batch_size = 100
         self._keep_running = True
-        self._handler = handler
+        self._handler = message_handler
 
     @property
     def notification_channel(self) -> str:

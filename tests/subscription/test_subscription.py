@@ -2,7 +2,7 @@ import threading
 import time
 from typing import List
 
-from depeche_db import Subscription, SubscriptionMessage
+from depeche_db import SubscriptionMessage
 from depeche_db.tools import DbSubscriptionStateProvider
 
 # from ._tools import MyLockProvider, MyStateProvider, MyThreadLockProvider
@@ -33,9 +33,8 @@ def test_db_subscription_state(
     identifier, db_engine, stream_with_events, lock_provider
 ):
     state_provider_name = identifier()
-    subject = Subscription[AccountEvent](
+    subject = stream_with_events.subscription(
         name=identifier(),
-        stream=stream_with_events,
         lock_provider=lock_provider,
         state_provider=DbSubscriptionStateProvider(
             engine=db_engine, name=state_provider_name
@@ -53,9 +52,8 @@ def test_db_subscription_state(
 
     assert_subscription_event_order(events)
 
-    subject = Subscription[AccountEvent](
+    subject = stream_with_events.subscription(
         name=subject.name,
-        stream=stream_with_events,
         lock_provider=lock_provider,
         state_provider=DbSubscriptionStateProvider(
             engine=db_engine, name=state_provider_name

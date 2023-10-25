@@ -26,7 +26,8 @@ nav:
     - AggregatedStream: api/aggregated_stream.md
     - Subscription: api/subscription.md
     - Executor: api/executor.md
-    - datastructures: api/datastructures.md
+    - Message handlers: api/message_handlers.md
+    - Data structures: api/datastructures.md
   - Changelog: CHANGELOG.md
 plugins:
   - mermaid2:
