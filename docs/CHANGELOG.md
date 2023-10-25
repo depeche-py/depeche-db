@@ -1,4 +1,7 @@
-# 0.6.0 (unreleased)
+# TBD unreleased
+
+
+# 0.6.0
 
 * Nicer interface to create `AggregatedStream` & `Subscription`
 * Move runner back onto `Subscription`
