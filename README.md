@@ -28,6 +28,7 @@ Key features:
 
 * Message store with optimistic concurrency control & strong ordering guarantees
 * Subscriptions with "at least once" semantics
+* Parallel processing of (partitioned) subscriptions
 * No database polling
 
 ## Requirements
