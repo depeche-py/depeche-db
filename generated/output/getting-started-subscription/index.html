@@ -599,11 +599,31 @@
   
   
     <li class="md-nav__item">
+      <a href="../../../api/message_handlers/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Message handlers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../../../api/datastructures/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    datastructures
+    Data structures
   </span>
   
 
@@ -678,15 +698,11 @@
 <h1 id="subscription">Subscription</h1>
 <p>Given the aggregated stream from the previous chapter, we can put together a
 subscription.</p>
-<div class="language-python highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">from</span> <span class="nn">depeche_db</span> <span class="kn">import</span> <span class="n">Subscription</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">subscription</span> <span class="o">=</span> <span class="n">Subscription</span><span class="p">[</span><span class="n">EventA</span> <span class="o">|</span> <span class="n">EventB</span><span class="p">](</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;sub_example_docs_aggregate_me2&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>    <span class="n">stream</span><span class="o">=</span><span class="n">aggregated_stream</span><span class="p">,</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">subscription</span> <span class="o">=</span> <span class="n">aggregated_stream</span><span class="o">.</span><span class="n">subscription</span><span class="p">(</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;sub_example_docs_aggregate_me&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="p">)</span>
 </code></pre></div>
-<p>You can read from a subscription directly but you will usually want to use
-a <code>SubscriptionRunner</code> to do that for you. Whenever <code>get_next_messages</code> emits
+<p>You can read from a subscription directly. Whenever <code>get_next_messages</code> emits
 a message, it will update the position of the subscription, so that the next
 call will return the next message.</p>
 <p>The emitted message is wrapped in a <code>SubscriptionMessage</code> object which contains
@@ -709,10 +725,11 @@ the metadata about the message in the context of the subscription/aggregated str
 <a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="c1">#      ),</span>
 <a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="c1">#  )</span>
 </code></pre></div>
-<p>In order to continously handle messages on a subscription we use a
-<code>MessageHandlerRegister</code> and a <code>SubscriptionRunner</code>.</p>
-<p>First we create a <code>MessageHandlerRegister</code> and register a handler for the
-message type we are interested in.
+<p>Reading from a subscription directly is not the most common use case though.
+In order to continously handle messages on a subscription we create a
+<code>MessageHandlerRegister</code> and pass this in when we create the subscription.</p>
+<p>On the <code>MessageHandlerRegister</code> we register a handler for the
+message type(s) we are interested in.
 You can register multiple handlers for different message types but the handled
 message types must not overlap. Given your message type <code>E</code>, you can request
 <code>SubscriptionMessage[E]</code>, <code>StoredMessage[E]</code> or <code>E</code> as the type of the
@@ -727,23 +744,23 @@ argument to the handler by using type hints.</p>
 <a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">real_message</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">stored_message</span><span class="o">.</span><span class="n">message</span>
 <a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;num=</span><span class="si">{</span><span class="n">real_message</span><span class="o">.</span><span class="n">num</span><span class="si">}</span><span class="s2"> (partition </span><span class="si">{</span><span class="n">msg</span><span class="o">.</span><span class="n">partition</span><span class="si">}</span><span class="s2"> at </span><span class="si">{</span><span class="n">msg</span><span class="o">.</span><span class="n">position</span><span class="si">}</span><span class="s2">)&quot;</span><span class="p">)</span>
 </code></pre></div>
-<p>Now we can create a <code>SubscriptionRunner</code> and run it.</p>
-<div class="language-python highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="kn">from</span> <span class="nn">depeche_db</span> <span class="kn">import</span> <span class="n">SubscriptionRunner</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">subscription_runner</span> <span class="o">=</span> <span class="n">SubscriptionRunner</span><span class="o">.</span><span class="n">create</span><span class="p">(</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">subscription</span><span class="o">=</span><span class="n">subscription</span><span class="p">,</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">handlers</span><span class="o">=</span><span class="n">handlers</span><span class="p">,</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="p">)</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">subscription_runner</span><span class="o">.</span><span class="n">run_once</span><span class="p">()</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="c1">#  num=111 (partition 0 at 0)</span>
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a><span class="c1">#  num=199 (partition 1 at 0)</span>
-<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="c1">#  num=166 (partition 1 at 1)</span>
-<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="c1">#  num=0 (partition 0 at 1)</span>
-<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a><span class="c1">#  num=152 (partition 2 at 1) # we already saw 2:0 above!</span>
-<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="c1">#  num=172 (partition 1 at 2)</span>
-<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a><span class="c1">#  num=12 (partition 0 at 2)</span>
-<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a><span class="c1">#  ...</span>
+<p>Now we can create a new subscription with these handlers.</p>
+<div class="language-python highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">subscription</span> <span class="o">=</span> <span class="n">aggregated_stream</span><span class="o">.</span><span class="n">subscription</span><span class="p">(</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;sub_example_docs_aggregate_me_with_handlers&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">handlers</span><span class="o">=</span><span class="n">handlers</span><span class="p">,</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="p">)</span>
+</code></pre></div>
+<p>Running <code>run_once</code> will read the unprocessed messages from the subscription and call
+the registered handlers (if any).</p>
+<div class="language-python highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">subscription</span><span class="o">.</span><span class="n">runner</span><span class="o">.</span><span class="n">run_once</span><span class="p">()</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1">#  num=111 (partition 0 at 0)</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1">#  num=199 (partition 1 at 0)</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1">#  num=166 (partition 1 at 1)</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="c1">#  num=0 (partition 0 at 1)</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="c1">#  num=152 (partition 2 at 0)</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1">#  num=172 (partition 1 at 2)</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="c1">#  num=12 (partition 0 at 2)</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="c1">#  ...</span>
 </code></pre></div>
 <p>Running <code>run_once</code> will read the unprocessed messages from the subscription and call
 the registered handlers (if any).</p>

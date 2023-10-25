@@ -73,7 +73,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#depeche_db.AggregatedStream" class="md-skip">
+        <a href="#depeche_db.AggregatedStreamFactory" class="md-skip">
           Skip to content
         </a>
       
@@ -571,6 +571,26 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#depeche_db.AggregatedStreamFactory" class="md-nav__link">
+    AggregatedStreamFactory
+  </a>
+  
+    <nav class="md-nav" aria-label="AggregatedStreamFactory">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#depeche_db.AggregatedStreamFactory.__call__" class="md-nav__link">
+    __call__()
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#depeche_db.AggregatedStream" class="md-nav__link">
     AggregatedStream
   </a>
@@ -727,11 +747,31 @@
   
   
     <li class="md-nav__item">
+      <a href="../message_handlers/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Message handlers
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../datastructures/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
-    datastructures
+    Data structures
   </span>
   
 
@@ -790,6 +830,26 @@
       Table of contents
     </label>
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#depeche_db.AggregatedStreamFactory" class="md-nav__link">
+    AggregatedStreamFactory
+  </a>
+  
+    <nav class="md-nav" aria-label="AggregatedStreamFactory">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#depeche_db.AggregatedStreamFactory.__call__" class="md-nav__link">
+    __call__()
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
   <a href="#depeche_db.AggregatedStream" class="md-nav__link">
@@ -918,6 +978,121 @@
 
 
 
+<h2 id="depeche_db.AggregatedStreamFactory" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">depeche_db</span><span class="o">.</span><span class="n">AggregatedStreamFactory</span><span class="p">(</span><span class="n">store</span><span class="p">)</span></code>
+
+</h2>
+
+
+  <div class="doc doc-contents first">
+          <p class="doc doc-class-bases">
+            Bases: <code><span title="typing.Generic">Generic</span>[<span title="depeche_db._factories.E">E</span>]</code></p>
+
+
+
+  
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+
+
+<h3 id="depeche_db.AggregatedStreamFactory.__call__" class="doc doc-heading">
+          <code class="highlight language-python"><span class="fm">__call__</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">partitioner</span><span class="p">,</span> <span class="n">stream_wildcards</span><span class="p">)</span></code>
+
+</h3>
+
+
+  <div class="doc doc-contents ">
+  
+      <p>Create an aggregated stream.</p>
+
+
+
+  <p><strong>Parameters:</strong></p>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Description</th>
+        <th>Default</th>
+      </tr>
+    </thead>
+    <tbody>
+        <tr>
+          <td><code>name</code></td>
+          <td>
+                <code>str</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>The name of the stream</p>
+            </div>
+          </td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>partitioner</code></td>
+          <td>
+                <code><a class="autorefs autorefs-internal" title="depeche_db._interfaces.MessagePartitioner" href="#depeche_db.MessagePartitioner">MessagePartitioner</a>[<span title="depeche_db._factories.E">E</span>]</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>A partitioner for the stream</p>
+            </div>
+          </td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>stream_wildcards</code></td>
+          <td>
+                <code><span title="typing.List">List</span>[str]</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>A list of stream wildcards to be aggregated</p>
+            </div>
+          </td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+    </tbody>
+  </table>
+
+  </div>
+
+</div>
+
+
+
+  </div>
+
+  </div>
+
+</div>
+
+<div class="doc doc-object doc-class">
+
+
+
+
 <h2 id="depeche_db.AggregatedStream" class="doc doc-heading">
             <code class="highlight language-python"><span class="n">depeche_db</span><span class="o">.</span><span class="n">AggregatedStream</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">store</span><span class="p">,</span> <span class="n">partitioner</span><span class="p">,</span> <span class="n">stream_wildcards</span><span class="p">)</span></code>
 
@@ -1037,6 +1212,17 @@
             </div>
           </td>
         </tr>
+        <tr>
+          <td><code>subscription</code></td>
+          <td>
+                <code><a class="autorefs autorefs-internal" title="depeche_db._factories.SubscriptionFactory" href="../subscription/#depeche_db.SubscriptionFactory">SubscriptionFactory</a></code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>Factory to create subscriptions</p>
+            </div>
+          </td>
+        </tr>
     </tbody>
   </table>
 
@@ -1080,7 +1266,7 @@
 
 
 <h3 id="depeche_db.AggregatedStream.read" class="doc doc-heading">
-          <code class="highlight language-python"><span class="n">read</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">partition</span><span class="p">)</span></code>
+          <code class="highlight language-python"><span class="n">read</span><span class="p">(</span><span class="n">partition</span><span class="p">)</span></code>
 
 </h3>
 
@@ -1102,20 +1288,6 @@
       </tr>
     </thead>
     <tbody>
-        <tr>
-          <td><code>conn</code></td>
-          <td>
-                <code><span title="depeche_db._compat.SAConnection">SAConnection</span></code>
-          </td>
-          <td>
-            <div class="doc-md-description">
-              <p>Database connection</p>
-            </div>
-          </td>
-          <td>
-              <em>required</em>
-          </td>
-        </tr>
         <tr>
           <td><code>partition</code></td>
           <td>
