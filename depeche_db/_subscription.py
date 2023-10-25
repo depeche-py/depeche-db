@@ -28,6 +28,10 @@ DEPECHE_LOGGER = _logging.getLogger("depeche_db")
 
 
 class ExitSubscriptionErrorHandler(SubscriptionErrorHandler):
+    """
+    Exit the subscription on error
+    """
+
     def handle_error(
         self, error: Exception, message: SubscriptionMessage[E]
     ) -> ErrorAction:
@@ -35,6 +39,10 @@ class ExitSubscriptionErrorHandler(SubscriptionErrorHandler):
 
 
 class LogAndIgnoreSubscriptionErrorHandler(SubscriptionErrorHandler):
+    """
+    Log the error and ignore the message
+    """
+
     def __init__(self, subscription_name: str):
         self._logger = _logging.getLogger(
             f"depeche_db.subscription.{subscription_name}"
@@ -55,6 +63,7 @@ class Subscription(Generic[E]):
         name: str,
         stream: AggregatedStream[E],
         message_handler: "SubscriptionMessageHandler[E]",
+        batch_size: Optional[int] = None,
         state_provider: Optional[SubscriptionStateProvider] = None,
         lock_provider: Optional[LockProvider] = None,
         # TODO start at time
@@ -63,12 +72,15 @@ class Subscription(Generic[E]):
         """
         A subscription is a way to read messages from an aggregated stream.
 
+        Read more about the subscription in the [concepts section](../concepts/subscriptions.md).
+
         Args:
-            name: Name of the subscription
-            message_handler: Handler for the messages
+            name: Name of the subscription, needs to be a valid python identifier
             stream: Stream to read from
-            state_provider: Provider for the subscription state
-            lock_provider: Provider for the locks
+            message_handler: Handler for the messages
+            batch_size: Number of messages to read at once, defaults to 10, read more [here][depeche_db.SubscriptionRunner]
+            state_provider: Provider for the subscription state, defaults to a PostgreSQL provider
+            lock_provider: Provider for the locks, defaults to a PostgreSQL provider
         """
         assert name.isidentifier(), "Group name must be a valid identifier"
         self.name = name
@@ -82,6 +94,7 @@ class Subscription(Generic[E]):
         self.runner = SubscriptionRunner(
             subscription=self,
             message_handler=message_handler,
+            batch_size=batch_size,
         )
 
     def get_next_messages(self, count: int) -> Iterator[SubscriptionMessage[E]]:
@@ -155,7 +168,7 @@ class SubscriptionMessageHandler(Generic[E]):
 
         Args:
             handler_register: The handler register to use
-            error_handler: The error handler to use
+            error_handler: A handler for errors raised by the handlers, defaults to handler that will exit the subscription
             call_middleware: The middleware to call before calling the handler
         """
         self._register = handler_register
@@ -214,18 +227,30 @@ class SubscriptionRunner(Generic[E]):
         self,
         subscription: Subscription[E],
         message_handler: SubscriptionMessageHandler,
+        batch_size: Optional[int] = None,
     ):
         """
         Handles messages from a subscription using a handler
+
+        The `batch_size` argument controls how many messages to handle in each
+        batch. If not provided, the default is 10. A larger batch size will
+        result less round trips to the database, but will also make it more
+        likely that messages from _different partitions_ will be processed out of
+        the order defined by their `global_position` on the message store.
+
+        A batch size of 1 will ensure that messages are processed in order
+        regarding to their `global_position`.
+        Messages in the same partition will always be processed in order.
 
         Implements: [RunOnNotification][depeche_db.RunOnNotification]
 
         Args:
             subscription: The subscription to handle
             message_handler: The handler to use
+            batch_size: The number of messages to handle in each batch, defaults to 10
         """
         self._subscription = subscription
-        self._batch_size = 100
+        self._batch_size = batch_size or 10
         self._keep_running = True
         self._handler = message_handler
 

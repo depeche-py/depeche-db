@@ -26,6 +26,16 @@ E = TypeVar("E", bound=MessageProtocol)
 
 class AggregatedStreamFactory(Generic[E]):
     def __init__(self, store: "MessageStore[E]"):
+        """
+        This factory is accessible on the message store:
+
+            store = MessageStore(...)
+            stream = store.aggregated_stream(
+                name="stream_name",
+                partitioner=...,
+                stream_wildcards=["stream_%"]
+            )
+        """
         self._store = store
 
     def __call__(
@@ -33,14 +43,16 @@ class AggregatedStreamFactory(Generic[E]):
         name: str,
         partitioner: "MessagePartitioner[E]",
         stream_wildcards: List[str],
+        update_batch_size: Optional[int] = None,
     ) -> "AggregatedStream[E]":
         """
         Create an aggregated stream.
 
         Args:
-            name: The name of the stream
+            name: The name of the stream, needs to be a valid python identifier
             partitioner: A partitioner for the stream
-            stream_wildcards: A list of stream wildcards to be aggregated
+            stream_wildcards: A list of stream wildcards
+            update_batch_size: The batch size for updating the stream
         """
         from ._aggregated_stream import AggregatedStream
 
@@ -54,12 +66,26 @@ class AggregatedStreamFactory(Generic[E]):
 
 class SubscriptionFactory(Generic[E]):
     def __init__(self, stream: "AggregatedStream[E]"):
+        """
+        This factory is accessible on the aggregated stream:
+
+            stream : AggregatedStream = ...
+            subscription = stream.subscription(
+                name="subscription_name",
+                handlers=...,
+                call_middleware=...,
+                error_handler=...,
+                state_provider=...,
+                lock_provider=...,
+            )
+        """
         self._stream = stream
 
     def __call__(
         self,
         name: str,
-        handlers: MessageHandlerRegisterProtocol[E] = None,
+        handlers: Optional[MessageHandlerRegisterProtocol[E]] = None,
+        batch_size: Optional[int] = None,
         call_middleware: Optional[CallMiddleware] = None,
         error_handler: Optional[SubscriptionErrorHandler] = None,
         state_provider: Optional[SubscriptionStateProvider] = None,
@@ -69,12 +95,13 @@ class SubscriptionFactory(Generic[E]):
         Create a subscription.
 
         Args:
-            name: The name of the subscription
-            handlers: Handlers to be called when a message is received
-            call_middleware: A middleware to be called before the handlers
-            error_handler: A handler for errors raised by the handlers
-            state_provider: A provider for the subscription state
-            lock_provider: A provider for the subscription locks
+            name: The name of the subscription, needs to be a valid python identifier
+            handlers: Handlers to be called when a message is received, defaults to an empty register
+            batch_size: Number of messages to read at once, defaults to 10, read more [here][depeche_db.SubscriptionRunner]
+            call_middleware: A middleware to customize the call to the handlers
+            error_handler: A handler for errors raised by the handlers, defaults to handler that will exit the subscription
+            state_provider: Provider for the subscription state, defaults to a PostgreSQL provider
+            lock_provider: Provider for the locks, defaults to a PostgreSQL provider
         """
         from ._message_handler import MessageHandlerRegister
         from ._subscription import Subscription, SubscriptionMessageHandler

@@ -228,6 +228,9 @@ class CallMiddleware(Generic[E]):
         """
         Calls a handler with a given message.
 
+        The type of the message depends on the type annotation of the handler function.
+        See [MessageHandlerRegister][depeche_db.MessageHandlerRegister] for more details.
+
         Args:
             handler: Handler
             message: Message to be passed to the handler

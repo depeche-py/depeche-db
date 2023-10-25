@@ -27,20 +27,28 @@ class AggregatedStream(Generic[E]):
         store: MessageStore[E],
         partitioner: MessagePartitioner[E],
         stream_wildcards: List[str],
+        update_batch_size: Optional[int] = None,
     ) -> None:
         """
-        AggregatedStream is a stream that is used to aggregate multiple streams into one.
+        AggregatedStream aggregates multiple streams into one (partitioned) stream.
+
+        Read more about aggregated streams under [Data Model](../concepts/data-model.md#aggregated-streams).
+
+        The `update_batch_size` argument can be used to control the batch size of the
+        update process. Higher numbers will result in less database roundtrips but
+        also in higher memory usage.
 
         Args:
-            name: Stream name
+            name: Stream name, needs to be a valid python identifier
             store: Message store
             partitioner: Message partitioner
             stream_wildcards: List of stream wildcards
+            update_batch_size: Batch size for updating the stream, defaults to 100
 
         Attributes:
             name (str): Stream name
             projector (StreamProjector): Stream projector
-            subscription (SubscriptionFactory): Factory to create subscriptions
+            subscription (SubscriptionFactory): Factory to create subscriptions on this stream
         """
         assert name.isidentifier(), "name must be a valid identifier"
         self.name = name
@@ -107,6 +115,7 @@ class AggregatedStream(Generic[E]):
             stream=self,
             partitioner=partitioner,
             stream_wildcards=stream_wildcards,
+            batch_size=update_batch_size,
         )
 
     def truncate(self, conn: SAConnection):
@@ -198,7 +207,8 @@ class AggregatedStream(Generic[E]):
         result_limit: Optional[int] = None,
     ) -> Iterator[StreamPartitionStatistic]:
         """
-        Get partition statistics for deciding which partitions to read from.
+        Get partition statistics for deciding which partitions to read from. This
+        is used by subscriptions.
         """
         with self._connection() as conn:
             position_limits = position_limits or {-1: -1}
@@ -259,16 +269,20 @@ class StreamProjector(Generic[E]):
         stream: AggregatedStream[E],
         partitioner: MessagePartitioner[E],
         stream_wildcards: List[str],
+        batch_size: Optional[int] = None,
     ):
         """
         Stream projector is responsible for updating an aggregated stream.
+
+        The update process is locked to prevent concurrent updates. Thus, it is
+        fine to run the projector in multiple processes.
 
         Implements: [RunOnNotification][depeche_db.RunOnNotification]
         """
         self.stream = stream
         self.stream_wildcards = stream_wildcards
         self.partitioner = partitioner
-        self.batch_size = 100
+        self.batch_size = batch_size or 100
 
     @property
     def notification_channel(self) -> str:

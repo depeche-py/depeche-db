@@ -229,7 +229,7 @@ class MessageStore(Generic[E]):
         Optimistic concurrency control must used to ensure that the stream is
         not modified by another process between reading the last message and
         writing the new message. You have to give `expected_version`. If the
-        stream has been modified, a `ValueError` will be raised.
+        stream has been modified, a `OptimisticConcurrencyError` will be raised.
 
         You can give a connection to use for the write as `conn`. If you don't
         give a connection, a new connection will be created and the write will
