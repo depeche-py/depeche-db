@@ -44,6 +44,7 @@ class AccountCreditedEvent(Event):
 AccountEvent = Union[AccountRegisteredEvent, AccountCreditedEvent]
 
 
+# TODO use pydantic serializer
 class AccountEventSerializer(MessageSerializer[AccountEvent]):
     def serialize(self, message: AccountEvent) -> dict:
         return message.model_dump(mode="json")
@@ -52,6 +53,7 @@ class AccountEventSerializer(MessageSerializer[AccountEvent]):
         return _pydantic.TypeAdapter(AccountEvent).validate_python(message)  # type: ignore
 
 
+# TODO use event_sourceing.EventSourcedAggregateRoot
 class AggregateRoot(Generic[E]):
     def __init__(self):
         self._events: List[E] = []

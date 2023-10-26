@@ -1,5 +1,6 @@
-# TBD unreleased
+# 0.6.1
 
+* Add small event sourcing lib
 
 # 0.6.0
 
