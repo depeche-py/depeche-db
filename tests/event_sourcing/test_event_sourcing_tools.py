@@ -1,6 +1,6 @@
 import datetime as _dt
 import uuid as _uuid
-from typing import Union
+from typing import Optional, Union
 
 import pydantic as _pydantic
 
@@ -37,7 +37,7 @@ class Foo(_es.EventSourcedAggregateRoot[_uuid.UUID, FooEvent]):
     id: _uuid.UUID
     name: str
 
-    def get_id(self) -> _uuid.UUID | None:
+    def get_id(self) -> Optional[_uuid.UUID]:
         if hasattr(self, "id"):
             return self.id
         return None
