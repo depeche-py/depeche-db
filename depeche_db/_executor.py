@@ -81,7 +81,6 @@ class Executor:
         while self.keep_running:
             try:
                 handler = self.handler_queue.get(timeout=0.5)
-                print("Running handler", handler)
                 try:
                     handler()
                 except Exception:
