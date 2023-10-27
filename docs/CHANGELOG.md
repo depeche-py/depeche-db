@@ -1,3 +1,7 @@
+# 0.6.2
+
+* Add `register_manual` method to `MessageHandlerRegister`
+
 # 0.6.1
 
 * Add small event sourcing lib
