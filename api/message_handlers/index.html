@@ -672,6 +672,13 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#depeche_db.MessageHandlerRegister.register_manual" class="md-nav__link">
+    register_manual()
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -910,6 +917,13 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#depeche_db.MessageHandlerRegister.register_manual" class="md-nav__link">
+    register_manual()
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -1144,6 +1158,89 @@ messages. Overlaps will cause a <code>ValueError</code>.</p>
             <div class="doc-md-description">
               <p>The unaltered handler function.</p>
             </div>
+          </td>
+        </tr>
+    </tbody>
+  </table>
+
+  </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+
+<h3 id="depeche_db.MessageHandlerRegister.register_manual" class="doc doc-heading">
+          <code class="highlight language-python"><span class="n">register_manual</span><span class="p">(</span><span class="n">handler</span><span class="p">,</span> <span class="n">handled_type</span><span class="p">,</span> <span class="n">requires_middleware</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></code>
+
+</h3>
+
+
+  <div class="doc doc-contents ">
+  
+      <p>Registers a handler for a given message type.</p>
+<p>The handler must have at least one parameter. The first parameter must
+be of a message type.</p>
+<p>Same overlap rules apply to this method as to the <code>register</code> method.</p>
+<p>If the handler takes more than one parameter, you must set the
+<code>requires_middleware</code> parameter to <code>True</code>!</p>
+
+
+
+  <p><strong>Parameters:</strong></p>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Description</th>
+        <th>Default</th>
+      </tr>
+    </thead>
+    <tbody>
+        <tr>
+          <td><code>handler</code></td>
+          <td>
+                <code><span title="depeche_db._message_handler.H">H</span></code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>A handler function.</p>
+            </div>
+          </td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>handled_type</code></td>
+          <td>
+                <code><span title="typing.Type">Type</span></code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>The type of message to handle.</p>
+            </div>
+          </td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>requires_middleware</code></td>
+          <td>
+                <code>bool</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>Whether the handler requires middleware.</p>
+            </div>
+          </td>
+          <td>
+                <code>False</code>
           </td>
         </tr>
     </tbody>
