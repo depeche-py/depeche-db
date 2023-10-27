@@ -9,10 +9,10 @@
       
       
       
-        <link rel="prev" href="../executor/">
+        <link rel="prev" href="../exceptions/">
       
       
-        <link rel="next" href="../datastructures/">
+        <link rel="next" href="../../examples/bank-eventsourced/">
       
       
       <link rel="icon" href="../../assets/logo-bg256.png">
@@ -20,7 +20,7 @@
     
     
       
-        <title>Message handlers - Depeche DB</title>
+        <title>Event Sourcing - Depeche DB</title>
       
     
     
@@ -73,7 +73,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#depeche_db.MessageHandlerRegisterProtocol" class="md-skip">
+        <a href="#event-sourcing-tools" class="md-skip">
           Skip to content
         </a>
       
@@ -108,7 +108,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Message handlers
+              Event Sourcing
             
           </span>
         </div>
@@ -587,27 +587,9 @@
                 
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  <span class="md-ellipsis">
-    Message handlers
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../message_handlers/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -616,78 +598,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#depeche_db.MessageHandlerRegisterProtocol" class="md-nav__link">
-    MessageHandlerRegisterProtocol
-  </a>
-  
-    <nav class="md-nav" aria-label="MessageHandlerRegisterProtocol">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#depeche_db.MessageHandlerRegisterProtocol.get_all_handlers" class="md-nav__link">
-    get_all_handlers()
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#depeche_db.MessageHandlerRegisterProtocol.get_handler" class="md-nav__link">
-    get_handler()
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#depeche_db.MessageHandlerRegister" class="md-nav__link">
-    MessageHandlerRegister
-  </a>
-  
-    <nav class="md-nav" aria-label="MessageHandlerRegister">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#depeche_db.MessageHandlerRegister.register" class="md-nav__link">
-    register()
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#depeche_db.MessageHandler" class="md-nav__link">
-    MessageHandler
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -737,9 +647,29 @@
                 
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="../event_sourcing/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Event Sourcing
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -748,6 +678,74 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#depeche_db.event_sourcing.EventSourcedAggregateRoot" class="md-nav__link">
+    EventSourcedAggregateRoot
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#depeche_db.event_sourcing.Repo" class="md-nav__link">
+    Repo
+  </a>
+  
+    <nav class="md-nav" aria-label="Repo">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#depeche_db.event_sourcing.Repo.add" class="md-nav__link">
+    add()
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#depeche_db.event_sourcing.Repo.get" class="md-nav__link">
+    get()
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#depeche_db.event_sourcing.Repo.save" class="md-nav__link">
+    save()
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#depeche_db.event_sourcing.EventStoreRepo" class="md-nav__link">
+    EventStoreRepo
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -861,6 +859,8 @@
   
   
   
+    
+  
   
     <label class="md-nav__title" for="__toc">
       <span class="md-nav__icon md-icon"></span>
@@ -869,23 +869,37 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#depeche_db.MessageHandlerRegisterProtocol" class="md-nav__link">
-    MessageHandlerRegisterProtocol
+  <a href="#depeche_db.event_sourcing.EventSourcedAggregateRoot" class="md-nav__link">
+    EventSourcedAggregateRoot
   </a>
   
-    <nav class="md-nav" aria-label="MessageHandlerRegisterProtocol">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#depeche_db.event_sourcing.Repo" class="md-nav__link">
+    Repo
+  </a>
+  
+    <nav class="md-nav" aria-label="Repo">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#depeche_db.MessageHandlerRegisterProtocol.get_all_handlers" class="md-nav__link">
-    get_all_handlers()
+  <a href="#depeche_db.event_sourcing.Repo.add" class="md-nav__link">
+    add()
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#depeche_db.MessageHandlerRegisterProtocol.get_handler" class="md-nav__link">
-    get_handler()
+  <a href="#depeche_db.event_sourcing.Repo.get" class="md-nav__link">
+    get()
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#depeche_db.event_sourcing.Repo.save" class="md-nav__link">
+    save()
   </a>
   
 </li>
@@ -896,28 +910,8 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#depeche_db.MessageHandlerRegister" class="md-nav__link">
-    MessageHandlerRegister
-  </a>
-  
-    <nav class="md-nav" aria-label="MessageHandlerRegister">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#depeche_db.MessageHandlerRegister.register" class="md-nav__link">
-    register()
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#depeche_db.MessageHandler" class="md-nav__link">
-    MessageHandler
+  <a href="#depeche_db.event_sourcing.EventStoreRepo" class="md-nav__link">
+    EventStoreRepo
   </a>
   
 </li>
@@ -940,15 +934,18 @@
   
 
 
-  <h1>Message handlers</h1>
+<h1 id="event-sourcing-tools">Event Sourcing tools</h1>
+<p>These classes are just given for reference. They are pretty straight-forward
+and you probably will implement them yourself instead of using these.</p>
+
 
 <div class="doc doc-object doc-class">
 
 
 
 
-<h2 id="depeche_db.MessageHandlerRegisterProtocol" class="doc doc-heading">
-          <code>depeche_db.MessageHandlerRegisterProtocol</code>
+<h2 id="depeche_db.event_sourcing.EventSourcedAggregateRoot" class="doc doc-heading">
+          <code>depeche_db.event_sourcing.EventSourcedAggregateRoot</code>
 
 
 </h2>
@@ -956,18 +953,122 @@
 
   <div class="doc doc-contents first">
           <p class="doc doc-class-bases">
-            Bases: <code><span title="typing.Protocol">Protocol</span></code>, <code><span title="typing.Generic">Generic</span>[<span title="depeche_db._interfaces.E">E</span>]</code></p>
+            Bases: <code><span title="abc.ABC">ABC</span></code>, <code><span title="typing.Generic">Generic</span>[<span title="depeche_db.event_sourcing.aggregate_root.ID">ID</span>, <span title="depeche_db.event_sourcing.aggregate_root.E">E</span>]</code></p>
+
+
+            <details class="quote">
+              <summary>Source code in <code>depeche_db/event_sourcing/aggregate_root.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-10">10</a></span>
+<span class="normal"><a href="#__codelineno-0-11">11</a></span>
+<span class="normal"><a href="#__codelineno-0-12">12</a></span>
+<span class="normal"><a href="#__codelineno-0-13">13</a></span>
+<span class="normal"><a href="#__codelineno-0-14">14</a></span>
+<span class="normal"><a href="#__codelineno-0-15">15</a></span>
+<span class="normal"><a href="#__codelineno-0-16">16</a></span>
+<span class="normal"><a href="#__codelineno-0-17">17</a></span>
+<span class="normal"><a href="#__codelineno-0-18">18</a></span>
+<span class="normal"><a href="#__codelineno-0-19">19</a></span>
+<span class="normal"><a href="#__codelineno-0-20">20</a></span>
+<span class="normal"><a href="#__codelineno-0-21">21</a></span>
+<span class="normal"><a href="#__codelineno-0-22">22</a></span>
+<span class="normal"><a href="#__codelineno-0-23">23</a></span>
+<span class="normal"><a href="#__codelineno-0-24">24</a></span>
+<span class="normal"><a href="#__codelineno-0-25">25</a></span>
+<span class="normal"><a href="#__codelineno-0-26">26</a></span>
+<span class="normal"><a href="#__codelineno-0-27">27</a></span>
+<span class="normal"><a href="#__codelineno-0-28">28</a></span>
+<span class="normal"><a href="#__codelineno-0-29">29</a></span>
+<span class="normal"><a href="#__codelineno-0-30">30</a></span>
+<span class="normal"><a href="#__codelineno-0-31">31</a></span>
+<span class="normal"><a href="#__codelineno-0-32">32</a></span>
+<span class="normal"><a href="#__codelineno-0-33">33</a></span>
+<span class="normal"><a href="#__codelineno-0-34">34</a></span>
+<span class="normal"><a href="#__codelineno-0-35">35</a></span>
+<span class="normal"><a href="#__codelineno-0-36">36</a></span>
+<span class="normal"><a href="#__codelineno-0-37">37</a></span>
+<span class="normal"><a href="#__codelineno-0-38">38</a></span>
+<span class="normal"><a href="#__codelineno-0-39">39</a></span>
+<span class="normal"><a href="#__codelineno-0-40">40</a></span>
+<span class="normal"><a href="#__codelineno-0-41">41</a></span>
+<span class="normal"><a href="#__codelineno-0-42">42</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-10" name="__codelineno-0-10"></a><span class="k">class</span> <span class="nc">EventSourcedAggregateRoot</span><span class="p">(</span><span class="n">_abc</span><span class="o">.</span><span class="n">ABC</span><span class="p">,</span> <span class="n">Generic</span><span class="p">[</span><span class="n">ID</span><span class="p">,</span> <span class="n">E</span><span class="p">]):</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11"></a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_events</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">E</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_version</span> <span class="o">=</span> <span class="mi">0</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14"></a>
+<a id="__codelineno-0-15" name="__codelineno-0-15"></a>    <span class="nd">@property</span>
+<a id="__codelineno-0-16" name="__codelineno-0-16"></a>    <span class="k">def</span> <span class="nf">events</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">E</span><span class="p">]:</span>
+<a id="__codelineno-0-17" name="__codelineno-0-17"></a>        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_events</span><span class="p">)</span>
+<a id="__codelineno-0-18" name="__codelineno-0-18"></a>
+<a id="__codelineno-0-19" name="__codelineno-0-19"></a>    <span class="nd">@_abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+<a id="__codelineno-0-20" name="__codelineno-0-20"></a>    <span class="k">def</span> <span class="nf">get_id</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ID</span><span class="p">:</span>
+<a id="__codelineno-0-21" name="__codelineno-0-21"></a>        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+<a id="__codelineno-0-22" name="__codelineno-0-22"></a>
+<a id="__codelineno-0-23" name="__codelineno-0-23"></a>    <span class="k">def</span> <span class="nf">_add_event</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="n">E</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-24" name="__codelineno-0-24"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_version</span> <span class="o">+=</span> <span class="mi">1</span>
+<a id="__codelineno-0-25" name="__codelineno-0-25"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_events</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+<a id="__codelineno-0-26" name="__codelineno-0-26"></a>
+<a id="__codelineno-0-27" name="__codelineno-0-27"></a>    <span class="k">def</span> <span class="nf">apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="n">E</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-28" name="__codelineno-0-28"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_apply</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+<a id="__codelineno-0-29" name="__codelineno-0-29"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_check_invariants</span><span class="p">()</span>
+<a id="__codelineno-0-30" name="__codelineno-0-30"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_add_event</span><span class="p">(</span><span class="n">event</span><span class="p">)</span>
+<a id="__codelineno-0-31" name="__codelineno-0-31"></a>
+<a id="__codelineno-0-32" name="__codelineno-0-32"></a>    <span class="nd">@_abc</span><span class="o">.</span><span class="n">abstractmethod</span>
+<a id="__codelineno-0-33" name="__codelineno-0-33"></a>    <span class="k">def</span> <span class="nf">_apply</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">:</span> <span class="n">E</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-34" name="__codelineno-0-34"></a>        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+<a id="__codelineno-0-35" name="__codelineno-0-35"></a>
+<a id="__codelineno-0-36" name="__codelineno-0-36"></a>    <span class="k">def</span> <span class="nf">_check_invariants</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-37" name="__codelineno-0-37"></a>        <span class="k">pass</span>
+<a id="__codelineno-0-38" name="__codelineno-0-38"></a>
+<a id="__codelineno-0-39" name="__codelineno-0-39"></a>    <span class="k">def</span> <span class="fm">__eq__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">other</span><span class="p">:</span> <span class="nb">object</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<a id="__codelineno-0-40" name="__codelineno-0-40"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">other</span><span class="p">,</span> <span class="n">EventSourcedAggregateRoot</span><span class="p">):</span>
+<a id="__codelineno-0-41" name="__codelineno-0-41"></a>            <span class="k">raise</span> <span class="ne">NotImplementedError</span><span class="p">()</span>
+<a id="__codelineno-0-42" name="__codelineno-0-42"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">get_id</span><span class="p">()</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">get_id</span><span class="p">()</span> <span class="ow">and</span> <span class="bp">self</span><span class="o">.</span><span class="n">_version</span> <span class="o">==</span> <span class="n">other</span><span class="o">.</span><span class="n">_version</span>
+</code></pre></div></td></tr></table></div>
+            </details>
 
   
-      <p>Message handler register protocol is used by runners to find handlers for messages.</p>
 
-<details class="implemented-by" open>
-  <summary>Implemented by</summary>
-  <ul>
-<li><a class="autorefs autorefs-internal" href="#depeche_db.MessageHandlerRegister">MessageHandlerRegister</a></li>
-<li><a class="autorefs autorefs-internal" href="#depeche_db.MessageHandler">MessageHandler</a></li>
-</ul>
-</details>
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+  </div>
+
+</div><hr />
+
+
+<div class="doc doc-object doc-class">
+
+
+
+
+<h2 id="depeche_db.event_sourcing.Repo" class="doc doc-heading">
+          <code>depeche_db.event_sourcing.Repo</code>
+
+
+</h2>
+
+
+  <div class="doc doc-contents first">
+          <p class="doc doc-class-bases">
+            Bases: <code><span title="abc.ABC">ABC</span></code>, <code><span title="typing.Generic">Generic</span>[<span title="depeche_db.event_sourcing.repository.OBJ">OBJ</span>, <span title="depeche_db.event_sourcing.repository.ID">ID</span>]</code></p>
+
+  
+      <p>A repository is a collection of objects that can be queried and
+persisted.</p>
+<p>This is an abstract base class that defines the interface that
+all repositories implement.</p>
+
 
   
 
@@ -987,15 +1088,19 @@
 
 
 
-<h3 id="depeche_db.MessageHandlerRegisterProtocol.get_all_handlers" class="doc doc-heading">
-          <code class="highlight language-python"><span class="n">get_all_handlers</span><span class="p">()</span></code>
+<h3 id="depeche_db.event_sourcing.Repo.add" class="doc doc-heading">
+          <code class="highlight language-python"><span class="n">add</span><span class="p">(</span><span class="n">entity</span><span class="p">)</span></code>
+  
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
+  </span>
 
 </h3>
 
 
   <div class="doc doc-contents ">
   
-      <p>Returns all registered handlers.</p>
+      <p>Add a new entity to the repository.</p>
 
   </div>
 
@@ -1007,15 +1112,43 @@
 
 
 
-<h3 id="depeche_db.MessageHandlerRegisterProtocol.get_handler" class="doc doc-heading">
-          <code class="highlight language-python"><span class="n">get_handler</span><span class="p">(</span><span class="n">message_type</span><span class="p">)</span></code>
+<h3 id="depeche_db.event_sourcing.Repo.get" class="doc doc-heading">
+          <code class="highlight language-python"><span class="n">get</span><span class="p">(</span><span class="nb">id</span><span class="p">)</span></code>
+  
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
+  </span>
 
 </h3>
 
 
   <div class="doc doc-contents ">
   
-      <p>Returns a handler for a given message type.</p>
+      <p>Get an entity from the repository by its ID.</p>
+
+  </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+
+<h3 id="depeche_db.event_sourcing.Repo.save" class="doc doc-heading">
+          <code class="highlight language-python"><span class="n">save</span><span class="p">(</span><span class="n">entity</span><span class="p">,</span> <span class="n">expected_version</span><span class="p">)</span></code>
+  
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-abstractmethod"><code>abstractmethod</code></small>
+  </span>
+
+</h3>
+
+
+  <div class="doc doc-contents ">
+  
+      <p>Save an existing entity to the repository.</p>
 
   </div>
 
@@ -1035,163 +1168,77 @@
 
 
 
-<h2 id="depeche_db.MessageHandlerRegister" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">depeche_db</span><span class="o">.</span><span class="n">MessageHandlerRegister</span><span class="p">()</span></code>
+<h2 id="depeche_db.event_sourcing.EventStoreRepo" class="doc doc-heading">
+          <code>depeche_db.event_sourcing.EventStoreRepo</code>
+
 
 </h2>
 
 
   <div class="doc doc-contents first">
           <p class="doc doc-class-bases">
-            Bases: <code><span title="typing.Generic">Generic</span>[<span title="depeche_db._message_handler.E">E</span>]</code></p>
-
-  
-      <p>Message handler register is a registry of message handlers.</p>
-<p>Typical usage:</p>
-<div class="language-text highlight"><pre><span></span><code>handlers = MessageHandlerRegister()
-
-@handlers.register
-def handle_message(message: MyMessage):
-    ...
-
-@handlers.register
-def handle_other_message(message: StoredMessage[MyOtherMessage]):
-    ...
-</code></pre></div>
-<p>Implements: <a class="autorefs autorefs-internal" href="#depeche_db.MessageHandlerRegisterProtocol">MessageHandlerRegisterProtocol</a></p>
+            Bases: <code><span title="typing.Generic">Generic</span>[<span title="depeche_db.event_sourcing.repository.E">E</span>, <span title="depeche_db.event_sourcing.repository.OBJ">OBJ</span>, <span title="depeche_db.event_sourcing.repository.ID">ID</span>]</code>, <code><a class="autorefs autorefs-internal" title="depeche_db.event_sourcing.repository.Repo" href="#depeche_db.event_sourcing.Repo">Repo</a>[<span title="depeche_db.event_sourcing.repository.OBJ">OBJ</span>, <span title="depeche_db.event_sourcing.repository.ID">ID</span>]</code></p>
 
 
-  
-
-  <div class="doc doc-children">
-
-
-
-
-
-
-
-
-
-
-<div class="doc doc-object doc-function">
-
-
-
-
-<h3 id="depeche_db.MessageHandlerRegister.register" class="doc doc-heading">
-          <code class="highlight language-python"><span class="n">register</span><span class="p">(</span><span class="n">handler</span><span class="p">)</span></code>
-
-</h3>
-
-
-  <div class="doc doc-contents ">
-  
-      <p>Registers a handler for a given message type.</p>
-<p>The handler must have at least one parameter. The first parameter must
-be of a message type. <code>E</code> being your message type, the parameter can be
-of type <code>E</code>, <code>SubscriptionMessage[E]</code> or <code>StoredMessage[E]</code>. When a
-handler is called, the message will be passed in the requested type.</p>
-<p>Multiple handlers can be registered for non-overlapping types of
-messages. Overlaps will cause a <code>ValueError</code>.</p>
-
-
-
-  <p><strong>Parameters:</strong></p>
-  <table>
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Type</th>
-        <th>Description</th>
-        <th>Default</th>
-      </tr>
-    </thead>
-    <tbody>
-        <tr>
-          <td><code>handler</code></td>
-          <td>
-                <code><span title="depeche_db._message_handler.H">H</span></code>
-          </td>
-          <td>
-            <div class="doc-md-description">
-              <p>A handler function.</p>
-            </div>
-          </td>
-          <td>
-              <em>required</em>
-          </td>
-        </tr>
-    </tbody>
-  </table>
-
-
-
-  <p><strong>Returns:</strong></p>
-  <table>
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-        <tr>
-          <td>
-                <code><span title="depeche_db._message_handler.H">H</span></code>
-          </td>
-          <td>
-            <div class="doc-md-description">
-              <p>The unaltered handler function.</p>
-            </div>
-          </td>
-        </tr>
-    </tbody>
-  </table>
-
-  </div>
-
-</div>
-
-
-
-  </div>
-
-  </div>
-
-</div><hr />
-
-
-<div class="doc doc-object doc-class">
-
-
-
-
-<h2 id="depeche_db.MessageHandler" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">depeche_db</span><span class="o">.</span><span class="n">MessageHandler</span><span class="p">()</span></code>
-
-</h2>
-
-
-  <div class="doc doc-contents first">
-          <p class="doc doc-class-bases">
-            Bases: <code><span title="typing.Generic">Generic</span>[<span title="depeche_db._message_handler.E">E</span>]</code></p>
-
-  
-      <p>Message handler is a base class for message handlers.</p>
-<p>This is basically a class-based version of the <code>MessageHandlerRegister</code>.</p>
-<p>Typical usage (equivalent to the example in <code>MessageHandlerRegister</code>):</p>
-<div class="language-text highlight"><pre><span></span><code>class MyMessageHandler(MessageHandler):
-    @MessageHandler.register
-    def handle_message(self, message: MyMessage):
-        ...
-
-    @MessageHandler.register
-    def handle_other_message(self, message: StoredMessage[MyOtherMessage]):
-        ...
-</code></pre></div>
-<p>Implements: <a class="autorefs autorefs-internal" href="#depeche_db.MessageHandlerRegisterProtocol">MessageHandlerRegisterProtocol</a></p>
-
+            <details class="quote">
+              <summary>Source code in <code>depeche_db/event_sourcing/repository.py</code></summary>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-49">49</a></span>
+<span class="normal"><a href="#__codelineno-0-50">50</a></span>
+<span class="normal"><a href="#__codelineno-0-51">51</a></span>
+<span class="normal"><a href="#__codelineno-0-52">52</a></span>
+<span class="normal"><a href="#__codelineno-0-53">53</a></span>
+<span class="normal"><a href="#__codelineno-0-54">54</a></span>
+<span class="normal"><a href="#__codelineno-0-55">55</a></span>
+<span class="normal"><a href="#__codelineno-0-56">56</a></span>
+<span class="normal"><a href="#__codelineno-0-57">57</a></span>
+<span class="normal"><a href="#__codelineno-0-58">58</a></span>
+<span class="normal"><a href="#__codelineno-0-59">59</a></span>
+<span class="normal"><a href="#__codelineno-0-60">60</a></span>
+<span class="normal"><a href="#__codelineno-0-61">61</a></span>
+<span class="normal"><a href="#__codelineno-0-62">62</a></span>
+<span class="normal"><a href="#__codelineno-0-63">63</a></span>
+<span class="normal"><a href="#__codelineno-0-64">64</a></span>
+<span class="normal"><a href="#__codelineno-0-65">65</a></span>
+<span class="normal"><a href="#__codelineno-0-66">66</a></span>
+<span class="normal"><a href="#__codelineno-0-67">67</a></span>
+<span class="normal"><a href="#__codelineno-0-68">68</a></span>
+<span class="normal"><a href="#__codelineno-0-69">69</a></span>
+<span class="normal"><a href="#__codelineno-0-70">70</a></span>
+<span class="normal"><a href="#__codelineno-0-71">71</a></span>
+<span class="normal"><a href="#__codelineno-0-72">72</a></span>
+<span class="normal"><a href="#__codelineno-0-73">73</a></span>
+<span class="normal"><a href="#__codelineno-0-74">74</a></span>
+<span class="normal"><a href="#__codelineno-0-75">75</a></span>
+<span class="normal"><a href="#__codelineno-0-76">76</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-49" name="__codelineno-0-49"></a><span class="k">class</span> <span class="nc">EventStoreRepo</span><span class="p">(</span><span class="n">Generic</span><span class="p">[</span><span class="n">E</span><span class="p">,</span> <span class="n">OBJ</span><span class="p">,</span> <span class="n">ID</span><span class="p">],</span> <span class="n">Repo</span><span class="p">[</span><span class="n">OBJ</span><span class="p">,</span> <span class="n">ID</span><span class="p">]):</span>
+<a id="__codelineno-0-50" name="__codelineno-0-50"></a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+<a id="__codelineno-0-51" name="__codelineno-0-51"></a>        <span class="bp">self</span><span class="p">,</span>
+<a id="__codelineno-0-52" name="__codelineno-0-52"></a>        <span class="n">event_store</span><span class="p">:</span> <span class="n">MessageStore</span><span class="p">[</span><span class="n">E</span><span class="p">],</span>
+<a id="__codelineno-0-53" name="__codelineno-0-53"></a>        <span class="n">constructor</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="n">OBJ</span><span class="p">],</span>
+<a id="__codelineno-0-54" name="__codelineno-0-54"></a>        <span class="n">stream_prefix</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<a id="__codelineno-0-55" name="__codelineno-0-55"></a>    <span class="p">):</span>
+<a id="__codelineno-0-56" name="__codelineno-0-56"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_event_store</span> <span class="o">=</span> <span class="n">event_store</span>
+<a id="__codelineno-0-57" name="__codelineno-0-57"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_constructor</span> <span class="o">=</span> <span class="n">constructor</span>
+<a id="__codelineno-0-58" name="__codelineno-0-58"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">_stream_prefix</span> <span class="o">=</span> <span class="n">stream_prefix</span>
+<a id="__codelineno-0-59" name="__codelineno-0-59"></a>
+<a id="__codelineno-0-60" name="__codelineno-0-60"></a>    <span class="k">def</span> <span class="nf">add</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">:</span> <span class="n">OBJ</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MessagePosition</span><span class="p">:</span>
+<a id="__codelineno-0-61" name="__codelineno-0-61"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">expected_version</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<a id="__codelineno-0-62" name="__codelineno-0-62"></a>
+<a id="__codelineno-0-63" name="__codelineno-0-63"></a>    <span class="k">def</span> <span class="nf">save</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">obj</span><span class="p">:</span> <span class="n">OBJ</span><span class="p">,</span> <span class="n">expected_version</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MessagePosition</span><span class="p">:</span>
+<a id="__codelineno-0-64" name="__codelineno-0-64"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_event_store</span><span class="o">.</span><span class="n">synchronize</span><span class="p">(</span>
+<a id="__codelineno-0-65" name="__codelineno-0-65"></a>            <span class="n">stream</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_stream_prefix</span><span class="si">}</span><span class="s2">-</span><span class="si">{</span><span class="n">obj</span><span class="o">.</span><span class="n">get_id</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-66" name="__codelineno-0-66"></a>            <span class="n">messages</span><span class="o">=</span><span class="n">obj</span><span class="o">.</span><span class="n">events</span><span class="p">,</span>
+<a id="__codelineno-0-67" name="__codelineno-0-67"></a>            <span class="n">expected_version</span><span class="o">=</span><span class="n">expected_version</span><span class="p">,</span>
+<a id="__codelineno-0-68" name="__codelineno-0-68"></a>        <span class="p">)</span>
+<a id="__codelineno-0-69" name="__codelineno-0-69"></a>
+<a id="__codelineno-0-70" name="__codelineno-0-70"></a>    <span class="k">def</span> <span class="nf">get</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="nb">id</span><span class="p">:</span> <span class="n">ID</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">OBJ</span><span class="p">:</span>
+<a id="__codelineno-0-71" name="__codelineno-0-71"></a>        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">_event_store</span><span class="o">.</span><span class="n">reader</span><span class="p">()</span> <span class="k">as</span> <span class="n">reader</span><span class="p">:</span>
+<a id="__codelineno-0-72" name="__codelineno-0-72"></a>            <span class="k">return</span> <span class="n">ReadRepository</span><span class="p">[</span><span class="n">E</span><span class="p">,</span> <span class="n">OBJ</span><span class="p">,</span> <span class="n">ID</span><span class="p">](</span>
+<a id="__codelineno-0-73" name="__codelineno-0-73"></a>                <span class="n">event_store_reader</span><span class="o">=</span><span class="n">reader</span><span class="p">,</span>
+<a id="__codelineno-0-74" name="__codelineno-0-74"></a>                <span class="n">constructor</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_constructor</span><span class="p">,</span>
+<a id="__codelineno-0-75" name="__codelineno-0-75"></a>                <span class="n">stream_prefix</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_stream_prefix</span><span class="p">,</span>
+<a id="__codelineno-0-76" name="__codelineno-0-76"></a>            <span class="p">)</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">id</span><span class="p">)</span>
+</code></pre></div></td></tr></table></div>
+            </details>
 
   
 
