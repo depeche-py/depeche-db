@@ -21,13 +21,13 @@ class EventSourcedAggregateRoot(_abc.ABC, Generic[ID, E]):
         raise NotImplementedError
 
     def _add_event(self, event: E) -> None:
+        self._version += 1
         self._events.append(event)
 
     def apply(self, event: E) -> None:
         self._apply(event)
-        self._version += 1
-        self._add_event(event)
         self._check_invariants()
+        self._add_event(event)
 
     @_abc.abstractmethod
     def _apply(self, event: E) -> None:

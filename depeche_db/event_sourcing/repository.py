@@ -16,16 +16,33 @@ ID = TypeVar("ID")
 
 
 class Repo(_abc.ABC, Generic[OBJ, ID]):
+    """
+    A repository is a collection of objects that can be queried and
+    persisted.
+
+    This is an abstract base class that defines the interface that
+    all repositories implement.
+    """
+
     @_abc.abstractmethod
     def add(self, entity: OBJ) -> MessagePosition:
+        """
+        Add a new entity to the repository.
+        """
         raise NotImplementedError
 
     @_abc.abstractmethod
     def save(self, entity: OBJ, expected_version: int) -> MessagePosition:
+        """
+        Save an existing entity to the repository.
+        """
         raise NotImplementedError
 
     @_abc.abstractmethod
     def get(self, id: ID) -> OBJ:
+        """
+        Get an entity from the repository by its ID.
+        """
         raise NotImplementedError
 
 

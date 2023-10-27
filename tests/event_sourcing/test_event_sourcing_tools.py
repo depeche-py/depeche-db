@@ -3,6 +3,7 @@ import uuid as _uuid
 from typing import Optional, Union
 
 import pydantic as _pydantic
+import pytest
 
 from depeche_db import MessageStore
 from depeche_db import event_sourcing as _es
@@ -51,6 +52,10 @@ class Foo(_es.EventSourcedAggregateRoot[_uuid.UUID, FooEvent]):
         else:
             raise NotImplementedError(f"Event {type(event)} is not supported")
 
+    def _check_invariants(self):
+        assert self.name != "", "Name cannot be empty"
+        assert self.name != self.name.upper(), "Name cannot be all uppercase"
+
     @property
     def version(self) -> int:
         return self._version
@@ -69,12 +74,22 @@ def test_event_sourced_aggregate():
     foo = Foo.create(_uuid.uuid4(), "foo")
     assert foo.version == 1
     assert foo.name == "foo"
-    assert len(foo._events) == 1
+    assert len(foo.events) == 1
 
     foo.rename("bar")
     assert foo.version == 2
     assert foo.name == "bar"
-    assert len(foo._events) == 2
+    assert len(foo.events) == 2
+
+
+def test_event_sourced_aggregate_enforces_invariants():
+    with pytest.raises(AssertionError):
+        Foo.create(_uuid.uuid4(), "")
+
+    foo = Foo.create(_uuid.uuid4(), "a")
+    with pytest.raises(AssertionError):
+        foo.rename("BAR")
+    assert len(foo.events) == 1
 
 
 class FooRepo(_es.EventStoreRepo[FooEvent, Foo, _uuid.UUID]):

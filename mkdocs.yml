@@ -29,6 +29,7 @@ nav:
     - Message handlers: api/message_handlers.md
     - Data structures: api/datastructures.md
     - Exceptions: api/exceptions.md
+    - Event Sourcing: api/event_sourcing.md
   - Examples:
     - Bank (event sourced): examples/bank-eventsourced.md
   - Changelog: CHANGELOG.md
