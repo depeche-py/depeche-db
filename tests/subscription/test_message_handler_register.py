@@ -77,3 +77,12 @@ def test_class_based_handler():
 
     subject.get_handler(AccountCreditedEvent).handler(1)
     assert len(seen) == 1
+
+
+def test_register_manual():
+    subject: MessageHandlerRegister[Any] = MessageHandlerRegister()
+
+    def handler1(event):
+        pass
+
+    subject.register_manual(handler1, AccountCreditedEvent)

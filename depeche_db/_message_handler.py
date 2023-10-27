@@ -67,9 +67,35 @@ class MessageHandlerRegister(Generic[E]):
         if len(signature.parameters) < 1:
             raise ValueError("Handler must have at least one parameter")
 
+        handled_type = list(signature.parameters.values())[0].annotation
+        self.register_manual(
+            handler=handler,
+            handled_type=handled_type,
+            requires_middleware=len(signature.parameters) > 1,
+        )
+        return handler
+
+    def register_manual(
+        self, handler: H, handled_type: Type, requires_middleware: bool = False
+    ):
+        """
+        Registers a handler for a given message type.
+
+        The handler must have at least one parameter. The first parameter must
+        be of a message type.
+
+        Same overlap rules apply to this method as to the `register` method.
+
+        If the handler takes more than one parameter, you must set the
+        `requires_middleware` parameter to `True`!
+
+        Args:
+            handler: A handler function.
+            handled_type: The type of message to handle.
+            requires_middleware: Whether the handler requires middleware.
+        """
         pass_subscription_message = False
         pass_stored_message = False
-        handled_type = list(signature.parameters.values())[0].annotation
         origin = _typing.get_origin(handled_type)
         if origin == SubscriptionMessage:
             pass_subscription_message = True
@@ -88,7 +114,7 @@ class MessageHandlerRegister(Generic[E]):
             handler=handler,
             pass_subscription_message=pass_subscription_message,
             pass_stored_message=pass_stored_message,
-            requires_middleware=len(signature.parameters) > 1,
+            requires_middleware=requires_middleware,
         )
         return handler
 
