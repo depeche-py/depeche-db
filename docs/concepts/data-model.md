@@ -94,9 +94,12 @@ flowchart TB
     end
 ```
 
-Within a partition, messages are ordered by their global position in the
-message store. Messages are assigned a unique & gapless `position` within their
-partition.
+Messages are assigned a unique & gapless `position` within their partition. The
+order of messages within a partition is based on their global position in the
+message store. This cannot be guaranteed though, because transactions writing
+to the messages store might be committed "out of order". The messages will be
+out of order concerning their global position, if the aggregated stream is
+updated between those commits.
 
 Please note that this example partitioning (which used the stream name as the
 partition key) is only one possibility. Users can define how messages are

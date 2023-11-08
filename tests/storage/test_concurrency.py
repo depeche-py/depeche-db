@@ -21,7 +21,13 @@ def test_concurrent_writes_to_same_stream_fail(db_engine, storage):
         with db_engine.connect() as conn:
             subject = storage
             try:
-                subject.add(conn, "stream1", 0, _uuid.uuid4(), {"foo": "bar"})
+                subject.add(
+                    conn=conn,
+                    stream="stream1",
+                    expected_version=0,
+                    message_id=_uuid.uuid4(),
+                    message={"foo": "bar"},
+                )
                 conn.commit()
                 success.append(True)
             except Exception:
@@ -45,7 +51,13 @@ def test_multiple_writes_do_not_interfere(db_engine, storage):
             with db_engine.connect() as conn:
                 subject = storage
 
-                subject.add(conn, "stream1", None, _uuid.uuid4(), {"foo": "bar"})
+                subject.add(
+                    conn=conn,
+                    stream="stream1",
+                    expected_version=None,
+                    message_id=_uuid.uuid4(),
+                    message={"foo": "bar"},
+                )
                 conn.commit()
         success.append(True)
 
