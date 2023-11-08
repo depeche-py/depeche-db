@@ -42,14 +42,14 @@ def test_gaps_in_global_position(db_engine, store_factory, stream_factory, accou
 
     with db_engine.connect() as conn:
         store.write(stream="account-a", message=msg(ACCOUNT1_ID), conn=conn)
-        conn.rollback()
+        conn.rollback()  # global position 1 is now missing
     with db_engine.connect() as conn:
         msg1 = msg(ACCOUNT1_ID)
         store.write(stream="account-a", message=msg1, conn=conn)
         conn.commit()
     with db_engine.connect() as conn:
         store.write(stream="account-a", message=msg(ACCOUNT1_ID), conn=conn)
-        conn.rollback()
+        conn.rollback()  # global position 3 is now missing
     with db_engine.connect() as conn:
         msg2 = msg(ACCOUNT1_ID)
         store.write(stream="account-a", message=msg2, conn=conn)
