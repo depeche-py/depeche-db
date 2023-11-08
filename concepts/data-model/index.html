@@ -462,9 +462,12 @@ to. Thus, aggregated streams are rather light-weight on the storage size.</p>
       style p22 fill:#aafeaa
     end
 </div></p>
-<p>Within a partition, messages are ordered by their global position in the
-message store. Messages are assigned a unique &amp; gapless <code>position</code> within their
-partition.</p>
+<p>Messages are assigned a unique &amp; gapless <code>position</code> within their partition. The
+order of messages within a partition is based on their global position in the
+message store. This cannot be guaranteed though, because transactions writing
+to the messages store might be committed "out of order". The messages will be
+out of order concerning their global position, if the aggregated stream is
+updated between those commits.</p>
 <p>Please note that this example partitioning (which used the stream name as the
 partition key) is only one possibility. Users can define how messages are
 partitioned. Furthermore, you can create multiple aggregated streams which
