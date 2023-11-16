@@ -11,7 +11,6 @@ from sqlalchemy import create_engine
 from depeche_db import (
     AggregatedStream,
     Executor,
-    MessageProtocol,
     MessageStore,
     StoredMessage,
     Subscription,
@@ -30,7 +29,7 @@ DB_DSN = "postgresql://depeche:depeche@localhost:4888/depeche_demo"
 db_engine = create_engine(DB_DSN)
 
 
-class MyMessage(pydantic.BaseModel, MessageProtocol):
+class MyMessage(pydantic.BaseModel):
     content: int
     message_id: UUID = pydantic.Field(default_factory=uuid4)
     sent_at: datetime = pydantic.Field(default_factory=datetime.utcnow)

@@ -1,3 +1,11 @@
+# next
+
+* Add `start_point` to subscriptions
+* Add three implementations for the subscription start point
+    * Default: Beginning of aggregated stream
+    * Next message
+    * Point in time
+
 # 0.6.2
 
 * Add `register_manual` method to `MessageHandlerRegister`

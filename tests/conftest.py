@@ -120,11 +120,11 @@ def store_with_events(store_factory):
 
 @pytest.fixture
 def stream_factory(identifier, db_engine):
-    def _inner(store: MessageStore[AccountEvent]):
+    def _inner(store: MessageStore[AccountEvent], partitioner=None):
         stream = AggregatedStream[AccountEvent](
             name=identifier(),
             store=store,
-            partitioner=MyPartitioner(),
+            partitioner=partitioner or MyPartitioner(),
             stream_wildcards=["account-%"],
         )
         with db_engine.connect() as conn:
@@ -158,12 +158,19 @@ def subscription_factory(identifier, lock_provider):
 class MyStateProvider:
     def __init__(self):
         self._state = SubscriptionState(positions={})
+        self._initialized = False
 
     def store(self, subscription_name: str, partition: int, position: int):
         self._state.positions[partition] = position
 
     def read(self, subscription_name: str) -> SubscriptionState:
         return self._state
+
+    def initialize(self, subscription_name: str):
+        self._initialized = True
+
+    def initialized(self, subscription_name: str) -> bool:
+        return self._initialized
 
 
 @pytest.fixture

@@ -17,6 +17,7 @@ from ._interfaces import (  # noqa: F401
     StreamPartitionStatistic,
     SubscriptionErrorHandler,
     SubscriptionMessage,
+    SubscriptionStartPoint,
     SubscriptionState,
     SubscriptionStateProvider,
 )
@@ -26,6 +27,8 @@ from ._storage import Storage  # noqa: F401
 from ._subscription import (  # noqa: F401
     ExitSubscriptionErrorHandler,  # move somewhere else
     LogAndIgnoreSubscriptionErrorHandler,  # move somewhere else
+    StartAtNextMessage,
+    StartAtPointInTime,
     Subscription,
     SubscriptionMessageHandler,
     SubscriptionRunner,

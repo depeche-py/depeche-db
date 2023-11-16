@@ -1,3 +1,4 @@
+import datetime as _dt
 import logging as _logging
 from typing import (
     Callable,
@@ -19,6 +20,7 @@ from ._interfaces import (
     StoredMessage,
     SubscriptionErrorHandler,
     SubscriptionMessage,
+    SubscriptionStartPoint,
     SubscriptionStateProvider,
 )
 
@@ -66,8 +68,7 @@ class Subscription(Generic[E]):
         batch_size: Optional[int] = None,
         state_provider: Optional[SubscriptionStateProvider] = None,
         lock_provider: Optional[LockProvider] = None,
-        # TODO start at time
-        # TODO start at "next message"
+        start_point: Optional[SubscriptionStartPoint] = None,
     ):
         """
         A subscription is a way to read messages from an aggregated stream.
@@ -81,6 +82,7 @@ class Subscription(Generic[E]):
             batch_size: Number of messages to read at once, defaults to 10, read more [here][depeche_db.SubscriptionRunner]
             state_provider: Provider for the subscription state, defaults to a PostgreSQL provider
             lock_provider: Provider for the locks, defaults to a PostgreSQL provider
+            start_point: The start point for the subscription, defaults to beginning of the stream
         """
         assert name.isidentifier(), "Group name must be a valid identifier"
         self.name = name
@@ -91,13 +93,35 @@ class Subscription(Generic[E]):
         self._state_provider = state_provider or _tools.DbSubscriptionStateProvider(
             name, self._stream._store.engine
         )
+        self._start_point = start_point
         self.runner = SubscriptionRunner(
             subscription=self,
             message_handler=message_handler,
             batch_size=batch_size,
         )
 
+    def _init_state(self):
+        if not self._state_provider.initialized(self.name):
+            lock_key = f"subscription-{self.name}-init"
+            if not self._lock_provider.lock(lock_key):
+                # another instance is already initializing the state
+                return
+            try:
+                if self._start_point is not None:
+                    self._start_point.init_state(
+                        subscription_name=self.name,
+                        stream=self._stream,
+                        state_provider=self._state_provider,
+                    )
+                self._state_provider.initialize(self.name)
+            finally:
+                self._lock_provider.unlock(lock_key)
+
     def get_next_messages(self, count: int) -> Iterator[SubscriptionMessage[E]]:
+        if not self._state_provider.initialized(self.name):
+            self._init_state()
+        assert self._state_provider.initialized(self.name)
+
         state = self._state_provider.read(self.name)
         statistics = list(
             self._stream.get_partition_statistics(
@@ -275,3 +299,52 @@ class SubscriptionRunner(Generic[E]):
 
     def handle(self, message: SubscriptionMessage):
         self._handler.handle(message)
+
+
+class StartAtNextMessage(SubscriptionStartPoint):
+    """
+    Starts consuming messages from the next message in the stream.
+    """
+
+    def init_state(
+        self,
+        subscription_name: str,
+        stream: "AggregatedStream",
+        state_provider: SubscriptionStateProvider,
+    ):
+        for partition_statistic in stream.get_partition_statistics():
+            state_provider.store(
+                subscription_name=subscription_name,
+                partition=partition_statistic.partition_number,
+                position=partition_statistic.max_position,
+            )
+
+
+class StartAtPointInTime(SubscriptionStartPoint):
+    def __init__(self, point_in_time: _dt.datetime):
+        """
+        Starts consuming messages from a point in time.
+
+        Args:
+            point_in_time: The point in time to start consuming messages from. The point in time must be timezone aware.
+        """
+        if not point_in_time.tzinfo:
+            raise ValueError("Point in time must be timezone aware")
+        self._point_in_time = point_in_time
+
+    def init_state(
+        self,
+        subscription_name: str,
+        stream: "AggregatedStream",
+        state_provider: SubscriptionStateProvider,
+    ):
+        for partition, position in stream.time_to_positions(
+            self._point_in_time
+        ).items():
+            print(partition, position)
+            if position > 0:
+                state_provider.store(
+                    subscription_name=subscription_name,
+                    partition=partition,
+                    position=position - 1,
+                )

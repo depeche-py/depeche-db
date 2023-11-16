@@ -13,6 +13,7 @@ from ._interfaces import (
     MessagePartitioner,
     MessageProtocol,
     SubscriptionErrorHandler,
+    SubscriptionStartPoint,
     SubscriptionStateProvider,
 )
 
@@ -90,6 +91,7 @@ class SubscriptionFactory(Generic[E]):
         error_handler: Optional[SubscriptionErrorHandler] = None,
         state_provider: Optional[SubscriptionStateProvider] = None,
         lock_provider: Optional[LockProvider] = None,
+        start_point: Optional[SubscriptionStartPoint] = None,
     ) -> "Subscription[E]":
         """
         Create a subscription.
@@ -102,6 +104,7 @@ class SubscriptionFactory(Generic[E]):
             error_handler: A handler for errors raised by the handlers, defaults to handler that will exit the subscription
             state_provider: Provider for the subscription state, defaults to a PostgreSQL provider
             lock_provider: Provider for the locks, defaults to a PostgreSQL provider
+            start_point: The start point for the subscription, defaults to beginning of the stream
         """
         from ._message_handler import MessageHandlerRegister
         from ._subscription import Subscription, SubscriptionMessageHandler
@@ -120,4 +123,5 @@ class SubscriptionFactory(Generic[E]):
             ),
             state_provider=state_provider,
             lock_provider=lock_provider,
+            start_point=start_point,
         )

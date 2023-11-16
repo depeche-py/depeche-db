@@ -1,9 +1,13 @@
+from typing import Set
+
 import sqlalchemy as _sa
 
 from .._interfaces import SubscriptionState
 
 
 class DbSubscriptionStateProvider:
+    SPECIAL_PARTITION_FOR_INIT_STATE = -1
+
     def __init__(self, name: str, engine: _sa.engine.Engine):
         assert name.isidentifier(), "Name must be a valid identifier"
         self.name = name
@@ -18,6 +22,7 @@ class DbSubscriptionStateProvider:
             _sa.Column("position", _sa.Integer, nullable=False),
         )
         self.metadata.create_all(self._engine)
+        self._initialized_subscriptions: Set[str] = set()
 
     def store(self, subscription_name: str, partition: int, position: int):
         from sqlalchemy.dialects.postgresql import insert
@@ -52,8 +57,48 @@ class DbSubscriptionStateProvider:
                             self.state_table.c.partition,
                             self.state_table.c.position,
                         ).where(
-                            self.state_table.c.subscription_name == subscription_name
+                            _sa.and_(
+                                self.state_table.c.subscription_name
+                                == subscription_name,
+                                self.state_table.c.partition
+                                != self.SPECIAL_PARTITION_FOR_INIT_STATE,
+                            )
                         )
                     )
                 }
             )
+
+    def initialize(self, subscription_name: str):
+        """
+        Marks subscription state as initialized.
+        """
+        self.store(
+            subscription_name=subscription_name,
+            partition=self.SPECIAL_PARTITION_FOR_INIT_STATE,
+            position=-1,
+        )
+
+    def initialized(self, subscription_name: str) -> bool:
+        """
+        Returns `True` if the subscription state was already initialized.
+        """
+        # Caches the result if True. It cannot go to False again!
+        if subscription_name in self._initialized_subscriptions:
+            return True
+
+        with self._engine.connect() as conn:
+            result = conn.execute(
+                _sa.select(
+                    self.state_table.c.partition.isnot(None),
+                ).where(
+                    _sa.and_(
+                        self.state_table.c.subscription_name == subscription_name,
+                        self.state_table.c.partition
+                        == self.SPECIAL_PARTITION_FOR_INIT_STATE,
+                    )
+                )
+            ).scalar()
+
+        if result:
+            self._initialized_subscriptions.add(subscription_name)
+        return result

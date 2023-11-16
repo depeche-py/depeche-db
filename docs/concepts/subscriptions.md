@@ -26,6 +26,17 @@ because it will favor processing older messages first.
 The order of steps 3c and 3d makes this a "at least once" delivery system,
 because the message is processed before the new position is recorded.
 
+## Start point
+
+When a subscription run for the first time, it decide where it should start consuming
+messages. Three options exist:
+
+* Beginning of the aggregated stream (default)
+* Next message: Start at the first message that is appended to the stream
+  after the subscription started
+* Point in time: Start at messages with a message time greater or equal a given
+  datetime.
+
 ## Services required by subscriptions
 
 A subscription requires two services provided to it:

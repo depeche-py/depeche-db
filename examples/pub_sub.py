@@ -11,7 +11,6 @@ from sqlalchemy import create_engine
 from depeche_db import (
     AggregatedStream,
     Executor,
-    MessageProtocol,
     MessageStore,
     StoredMessage,
     Subscription,
@@ -19,6 +18,7 @@ from depeche_db import (
     SubscriptionMessage,
     SubscriptionMessageHandler,
     SubscriptionRunner,
+    StartAtNextMessage,
 )
 from depeche_db.tools import PydanticMessageSerializer
 
@@ -26,7 +26,7 @@ DB_DSN = "postgresql://depeche:depeche@localhost:4888/depeche_demo"
 db_engine = create_engine(DB_DSN)
 
 
-class MyMessage(pydantic.BaseModel, MessageProtocol):
+class MyMessage(pydantic.BaseModel):
     content: int
     message_id: UUID = pydantic.Field(default_factory=uuid4)
     sent_at: datetime = pydantic.Field(default_factory=datetime.utcnow)
@@ -69,7 +69,9 @@ def handle_event_a(message: SubscriptionMessage[MyMessage]):
     time.sleep(0.05)
 
 
-subscription = stream.subscription(name="example_pub_sub", handlers=handlers)
+subscription = stream.subscription(
+    name="example_pub_sub", handlers=handlers, start_point=StartAtNextMessage()
+)
 
 
 def pub():

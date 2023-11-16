@@ -134,6 +134,9 @@ class AggregatedStream(Generic[E]):
         position: int,
         message_occurred_at: _dt.datetime,
     ) -> None:
+        # TODO assert message_occurred_at is UTC (or time zone aware)
+        if partition < 0:
+            raise ValueError("partition must be >= 0")
         conn.execute(
             self._table.insert().values(
                 message_id=message_id,
@@ -217,6 +220,7 @@ class AggregatedStream(Generic[E]):
                 _sa.select(
                     tbl.c.partition,
                     _sa.func.min(tbl.c.position).label("min_position"),
+                    _sa.func.max(tbl.c.position).label("max_position"),
                 )
                 .where(
                     _sa.or_(
@@ -234,7 +238,7 @@ class AggregatedStream(Generic[E]):
             )
 
             qry = (
-                _sa.select(tbl)
+                _sa.select(tbl, next_messages_tbl.c.max_position)
                 .select_from(
                     next_messages_tbl.join(
                         tbl,
@@ -254,9 +258,47 @@ class AggregatedStream(Generic[E]):
                     next_message_id=row.message_id,
                     next_message_position=row.position,
                     next_message_occurred_at=row.message_occurred_at,
+                    max_position=row.max_position,
                 )
             result.close()
             del result
+
+    def time_to_positions(self, time: _dt.datetime) -> Dict[int, int]:
+        if time.tzinfo is None:
+            raise ValueError("time must be timezone aware")
+        with self._connection() as conn:
+            tbl = self._table.alias()
+
+            positions_after_time = (
+                _sa.select(
+                    tbl.c.partition,
+                    _sa.func.min(tbl.c.position).label("min_position"),
+                )
+                .where(tbl.c.message_occurred_at >= time.astimezone(_dt.timezone.utc))
+                .group_by(tbl.c.partition)
+                .cte()
+            )
+            max_positions = (
+                _sa.select(
+                    tbl.c.partition,
+                    _sa.func.max(tbl.c.position).label("max_position"),
+                )
+                .group_by(tbl.c.partition)
+                .cte()
+            )
+            qry = _sa.select(
+                max_positions.c.partition,
+                _sa.func.coalesce(
+                    positions_after_time.c.min_position,
+                    max_positions.c.max_position + 1,
+                ).label("position"),
+            ).select_from(
+                max_positions.outerjoin(
+                    positions_after_time,
+                    max_positions.c.partition == positions_after_time.c.partition,
+                )
+            )
+            return {row.partition: row.position for row in conn.execute(qry)}
 
 
 class _AlreadyUpdating(RuntimeError):

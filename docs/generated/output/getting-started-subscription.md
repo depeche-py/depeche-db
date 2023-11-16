@@ -89,3 +89,23 @@ the registered handlers (if any).
 
 In a real application, we would not call `run_once` directly, but we would use
 the [`Executor`](../../getting-started/executor.md) to do it for us.
+
+
+A subscription by default starts at the beginning of the stream. If we want to
+change this behaviour, we can pass in a `SubscriptionStartPosition` object when we
+create the subscription. This object can be one of the following:
+```python
+from datetime import timezone
+from depeche_db import StartAtNextMessage, StartAtPointInTime
+
+subscription_next = aggregated_stream.subscription(
+    name="sub_example_docs_aggregate_me_next", start_point=StartAtNextMessage()
+)
+
+subscription_point_in_time = aggregated_stream.subscription(
+    name="sub_example_docs_aggregate_me_next",
+    start_point=StartAtPointInTime(
+        datetime(2023, 10, 5, 14, 0, 0, 0, tzinfo=timezone.utc)
+    ),
+)
+```

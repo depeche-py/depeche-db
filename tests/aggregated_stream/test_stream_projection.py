@@ -94,3 +94,16 @@ def assert_stream_projection(stream, db_engine, account, account2):
     assert [msg.message_id for msg in stream.read(partition=2)] == [
         event.event_id for event in account2.events
     ]
+
+
+def test_only_positive_partitions(
+    db_engine, store_with_events, stream_factory, account_ids
+):
+    class IllegalPartitioner:
+        def get_partition(self, event):
+            return -1
+
+    store = store_with_events[0]
+    subject = stream_factory(store, partitioner=IllegalPartitioner())
+    with pytest.raises(ValueError):
+        subject.projector.update_full()

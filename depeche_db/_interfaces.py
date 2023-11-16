@@ -3,6 +3,7 @@ import datetime as _dt
 import enum as _enum
 import uuid as _uuid
 from typing import (
+    TYPE_CHECKING,
     Callable,
     Dict,
     Generic,
@@ -15,6 +16,9 @@ from typing import (
     no_type_check,
     runtime_checkable,
 )
+
+if TYPE_CHECKING:
+    from ._aggregated_stream import AggregatedStream
 
 
 @runtime_checkable
@@ -98,6 +102,7 @@ class StreamPartitionStatistic:
     next_message_id: _uuid.UUID
     next_message_position: int
     next_message_occurred_at: _dt.datetime
+    max_position: int
 
 
 @_dc.dataclass
@@ -204,6 +209,18 @@ class SubscriptionStateProvider(Protocol):
         """
         raise NotImplementedError
 
+    def initialize(self, subscription_name: str):
+        """
+        Marks subscription state as initialized.
+        """
+        raise NotImplementedError
+
+    def initialized(self, subscription_name: str) -> bool:
+        """
+        Returns `True` if the subscription state was already initialized.
+        """
+        raise NotImplementedError
+
 
 class CallMiddleware(Generic[E]):
     """
@@ -302,6 +319,23 @@ class SubscriptionErrorHandler(Generic[E]):
 
         Returns:
             Action to be taken
+        """
+        raise NotImplementedError
+
+
+class SubscriptionStartPoint:
+    """
+    Defines the start point of a subscription.
+    """
+
+    def init_state(
+        self,
+        subscription_name: str,
+        stream: "AggregatedStream",
+        state_provider: SubscriptionStateProvider,
+    ):
+        """
+        Initializes subscription state (if not yet initialized).
         """
         raise NotImplementedError
 

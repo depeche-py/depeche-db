@@ -27,3 +27,10 @@
 ::: depeche_db.SubscriptionStateProvider
     options:
       show_signature_annotations: true
+---
+::: depeche_db.SubscriptionStartPoint
+---
+::: depeche_db.StartAtNextMessage
+---
+::: depeche_db.StartAtPointInTime
+---
