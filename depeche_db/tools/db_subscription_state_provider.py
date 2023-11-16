@@ -87,7 +87,7 @@ class DbSubscriptionStateProvider:
             return True
 
         with self._engine.connect() as conn:
-            result = conn.execute(
+            result: bool = conn.execute(
                 _sa.select(
                     self.state_table.c.partition.isnot(None),
                 ).where(
