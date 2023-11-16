@@ -871,6 +871,23 @@ the registered handlers (if any).</p>
 the registered handlers (if any).</p>
 <p>In a real application, we would not call <code>run_once</code> directly, but we would use
 the <a href="../../../getting-started/executor/"><code>Executor</code></a> to do it for us.</p>
+<p>A subscription by default starts at the beginning of the stream. If we want to
+change this behaviour, we can pass in a <code>SubscriptionStartPosition</code> object when we
+create the subscription. This object can be one of the following:
+<div class="language-python highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="kn">from</span> <span class="nn">datetime</span> <span class="kn">import</span> <span class="n">timezone</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="kn">from</span> <span class="nn">depeche_db</span> <span class="kn">import</span> <span class="n">StartAtNextMessage</span><span class="p">,</span> <span class="n">StartAtPointInTime</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">subscription_next</span> <span class="o">=</span> <span class="n">aggregated_stream</span><span class="o">.</span><span class="n">subscription</span><span class="p">(</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;sub_example_docs_aggregate_me_next&quot;</span><span class="p">,</span> <span class="n">start_point</span><span class="o">=</span><span class="n">StartAtNextMessage</span><span class="p">()</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="p">)</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="n">subscription_point_in_time</span> <span class="o">=</span> <span class="n">aggregated_stream</span><span class="o">.</span><span class="n">subscription</span><span class="p">(</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>    <span class="n">name</span><span class="o">=</span><span class="s2">&quot;sub_example_docs_aggregate_me_next&quot;</span><span class="p">,</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    <span class="n">start_point</span><span class="o">=</span><span class="n">StartAtPointInTime</span><span class="p">(</span>
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>        <span class="n">datetime</span><span class="p">(</span><span class="mi">2023</span><span class="p">,</span> <span class="mi">10</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">14</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">tzinfo</span><span class="o">=</span><span class="n">timezone</span><span class="o">.</span><span class="n">utc</span><span class="p">)</span>
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>    <span class="p">),</span>
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="p">)</span>
+</code></pre></div></p>
 
 
 

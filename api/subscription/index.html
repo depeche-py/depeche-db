@@ -728,6 +728,20 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#depeche_db.SubscriptionStateProvider.initialize" class="md-nav__link">
+    initialize()
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#depeche_db.SubscriptionStateProvider.initialized" class="md-nav__link">
+    initialized()
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#depeche_db.SubscriptionStateProvider.read" class="md-nav__link">
     read()
   </a>
@@ -743,6 +757,40 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#depeche_db.SubscriptionStartPoint" class="md-nav__link">
+    SubscriptionStartPoint
+  </a>
+  
+    <nav class="md-nav" aria-label="SubscriptionStartPoint">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#depeche_db.SubscriptionStartPoint.init_state" class="md-nav__link">
+    init_state()
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#depeche_db.StartAtNextMessage" class="md-nav__link">
+    StartAtNextMessage
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#depeche_db.StartAtPointInTime" class="md-nav__link">
+    StartAtPointInTime
+  </a>
   
 </li>
       
@@ -1108,6 +1156,20 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#depeche_db.SubscriptionStateProvider.initialize" class="md-nav__link">
+    initialize()
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#depeche_db.SubscriptionStateProvider.initialized" class="md-nav__link">
+    initialized()
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#depeche_db.SubscriptionStateProvider.read" class="md-nav__link">
     read()
   </a>
@@ -1123,6 +1185,40 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#depeche_db.SubscriptionStartPoint" class="md-nav__link">
+    SubscriptionStartPoint
+  </a>
+  
+    <nav class="md-nav" aria-label="SubscriptionStartPoint">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#depeche_db.SubscriptionStartPoint.init_state" class="md-nav__link">
+    init_state()
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#depeche_db.StartAtNextMessage" class="md-nav__link">
+    StartAtNextMessage
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#depeche_db.StartAtPointInTime" class="md-nav__link">
+    StartAtPointInTime
+  </a>
   
 </li>
       
@@ -1194,7 +1290,7 @@ subscription = stream.subscription(
 
 
 <h3 id="depeche_db.SubscriptionFactory.__call__" class="doc doc-heading">
-          <code class="highlight language-python"><span class="fm">__call__</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">handlers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">call_middleware</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">error_handler</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">state_provider</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lock_provider</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+          <code class="highlight language-python"><span class="fm">__call__</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">handlers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">call_middleware</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">error_handler</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">state_provider</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lock_provider</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">start_point</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 </h3>
 
@@ -1314,6 +1410,20 @@ subscription = stream.subscription(
                 <code>None</code>
           </td>
         </tr>
+        <tr>
+          <td><code>start_point</code></td>
+          <td>
+                <code><span title="typing.Optional">Optional</span>[<a class="autorefs autorefs-internal" title="depeche_db._interfaces.SubscriptionStartPoint" href="#depeche_db.SubscriptionStartPoint">SubscriptionStartPoint</a>]</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>The start point for the subscription, defaults to beginning of the stream</p>
+            </div>
+          </td>
+          <td>
+                <code>None</code>
+          </td>
+        </tr>
     </tbody>
   </table>
 
@@ -1336,7 +1446,7 @@ subscription = stream.subscription(
 
 
 <h2 id="depeche_db.Subscription" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">depeche_db</span><span class="o">.</span><span class="n">Subscription</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">stream</span><span class="p">,</span> <span class="n">message_handler</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">state_provider</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lock_provider</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">depeche_db</span><span class="o">.</span><span class="n">Subscription</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">stream</span><span class="p">,</span> <span class="n">message_handler</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">state_provider</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lock_provider</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">start_point</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 </h2>
 
@@ -1440,6 +1550,20 @@ subscription = stream.subscription(
           <td>
             <div class="doc-md-description">
               <p>Provider for the locks, defaults to a PostgreSQL provider</p>
+            </div>
+          </td>
+          <td>
+                <code>None</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>start_point</code></td>
+          <td>
+                <code><span title="typing.Optional">Optional</span>[<a class="autorefs autorefs-internal" title="depeche_db._interfaces.SubscriptionStartPoint" href="#depeche_db.SubscriptionStartPoint">SubscriptionStartPoint</a>]</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>The start point for the subscription, defaults to beginning of the stream</p>
             </div>
           </td>
           <td>
@@ -2198,6 +2322,46 @@ This method must not block!</p>
 
 
 
+<h3 id="depeche_db.SubscriptionStateProvider.initialize" class="doc doc-heading">
+          <code class="highlight language-python"><span class="n">initialize</span><span class="p">(</span><span class="n">subscription_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span></code>
+
+</h3>
+
+
+  <div class="doc doc-contents ">
+  
+      <p>Marks subscription state as initialized.</p>
+
+  </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+
+<h3 id="depeche_db.SubscriptionStateProvider.initialized" class="doc doc-heading">
+          <code class="highlight language-python"><span class="n">initialized</span><span class="p">(</span><span class="n">subscription_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span></code>
+
+</h3>
+
+
+  <div class="doc doc-contents ">
+  
+      <p>Returns <code>True</code> if the subscription state was already initialized.</p>
+
+  </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+
 <h3 id="depeche_db.SubscriptionStateProvider.read" class="doc doc-heading">
           <code class="highlight language-python"><span class="n">read</span><span class="p">(</span><span class="n">subscription_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SubscriptionState</span></code>
 
@@ -2262,7 +2426,177 @@ This method must not block!</p>
 
   </div>
 
+</div><hr />
+
+
+<div class="doc doc-object doc-class">
+
+
+
+
+<h2 id="depeche_db.SubscriptionStartPoint" class="doc doc-heading">
+          <code>depeche_db.SubscriptionStartPoint</code>
+
+
+</h2>
+
+
+  <div class="doc doc-contents first">
+
+  
+      <p>Defines the start point of a subscription.</p>
+
+
+  
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+<div class="doc doc-object doc-function">
+
+
+
+
+<h3 id="depeche_db.SubscriptionStartPoint.init_state" class="doc doc-heading">
+          <code class="highlight language-python"><span class="n">init_state</span><span class="p">(</span><span class="n">subscription_name</span><span class="p">,</span> <span class="n">stream</span><span class="p">,</span> <span class="n">state_provider</span><span class="p">)</span></code>
+
+</h3>
+
+
+  <div class="doc doc-contents ">
+  
+      <p>Initializes subscription state (if not yet initialized).</p>
+
+  </div>
+
 </div>
+
+
+
+  </div>
+
+  </div>
+
+</div><hr />
+
+
+<div class="doc doc-object doc-class">
+
+
+
+
+<h2 id="depeche_db.StartAtNextMessage" class="doc doc-heading">
+          <code>depeche_db.StartAtNextMessage</code>
+
+
+</h2>
+
+
+  <div class="doc doc-contents first">
+          <p class="doc doc-class-bases">
+            Bases: <code><a class="autorefs autorefs-internal" title="depeche_db._interfaces.SubscriptionStartPoint" href="#depeche_db.SubscriptionStartPoint">SubscriptionStartPoint</a></code></p>
+
+  
+      <p>Starts consuming messages from the next message in the stream.</p>
+
+
+  
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+  </div>
+
+</div><hr />
+
+
+<div class="doc doc-object doc-class">
+
+
+
+
+<h2 id="depeche_db.StartAtPointInTime" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">depeche_db</span><span class="o">.</span><span class="n">StartAtPointInTime</span><span class="p">(</span><span class="n">point_in_time</span><span class="p">)</span></code>
+
+</h2>
+
+
+  <div class="doc doc-contents first">
+          <p class="doc doc-class-bases">
+            Bases: <code><a class="autorefs autorefs-internal" title="depeche_db._interfaces.SubscriptionStartPoint" href="#depeche_db.SubscriptionStartPoint">SubscriptionStartPoint</a></code></p>
+
+  
+      <p>Starts consuming messages from a point in time.</p>
+
+
+
+  <p><strong>Parameters:</strong></p>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Description</th>
+        <th>Default</th>
+      </tr>
+    </thead>
+    <tbody>
+        <tr>
+          <td><code>point_in_time</code></td>
+          <td>
+                <code><span title="datetime.datetime">datetime</span></code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>The point in time to start consuming messages from. The point in time must be timezone aware.</p>
+            </div>
+          </td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+    </tbody>
+  </table>
+
+
+  
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+  </div>
+
+</div><hr />
 
 
 
