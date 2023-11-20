@@ -420,11 +420,18 @@ within the same stream, it is guaranteed that if <code>a.version &lt; b.version<
 <h2 id="aggregated-streams">Aggregated streams</h2>
 <p>Because of the high granularity of the streams, it is not pratical to subscribe
 to them directly. That is why there is the notion of an aggregated stream which
-aggregates the messages from several streams.</p>
+aggregates the messages from several streams. The selection of the origin streams
+is done by match expressions, e.g. the expression <code>foo-%</code> will match streams
+like <code>foo-1</code>, <code>foo-123</code> etc. An origin stream can be part of multiple
+aggregated streams.</p>
 <p>Aggregated streams consist of partitions. Messages from the origin streams
 can be assigned to partitions by a user defined function. When a message is
 added to a partition within an aggregated stream, it is <strong>not</strong> copied but linked
 to. Thus, aggregated streams are rather light-weight on the storage size.</p>
+<p>The partitions is what gives us the possibility of concurrency while processing
+messages. You have to be careful when selecting a partition key or function.
+Messages which must be processed in the order in which they occurred in need to
+end up in the same partition.</p>
 <p>Given these streams:
 <div class="mermaid">flowchart TB
     subgraph stream-1
@@ -444,8 +451,8 @@ to. Thus, aggregated streams are rather light-weight on the storage size.</p>
     style msg32 fill:#aaaafe
     end
 </div></p>
-<p>An aggregated stream could look like this:
-<div class="mermaid">flowchart TB
+<p>The partitions of an example aggregated stream could look like this:</p>
+<p><div class="mermaid">flowchart TB
     subgraph partition-1
       p11 --&gt; p12 --&gt; p31 --&gt; p13 --&gt; p32
       style p11 fill:#feaaaa
