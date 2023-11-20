@@ -45,12 +45,20 @@ within the same stream, it is guaranteed that if `a.version < b.version` then
 
 Because of the high granularity of the streams, it is not pratical to subscribe
 to them directly. That is why there is the notion of an aggregated stream which
-aggregates the messages from several streams.
+aggregates the messages from several streams. The selection of the origin streams
+is done by match expressions, e.g. the expression `foo-%` will match streams
+like `foo-1`, `foo-123` etc. An origin stream can be part of multiple
+aggregated streams.
 
 Aggregated streams consist of partitions. Messages from the origin streams
 can be assigned to partitions by a user defined function. When a message is
 added to a partition within an aggregated stream, it is **not** copied but linked
 to. Thus, aggregated streams are rather light-weight on the storage size.
+
+The partitions is what gives us the possibility of concurrency while processing
+messages. You have to be careful when selecting a partition key or function.
+Messages which must be processed in the order in which they occurred in need to
+end up in the same partition.
 
 Given these streams:
 ```mermaid
@@ -73,7 +81,8 @@ flowchart TB
     end
 ```
 
-An aggregated stream could look like this:
+The partitions of an example aggregated stream could look like this:
+
 ```mermaid
 flowchart TB
     subgraph partition-1
