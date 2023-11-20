@@ -12,15 +12,18 @@ from sqlalchemy_utils import UUIDType as _UUIDType
 
 from ._compat import SAConnection
 from ._exceptions import OptimisticConcurrencyError
-from ._interfaces import MessagePosition
+from ._interfaces import MessagePosition, SchemaProvider
 
 
 class Storage:
     name: str
 
-    def __init__(self, name: str, engine: _sa.engine.Engine):
+    def __init__(
+        self, name: str, engine: _sa.engine.Engine, schema_provider: SchemaProvider
+    ):
         assert name.isidentifier(), "name must be a valid identifier"
         self.name = name
+        self._schema_provider = schema_provider
         self.metadata = _sa.MetaData()
         self.message_table = _sa.Table(
             f"{name}_messages",
@@ -58,7 +61,8 @@ class Storage:
         _sa.event.listen(
             self.message_table, "after_create", ddl.execute_if(dialect="postgresql")
         )
-        self.metadata.create_all(engine, checkfirst=True)
+        # self.metadata.create_all(engine, checkfirst=True)
+        schema_provider.register(self.metadata)
 
     def add(
         self,

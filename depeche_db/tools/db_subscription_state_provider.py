@@ -2,13 +2,15 @@ from typing import Set
 
 import sqlalchemy as _sa
 
-from .._interfaces import SubscriptionState
+from .._interfaces import SchemaProvider, SubscriptionState
 
 
 class DbSubscriptionStateProvider:
     SPECIAL_PARTITION_FOR_INIT_STATE = -1
 
-    def __init__(self, name: str, engine: _sa.engine.Engine):
+    def __init__(
+        self, name: str, engine: _sa.engine.Engine, schema_provider: SchemaProvider
+    ):
         assert name.isidentifier(), "Name must be a valid identifier"
         self.name = name
         self._engine = engine
@@ -21,7 +23,8 @@ class DbSubscriptionStateProvider:
             _sa.Column("partition", _sa.Integer, primary_key=True),
             _sa.Column("position", _sa.Integer, nullable=False),
         )
-        self.metadata.create_all(self._engine)
+        schema_provider.register(self.metadata)
+        # self.metadata.create_all(self._engine)
         self._initialized_subscriptions: Set[str] = set()
 
     def store(self, subscription_name: str, partition: int, position: int):

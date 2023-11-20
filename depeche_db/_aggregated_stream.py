@@ -110,7 +110,8 @@ class AggregatedStream(Generic[E]):
         _sa.event.listen(
             self._table, "after_create", trigger.execute_if(dialect="postgresql")
         )
-        self._metadata.create_all(store.engine, checkfirst=True)
+        # self._metadata.create_all(store.engine, checkfirst=True)
+        self._store._storage._schema_provider.register(self._metadata)
         self.projector = StreamProjector(
             stream=self,
             partitioner=partitioner,

@@ -4,6 +4,7 @@ from typing import List
 import pytest
 
 from depeche_db import (
+    DefaultSchemaProvider,
     StartAtNextMessage,
     StartAtPointInTime,
     Subscription,
@@ -79,4 +80,8 @@ def exhaust(subscription: Subscription) -> List[SubscriptionMessage]:
 
 @pytest.fixture
 def state_provider(identifier, db_engine):
-    return DbSubscriptionStateProvider(engine=db_engine, name=identifier())
+    return DbSubscriptionStateProvider(
+        engine=db_engine,
+        name=identifier(),
+        schema_provider=DefaultSchemaProvider(engine=db_engine),
+    )

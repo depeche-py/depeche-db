@@ -11,8 +11,10 @@ from ._interfaces import (
     MessagePosition,
     MessageProtocol,
     MessageSerializer,
+    SchemaProvider,
     StoredMessage,
 )
+from ._schema_provider import DefaultSchemaProvider
 from ._storage import Storage
 
 E = TypeVar("E", bound=MessageProtocol)
@@ -123,6 +125,7 @@ class MessageStore(Generic[E]):
         name: str,
         engine: _sa.engine.Engine,
         serializer: MessageSerializer[E],
+        schema_provider: SchemaProvider | None = None,
     ):
         """
         Message store.
@@ -132,12 +135,17 @@ class MessageStore(Generic[E]):
                 the database objects that are created.
             engine (Engine): A SQLAlchemy engine.
             serializer (MessageSerializer): A serializer for the messages.
+            schema_provider (SchemaProvider): A schema provider.
 
         Attributes:
             aggregated_stream (AggregatedStreamFactory): A factory for aggregated streams.
         """
+        if not schema_provider:
+            schema_provider = DefaultSchemaProvider(engine)
         self.engine = engine
-        self._storage = Storage(name=name, engine=engine)
+        self._storage = Storage(
+            name=name, engine=engine, schema_provider=schema_provider
+        )
         self._serializer = serializer
         self.aggregated_stream = AggregatedStreamFactory(store=self)
 

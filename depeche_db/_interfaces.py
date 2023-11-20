@@ -17,6 +17,8 @@ from typing import (
     runtime_checkable,
 )
 
+import sqlalchemy as _sa
+
 if TYPE_CHECKING:
     from ._aggregated_stream import AggregatedStream
 
@@ -395,4 +397,9 @@ class MessageHandlerRegisterProtocol(Protocol, Generic[E]):
         """
         Returns a handler for a given message type.
         """
+        raise NotImplementedError
+
+
+class SchemaProvider(Protocol):
+    def register(self, metadata: _sa.MetaData):
         raise NotImplementedError

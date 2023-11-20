@@ -2,7 +2,7 @@ import threading
 import time
 from typing import List
 
-from depeche_db import SubscriptionMessage
+from depeche_db import DefaultSchemaProvider, SubscriptionMessage
 from depeche_db.tools import DbSubscriptionStateProvider
 
 # from ._tools import MyLockProvider, MyStateProvider, MyThreadLockProvider
@@ -37,7 +37,9 @@ def test_db_subscription_state(
         name=identifier(),
         lock_provider=lock_provider,
         state_provider=DbSubscriptionStateProvider(
-            engine=db_engine, name=state_provider_name
+            engine=db_engine,
+            name=state_provider_name,
+            schema_provider=DefaultSchemaProvider(engine=db_engine),
         ),
     )
 
@@ -56,7 +58,9 @@ def test_db_subscription_state(
         name=subject.name,
         lock_provider=lock_provider,
         state_provider=DbSubscriptionStateProvider(
-            engine=db_engine, name=state_provider_name
+            engine=db_engine,
+            name=state_provider_name,
+            schema_provider=DefaultSchemaProvider(engine=db_engine),
         ),
     )
 

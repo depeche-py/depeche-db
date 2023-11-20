@@ -1,3 +1,4 @@
+import contextlib as _contextlib
 import os as _os
 import threading
 import uuid as _uuid
@@ -23,9 +24,9 @@ from tests._account_example import (
 from . import _tools
 
 
-@pytest.fixture(scope="session")
-def pg_db():
-    dsn = f"postgresql://depeche:depeche@localhost:4888/depeche_test_{_os.getpid()}"
+@_contextlib.contextmanager
+def _pg_db(suffix: str = ""):
+    dsn = f"postgresql://depeche:depeche@localhost:4888/depeche_test_{_os.getpid()}{suffix}"
     if _tools.pg_check_if_db_exists(dsn):
         _tools.pg_drop_db(dsn)
     _tools.pg_create_db(dsn)
@@ -33,6 +34,18 @@ def pg_db():
     yield dsn
 
     _tools.pg_drop_db(dsn)
+
+
+@pytest.fixture
+def clean_pg_db(identifier):
+    with _pg_db(identifier()) as dsn:
+        yield dsn
+
+
+@pytest.fixture(scope="session")
+def pg_db():
+    with _pg_db() as dsn:
+        yield dsn
 
 
 @pytest.fixture

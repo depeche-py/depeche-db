@@ -91,7 +91,9 @@ class Subscription(Generic[E]):
             name, self._stream._store.engine
         )
         self._state_provider = state_provider or _tools.DbSubscriptionStateProvider(
-            name, self._stream._store.engine
+            name,
+            self._stream._store.engine,
+            schema_provider=self._stream._store._storage._schema_provider,
         )
         self._start_point = start_point
         self.runner = SubscriptionRunner(
