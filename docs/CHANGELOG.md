@@ -1,4 +1,4 @@
-# next
+# 0.7.0
 
 * Add `start_point` to subscriptions
 * Add three implementations for the subscription start point
