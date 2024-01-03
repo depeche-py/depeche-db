@@ -64,6 +64,11 @@ class StoredMessage(Generic[E]):
     global_position: int
 
 
+class AckOpProtocol(Protocol):
+    def execute(self):
+        ...
+
+
 @_dc.dataclass(frozen=True)
 class SubscriptionMessage(Generic[E]):
     """
@@ -78,6 +83,7 @@ class SubscriptionMessage(Generic[E]):
     partition: int
     position: int
     stored_message: StoredMessage[E]
+    ack: AckOpProtocol
 
 
 @_dc.dataclass(frozen=True)

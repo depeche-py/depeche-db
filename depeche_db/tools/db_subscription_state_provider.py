@@ -25,6 +25,7 @@ class DbSubscriptionStateProvider:
         self._initialized_subscriptions: Set[str] = set()
 
     def store(self, subscription_name: str, partition: int, position: int):
+        # TODO accept connection
         from sqlalchemy.dialects.postgresql import insert
 
         with self._engine.connect() as conn:
@@ -48,6 +49,7 @@ class DbSubscriptionStateProvider:
             conn.commit()
 
     def read(self, subscription_name: str) -> SubscriptionState:
+        # TODO accept connection
         with self._engine.connect() as conn:
             return SubscriptionState(
                 {

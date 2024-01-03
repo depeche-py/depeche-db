@@ -59,6 +59,68 @@ class LogAndIgnoreSubscriptionErrorHandler(SubscriptionErrorHandler):
         return ErrorAction.IGNORE
 
 
+class NoAckOp:
+    def execute(self):
+        raise RuntimeError(
+            "NoAckOp cannot be executed, choose a different Ack strategy to use this operation"
+        )
+
+
+class AckOp:
+    def __init__(
+        self,
+        name: str,
+        partition: int,
+        position: int,
+        state_provider: SubscriptionStateProvider,
+    ):
+        self.name = name
+        self.partition = partition
+        self.position = position
+        self._state_provider = state_provider
+        self._executed = False
+        self._rolled_back = False
+
+    # TODO generic on state provider & type args?
+    def execute(self, **subscription_state_provider_kwargs):
+        if self._executed:
+            return
+
+        self._executed = True
+        state = self._state_provider.read(
+            self.name, **subscription_state_provider_kwargs
+        )
+        assert (
+            state.positions.get(self.partition, -1) == self.position - 1
+        ), f"{self.partition} should have {self.position - 1} as last position, but has {state.positions.get(self.partition, -1)}"
+        self._state_provider.store(
+            subscription_name=self.name,
+            partition=self.partition,
+            position=self.position,
+            **subscription_state_provider_kwargs,
+        )
+
+    def rollback(self):
+        self._rolled_back = True
+
+    @property
+    def rolled_back(self):
+        return self._rolled_back
+
+
+from ._interfaces import AckOpProtocol
+
+
+class AckStrategy:
+    def get_op(self) -> AckOpProtocol:
+        raise NotImplementedError()
+
+
+class ManagedAckStrategy(AckStrategy):
+    def get_op(self) -> AckOpProtocol:
+        return NoAckOp()
+
+
 class Subscription(Generic[E]):
     def __init__(
         self,
@@ -157,27 +219,26 @@ class Subscription(Generic[E]):
                     }
 
                     for pointer in message_pointers:
+                        ack = AckOp(
+                            name=self.name,
+                            partition=pointer.partition,
+                            position=pointer.position,
+                            state_provider=self._state_provider,
+                        )
+
                         yield SubscriptionMessage(
                             partition=pointer.partition,
                             position=pointer.position,
                             stored_message=stored_messages[pointer.message_id],
+                            ack=ack,
                         )
-                        self._ack(
-                            partition=pointer.partition,
-                            position=pointer.position,
-                        )
+                        if ack.rolled_back:
+                            # the message was not ack'd or the acknolwedgement was rolled back
+                            break
+                        ack.execute()
                 break
             finally:
                 self._lock_provider.unlock(lock_key)
-
-    def _ack(self, partition: int, position: int):
-        state = self._state_provider.read(self.name)
-        assert (
-            state.positions.get(partition, -1) == position - 1
-        ), f"{partition} should have {position - 1} as last position, but has {state.positions.get(partition, -1)}"
-        self._state_provider.store(
-            subscription_name=self.name, partition=partition, position=position
-        )
 
 
 class SubscriptionMessageHandler(Generic[E]):
