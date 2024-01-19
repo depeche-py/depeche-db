@@ -264,6 +264,9 @@ class AggregatedStream(Generic[E]):
             del result
 
     def time_to_positions(self, time: _dt.datetime) -> Dict[int, int]:
+        """
+        Get the positions for each partition at a given time.
+        """
         if time.tzinfo is None:
             raise ValueError("time must be timezone aware")
         with self._connection() as conn:
@@ -296,6 +299,50 @@ class AggregatedStream(Generic[E]):
                 max_positions.outerjoin(
                     positions_after_time,
                     max_positions.c.partition == positions_after_time.c.partition,
+                )
+            )
+            return {row.partition: row.position for row in conn.execute(qry)}
+
+    def global_position_to_positions(self, global_position: int) -> Dict[int, int]:
+        """
+        Get the positions for each partition at a given global position.
+        """
+        with self._connection() as conn:
+            tbl = self._table.alias()
+            messages_tbl = self._store._storage.message_table.alias()
+
+            positions_upto_global_pos = (
+                _sa.select(
+                    tbl.c.partition,
+                    _sa.func.max(tbl.c.position).label("position"),
+                )
+                .select_from(
+                    tbl.join(
+                        messages_tbl,
+                        messages_tbl.c.message_id == tbl.c.message_id,
+                    )
+                )
+                .where(messages_tbl.c.global_position <= global_position)
+                .group_by(tbl.c.partition)
+                .cte()
+            )
+            partitions = (
+                _sa.select(
+                    tbl.c.partition,
+                )
+                .group_by(tbl.c.partition)
+                .cte()
+            )
+            qry = _sa.select(
+                partitions.c.partition,
+                _sa.func.coalesce(
+                    positions_upto_global_pos.c.position,
+                    -1,
+                ).label("position"),
+            ).select_from(
+                partitions.outerjoin(
+                    positions_upto_global_pos,
+                    partitions.c.partition == positions_upto_global_pos.c.partition,
                 )
             )
             return {row.partition: row.position for row in conn.execute(qry)}
