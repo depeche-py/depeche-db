@@ -230,6 +230,12 @@ class SubscriptionStateProvider(Protocol):
     def session(self, **kwargs) -> "SubscriptionStateProvider":
         """
         Returns a session for the subscription state provider.
+
+        This can be used to run the state reads/updates in a transaction
+        provided by the client.
+
+        See [DbSubscriptionStateProvider][depeche_db.DbSubscriptionStateProvider]
+        for an example implementation.
         """
         raise NotImplementedError
 
