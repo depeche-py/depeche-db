@@ -266,6 +266,12 @@ class AggregatedStream(Generic[E]):
     def time_to_positions(self, time: _dt.datetime) -> Dict[int, int]:
         """
         Get the positions for each partition at a given time.
+
+        Args:
+            time: Time to get positions for (must be timezone aware)
+
+        Returns:
+            A dictionary mapping partition numbers to positions
         """
         if time.tzinfo is None:
             raise ValueError("time must be timezone aware")
@@ -306,6 +312,12 @@ class AggregatedStream(Generic[E]):
     def global_position_to_positions(self, global_position: int) -> Dict[int, int]:
         """
         Get the positions for each partition at a given global position.
+
+        Args:
+            global_position: Global position
+
+        Returns:
+            A dictionary mapping partition numbers to positions
         """
         with self._connection() as conn:
             tbl = self._table.alias()
