@@ -65,7 +65,7 @@ class StoredMessage(Generic[E]):
 
 
 class AckOpProtocol(Protocol):
-    def execute(self):
+    def execute(self, **kwargs):
         ...
 
 
@@ -224,6 +224,12 @@ class SubscriptionStateProvider(Protocol):
     def initialized(self, subscription_name: str) -> bool:
         """
         Returns `True` if the subscription state was already initialized.
+        """
+        raise NotImplementedError
+
+    def session(self, **kwargs) -> "SubscriptionStateProvider":
+        """
+        Returns a session for the subscription state provider.
         """
         raise NotImplementedError
 

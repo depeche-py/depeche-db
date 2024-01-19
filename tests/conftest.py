@@ -145,11 +145,11 @@ def stream_with_events(identifier, db_engine, store_with_events, stream_factory)
 
 @pytest.fixture
 def subscription_factory(identifier, lock_provider):
-    def _inner(stream):
+    def _inner(stream, state_provider=None):
         return stream.subscription(
             name=identifier(),
             lock_provider=lock_provider,
-            state_provider=MyStateProvider(),
+            state_provider=state_provider or MyStateProvider(),
         )
 
     return _inner
@@ -171,6 +171,9 @@ class MyStateProvider:
 
     def initialized(self, subscription_name: str) -> bool:
         return self._initialized
+
+    def session(self, **kwargs):
+        return self
 
 
 @pytest.fixture

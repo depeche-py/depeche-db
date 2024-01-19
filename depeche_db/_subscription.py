@@ -12,6 +12,7 @@ from typing import (
 from . import tools as _tools
 from ._aggregated_stream import AggregatedStream
 from ._interfaces import (
+    AckOpProtocol,
     CallMiddleware,
     ErrorAction,
     LockProvider,
@@ -60,7 +61,7 @@ class LogAndIgnoreSubscriptionErrorHandler(SubscriptionErrorHandler):
 
 
 class NoAckOp:
-    def execute(self):
+    def execute(self, **kwargs):
         raise RuntimeError(
             "NoAckOp cannot be executed, choose a different Ack strategy to use this operation"
         )
@@ -81,23 +82,26 @@ class AckOp:
         self._executed = False
         self._rolled_back = False
 
-    # TODO generic on state provider & type args?
     def execute(self, **subscription_state_provider_kwargs):
         if self._executed:
             return
 
+        if subscription_state_provider_kwargs:
+            provider = self._state_provider.session(
+                **subscription_state_provider_kwargs
+            )
+        else:
+            provider = self._state_provider
+
         self._executed = True
-        state = self._state_provider.read(
-            self.name, **subscription_state_provider_kwargs
-        )
+        state = provider.read(self.name)
         assert (
             state.positions.get(self.partition, -1) == self.position - 1
         ), f"{self.partition} should have {self.position - 1} as last position, but has {state.positions.get(self.partition, -1)}"
-        self._state_provider.store(
+        provider.store(
             subscription_name=self.name,
             partition=self.partition,
             position=self.position,
-            **subscription_state_provider_kwargs,
         )
 
     def rollback(self):
@@ -106,9 +110,6 @@ class AckOp:
     @property
     def rolled_back(self):
         return self._rolled_back
-
-
-from ._interfaces import AckOpProtocol
 
 
 class AckStrategy:
