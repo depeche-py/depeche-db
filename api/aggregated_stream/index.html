@@ -1451,6 +1451,60 @@ is used by subscriptions.</p>
   
       <p>Get the positions for each partition at a given global position.</p>
 
+
+
+  <p><strong>Parameters:</strong></p>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Description</th>
+        <th>Default</th>
+      </tr>
+    </thead>
+    <tbody>
+        <tr>
+          <td><code>global_position</code></td>
+          <td>
+                <code>int</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>Global position</p>
+            </div>
+          </td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+    </tbody>
+  </table>
+
+
+
+  <p><strong>Returns:</strong></p>
+  <table>
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+        <tr>
+          <td>
+                <code><span title="typing.Dict">Dict</span>[int, int]</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>A dictionary mapping partition numbers to positions</p>
+            </div>
+          </td>
+        </tr>
+    </tbody>
+  </table>
+
   </div>
 
 </div>
@@ -1598,6 +1652,60 @@ is used by subscriptions.</p>
   <div class="doc doc-contents ">
   
       <p>Get the positions for each partition at a given time.</p>
+
+
+
+  <p><strong>Parameters:</strong></p>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Description</th>
+        <th>Default</th>
+      </tr>
+    </thead>
+    <tbody>
+        <tr>
+          <td><code>time</code></td>
+          <td>
+                <code><span title="datetime.datetime">datetime</span></code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>Time to get positions for (must be timezone aware)</p>
+            </div>
+          </td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+    </tbody>
+  </table>
+
+
+
+  <p><strong>Returns:</strong></p>
+  <table>
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+        <tr>
+          <td>
+                <code><span title="typing.Dict">Dict</span>[int, int]</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>A dictionary mapping partition numbers to positions</p>
+            </div>
+          </td>
+        </tr>
+    </tbody>
+  </table>
 
   </div>
 
