@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "docs/**/*"
+      - "depeche_db/**/*.py"
       - ".github/workflows/docs-gh-pages.yml"
   workflow_dispatch:
 
