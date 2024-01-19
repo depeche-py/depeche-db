@@ -1,3 +1,7 @@
+# 0.7.1
+
+* Add `global_position_to_positions` method on aggregated stream
+
 # 0.7.0
 
 * Add `start_point` to subscriptions
