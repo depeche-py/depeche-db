@@ -16,7 +16,7 @@ class DbSubscriptionStateProvider:
 
         self.metadata = _sa.MetaData()
         self.state_table = _sa.Table(
-            f"{name}_subscription_state",
+            f"depeche_subscriptions_{name}",
             self.metadata,
             _sa.Column("subscription_name", _sa.String, primary_key=True),
             _sa.Column("partition", _sa.Integer, primary_key=True),

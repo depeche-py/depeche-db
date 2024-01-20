@@ -56,7 +56,7 @@ class AggregatedStream(Generic[E]):
         self._store = store
         self._metadata = _sa.MetaData()
         self._table = _sa.Table(
-            f"{name}_projected_stream",
+            f"depeche_stream_{name}",
             self._metadata,
             _sa.Column("message_id", _UUIDType(), primary_key=True),
             _sa.Column("origin_stream", _sa.String(255), nullable=False),
@@ -80,13 +80,14 @@ class AggregatedStream(Generic[E]):
             _sa.UniqueConstraint(
                 "partition",
                 "position",
-                name=f"uq_{name}_partition_position",
+                name=f"depeche_stream_{name}_uq",
             ),
         )
-        self.notification_channel = f"{name}_notifications"
+        self.notification_channel = f"depeche_stream_{name}"
+        trigger_name = f"depeche_stream_new_msg_{name}"
         trigger = _sa.DDL(
             f"""
-            CREATE OR REPLACE FUNCTION {name}_stream_notify_message_inserted()
+            CREATE OR REPLACE FUNCTION {trigger_name}()
               RETURNS trigger AS $$
             DECLARE
             BEGIN
@@ -101,10 +102,10 @@ class AggregatedStream(Generic[E]):
             END;
             $$ LANGUAGE plpgsql;
 
-            CREATE TRIGGER {name}_stream_notify_message_inserted
-              AFTER INSERT ON {name}_projected_stream
+            CREATE TRIGGER {trigger_name}
+              AFTER INSERT ON {self._table.name}
               FOR EACH ROW
-              EXECUTE PROCEDURE {name}_stream_notify_message_inserted();
+              EXECUTE PROCEDURE {trigger_name}();
             """
         )
         _sa.event.listen(

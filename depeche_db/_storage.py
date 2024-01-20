@@ -23,13 +23,13 @@ class Storage:
         self.name = name
         self.metadata = _sa.MetaData()
         self.message_table = _sa.Table(
-            f"{name}_messages",
+            f"depeche_msgs_{name}",
             self.metadata,
             _sa.Column("message_id", _UUIDType(), primary_key=True),
             _sa.Column(
                 "global_position",
                 _sa.Integer,
-                _sa.Sequence(f"{name}_messages_global_position_seq"),
+                _sa.Sequence(f"depeche_msgs_{name}_global_seq"),
                 unique=True,
                 nullable=False,
             ),
@@ -41,17 +41,19 @@ class Storage:
             _sa.Column("message", _PostgresJsonb, nullable=False),
             # TODO is this still required? only add in tests?
             _sa.UniqueConstraint(
-                "stream", "version", name=f"{name}_stream_version_unique"
+                "stream", "version", name=f"depeche_msgs_{name}_version_uq"
             ),
         )
-        self.notification_channel = f"{name}_messages"
+        self.notification_channel = f"depeche_msgs_{name}"
         ddl = _sa.DDL(
             "\n".join(
                 [
                     _notify_trigger(
-                        prefix=name, notification_channel=self.notification_channel
+                        name=name,
+                        tablename=self.message_table.name,
+                        notification_channel=self.notification_channel,
                     ),
-                    _write_message_fn(prefix=name),
+                    _write_message_fn(name=name, tablename=self.message_table.name),
                 ]
             )
         )
@@ -78,7 +80,7 @@ class Storage:
         messages: Sequence[Tuple[_uuid.UUID, dict]],
     ) -> MessagePosition:
         assert len(messages) > 0
-        func = getattr(_sa.func, f"{self.name}_write_message")
+        func = getattr(_sa.func, f"depeche_write_message_{self.name}")
         try:
             for idx, (message_id, message) in enumerate(messages):
                 _expected_version = (
@@ -209,9 +211,10 @@ class Storage:
         conn.execute(self.message_table.delete())
 
 
-def _notify_trigger(prefix: str, notification_channel: str) -> str:
+def _notify_trigger(name: str, tablename: str, notification_channel: str) -> str:
+    trigger_name = f"depeche_storage_new_msg_{name}"
     return f"""
-        CREATE OR REPLACE FUNCTION {prefix}_notify_message_inserted()
+        CREATE OR REPLACE FUNCTION {trigger_name}()
           RETURNS trigger AS $$
         DECLARE
         BEGIN
@@ -227,16 +230,17 @@ def _notify_trigger(prefix: str, notification_channel: str) -> str:
         END;
         $$ LANGUAGE plpgsql;
 
-        CREATE TRIGGER {prefix}_notify_message_inserted
-          AFTER INSERT ON {prefix}_messages
+        CREATE TRIGGER {trigger_name}
+          AFTER INSERT ON {tablename}
           FOR EACH ROW
-          EXECUTE PROCEDURE {prefix}_notify_message_inserted();
+          EXECUTE PROCEDURE {trigger_name}();
      """
 
 
-def _write_message_fn(prefix: str) -> str:
+def _write_message_fn(name: str, tablename: str) -> str:
+    function_name = f"depeche_write_message_{name}"
     return f"""
-        CREATE OR REPLACE FUNCTION {prefix}_write_message(
+        CREATE OR REPLACE FUNCTION {function_name}(
           message_id uuid,
           stream varchar,
           message json,
@@ -251,34 +255,34 @@ def _write_message_fn(prefix: str) -> str:
           _next_version bigint;
           _next_global_position bigint;
         BEGIN
-          _stream_hash := left('x' || md5({prefix}_write_message.stream), 17)::bit(64)::bigint;
+          _stream_hash := left('x' || md5({function_name}.stream), 17)::bit(64)::bigint;
           PERFORM pg_advisory_xact_lock(_stream_hash);
 
           SELECT
-            max({prefix}_messages.version) into _stream_version
+            max({tablename}.version) into _stream_version
           FROM
-            {prefix}_messages
+            {tablename}
           WHERE
-            {prefix}_messages.stream = {prefix}_write_message.stream;
+            {tablename}.stream = {function_name}.stream;
 
           IF _stream_version IS NULL THEN
             _stream_version := 0;
           END IF;
 
-          IF {prefix}_write_message.expected_version IS NOT NULL THEN
-            IF {prefix}_write_message.expected_version != _stream_version THEN
+          IF {function_name}.expected_version IS NOT NULL THEN
+            IF {function_name}.expected_version != _stream_version THEN
               RAISE EXCEPTION
                 'Wrong expected version: %% (Stream: %%, Stream Version: %%)',
-                {prefix}_write_message.expected_version,
-                {prefix}_write_message.stream,
+                {function_name}.expected_version,
+                {function_name}.stream,
                 _stream_version;
             END IF;
           END IF;
 
           _next_version := _stream_version + 1;
-          _next_global_position := nextval('{prefix}_messages_global_position_seq');
+          _next_global_position := nextval('depeche_msgs_{name}_global_seq');
 
-          INSERT INTO {prefix}_messages
+          INSERT INTO {tablename}
             (
               message_id,
               stream,
@@ -288,10 +292,10 @@ def _write_message_fn(prefix: str) -> str:
             )
           VALUES
             (
-              {prefix}_write_message.message_id,
-              {prefix}_write_message.stream,
+              {function_name}.message_id,
+              {function_name}.stream,
               _next_version,
-              {prefix}_write_message.message,
+              {function_name}.message,
               _next_global_position
             )
           ;
