@@ -3,6 +3,7 @@ from typing import Iterator, Set
 
 import sqlalchemy as _sa
 
+from .._compat import SAConnection
 from .._interfaces import SubscriptionState
 
 
@@ -82,6 +83,24 @@ class DbSubscriptionStateProvider:
         assert conn, "Connection is required"
         assert not kwargs, "More arguments are not supported"
         return _Session(conn=conn, parent=self)
+
+    @classmethod
+    def get_migration_ddl(cls, name: str):
+        """
+        DDL Script to migrate from <=0.8.0
+        """
+        tablename = (f"depeche_subscriptions_{name}",)
+        return f"""
+            ALTER TABLE "{name}_subscription_state"
+                 RENAME TO {tablename};
+            """
+
+    @classmethod
+    def migrate_db_objects(cls, name: str, conn: SAConnection):
+        """
+        Migrate from <=0.8.0
+        """
+        conn.execute(cls.get_migration_ddl(name=name))
 
 
 class _Session:

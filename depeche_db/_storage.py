@@ -23,7 +23,7 @@ class Storage:
         self.name = name
         self.metadata = _sa.MetaData()
         self.message_table = _sa.Table(
-            f"depeche_msgs_{name}",
+            self.message_table_name(name),
             self.metadata,
             _sa.Column("message_id", _UUIDType(), primary_key=True),
             _sa.Column(
@@ -44,7 +44,7 @@ class Storage:
                 "stream", "version", name=f"depeche_msgs_{name}_version_uq"
             ),
         )
-        self.notification_channel = f"depeche_msgs_{name}"
+        self.notification_channel = self.notification_channel_name(name)
         ddl = _sa.DDL(
             "\n".join(
                 [
@@ -209,6 +209,46 @@ class Storage:
 
     def truncate(self, conn: SAConnection):
         conn.execute(self.message_table.delete())
+
+    @staticmethod
+    def message_table_name(name: str) -> str:
+        return f"depeche_msgs_{name}"
+
+    @staticmethod
+    def notification_channel_name(name: str) -> str:
+        return f"depeche_{name}_messages"
+
+    @classmethod
+    def get_migration_ddl(cls, name: str):
+        """
+        DDL Script to migrate from <=0.8.0
+        """
+        tablename = cls.message_table_name(name)
+        new_objects = "\n".join(
+            [
+                _notify_trigger(
+                    name=name,
+                    tablename=tablename,
+                    notification_channel=cls.notification_channel_name(name),
+                ),
+                _write_message_fn(name=name, tablename=tablename),
+            ]
+        )
+        return f"""
+            ALTER TABLE {name}_messages
+                 RENAME TO {tablename};
+            DROP TRIGGER {name}_notify_message_inserted;
+            DROP FUNCTION IF EXISTS {name}_notify_message_inserted;
+            DROP FUNCTION IF EXISTS {name}_write_message;
+            {new_objects}
+            """
+
+    @classmethod
+    def migrate_db_objects(cls, name: str, conn: SAConnection):
+        """
+        Migrate from <=0.8.0
+        """
+        conn.execute(cls.get_migration_ddl(name=name))
 
 
 def _notify_trigger(name: str, tablename: str, notification_channel: str) -> str:

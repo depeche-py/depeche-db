@@ -56,7 +56,7 @@ class AggregatedStream(Generic[E]):
         self._store = store
         self._metadata = _sa.MetaData()
         self._table = _sa.Table(
-            f"depeche_stream_{name}",
+            self.stream_table_name(name),
             self._metadata,
             _sa.Column("message_id", _UUIDType(), primary_key=True),
             _sa.Column("origin_stream", _sa.String(255), nullable=False),
@@ -83,30 +83,13 @@ class AggregatedStream(Generic[E]):
                 name=f"depeche_stream_{name}_uq",
             ),
         )
-        self.notification_channel = f"depeche_stream_{name}"
-        trigger_name = f"depeche_stream_new_msg_{name}"
+        self.notification_channel = self.notification_channel_name(name)
         trigger = _sa.DDL(
-            f"""
-            CREATE OR REPLACE FUNCTION {trigger_name}()
-              RETURNS trigger AS $$
-            DECLARE
-            BEGIN
-              PERFORM pg_notify(
-                '{self.notification_channel}',
-                json_build_object(
-                    'message_id', NEW.message_id,
-                    'partition', NEW.partition,
-                    'position', NEW.position
-                )::text);
-              RETURN NEW;
-            END;
-            $$ LANGUAGE plpgsql;
-
-            CREATE TRIGGER {trigger_name}
-              AFTER INSERT ON {self._table.name}
-              FOR EACH ROW
-              EXECUTE PROCEDURE {trigger_name}();
-            """
+            _notify_trigger(
+                name=name,
+                tablename=self._table.name,
+                notification_channel=self.notification_channel,
+            )
         )
         _sa.event.listen(
             self._table, "after_create", trigger.execute_if(dialect="postgresql")
@@ -359,6 +342,65 @@ class AggregatedStream(Generic[E]):
                 )
             )
             return {row.partition: row.position for row in conn.execute(qry)}
+
+    @staticmethod
+    def stream_table_name(name: str) -> str:
+        return f"depeche_stream_{name}"
+
+    @staticmethod
+    def notification_channel_name(name: str) -> str:
+        return f"depeche_{name}_messages"
+
+    @classmethod
+    def get_migration_ddl(cls, name: str):
+        """
+        DDL Script to migrate from <=0.8.0
+        """
+        tablename = cls.stream_table_name(name)
+        new_objects = _notify_trigger(
+            name=name,
+            tablename=tablename,
+            notification_channel=cls.notification_channel_name(name),
+        )
+        return f"""
+            ALTER TABLE "{name}_projected_stream"
+                 RENAME TO {tablename};
+            DROP TRIGGER IF EXISTS {name}_stream_notify_message_inserted;
+            DROP FUNCTION IF EXISTS {name}_stream_notify_message_inserted;
+            {new_objects}
+            """
+
+    @classmethod
+    def migrate_db_objects(cls, name: str, conn: SAConnection):
+        """
+        Migrate from <=0.8.0
+        """
+        conn.execute(cls.get_migration_ddl(name=name))
+
+
+def _notify_trigger(name: str, tablename: str, notification_channel: str) -> str:
+    trigger_name = f"depeche_stream_new_msg_{name}"
+    return f"""
+        CREATE OR REPLACE FUNCTION {trigger_name}()
+          RETURNS trigger AS $$
+        DECLARE
+        BEGIN
+          PERFORM pg_notify(
+            '{notification_channel}',
+            json_build_object(
+                'message_id', NEW.message_id,
+                'partition', NEW.partition,
+                'position', NEW.position
+            )::text);
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+
+        CREATE TRIGGER {trigger_name}
+          AFTER INSERT ON {tablename}
+          FOR EACH ROW
+          EXECUTE PROCEDURE {trigger_name}();
+        """
 
 
 class _AlreadyUpdating(RuntimeError):
