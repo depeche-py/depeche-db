@@ -259,7 +259,7 @@
             
   
   <span class="md-ellipsis">
-    Getting started
+    Walk through
   </span>
   
 
@@ -269,7 +269,7 @@
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
-            Getting started
+            Walk through
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -364,6 +364,26 @@
   
   <span class="md-ellipsis">
     Executor
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/ack_in_client_transaction/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Exactly once Delivery
   </span>
   
 
@@ -749,6 +769,13 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#depeche_db.SubscriptionStateProvider.session" class="md-nav__link">
+    session()
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#depeche_db.SubscriptionStateProvider.store" class="md-nav__link">
     store()
   </a>
@@ -894,6 +921,26 @@
   
   <span class="md-ellipsis">
     Event Sourcing
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tools/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Tools
   </span>
   
 
@@ -1172,6 +1219,13 @@
           <li class="md-nav__item">
   <a href="#depeche_db.SubscriptionStateProvider.read" class="md-nav__link">
     read()
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#depeche_db.SubscriptionStateProvider.session" class="md-nav__link">
+    session()
   </a>
   
 </li>
@@ -2395,6 +2449,30 @@ This method must not block!</p>
         </tr>
     </tbody>
   </table>
+
+  </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+
+<h3 id="depeche_db.SubscriptionStateProvider.session" class="doc doc-heading">
+          <code class="highlight language-python"><span class="n">session</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">SubscriptionStateProvider</span></code>
+
+</h3>
+
+
+  <div class="doc doc-contents ">
+  
+      <p>Returns a session for the subscription state provider.</p>
+<p>This can be used to run the state reads/updates in a transaction
+provided by the client.</p>
+<p>See <a class="autorefs autorefs-internal" href="../tools/#depeche_db.tools.DbSubscriptionStateProvider">DbSubscriptionStateProvider</a>
+for an example implementation.</p>
 
   </div>
 

@@ -71,7 +71,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#071" class="md-skip">
+        <a href="#080" class="md-skip">
           Skip to content
         </a>
       
@@ -257,7 +257,7 @@
             
   
   <span class="md-ellipsis">
-    Getting started
+    Walk through
   </span>
   
 
@@ -267,7 +267,7 @@
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
-            Getting started
+            Walk through
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -362,6 +362,26 @@
   
   <span class="md-ellipsis">
     Executor
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../getting-started/ack_in_client_transaction/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Exactly once Delivery
   </span>
   
 
@@ -661,6 +681,26 @@
 
               
             
+              
+                
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/tools/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Tools
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -798,6 +838,25 @@
   
 
 
+<h1 id="080">0.8.0</h1>
+<ul>
+<li>Allow <code>ack</code> in client transaction: This allows for <code>exactly once</code> delivery semantics</li>
+<li><strong>BREAKING CHANGE</strong>: Change DB object names<ul>
+<li>AggregatedStream: <code>{name}_projected_stream</code> -&gt; <code>depeche_stream_{name}</code><ul>
+<li>see <code>AggregatedStream.[get_migration_ddl|migrate_db_objects]</code></li>
+</ul>
+</li>
+<li>MessageStore (ie. Storage): <code>{name}_messages</code> -&gt; <code>depeche_msgs_{name}</code><ul>
+<li>see <code>Storage.[get_migration_ddl|migrate_db_objects]</code></li>
+</ul>
+</li>
+<li>DbSuscriptionStateProvider: <code>{name}_subscription_state</code> -&gt; <code>depeche_subscriptions_{name}</code><ul>
+<li>see <code>DbSuscriptionStateProvider.[get_migration_ddl|migrate_db_objects]</code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
 <h1 id="071">0.7.1</h1>
 <ul>
 <li>Add <code>global_position_to_positions</code> method on aggregated stream</li>
