@@ -1,3 +1,14 @@
+# 0.8.0
+
+* Allow `ack` in client transaction: This allows for `exactly once` delivery semantics
+* **BREAKING CHANGE**: Change DB object names
+    * AggregatedStream: `{name}_projected_stream` -> `depeche_stream_{name}`
+        * see `AggregatedStream.[get_migration_ddl|migrate_db_objects]`
+    * MessageStore (ie. Storage): `{name}_messages` -> `depeche_msgs_{name}`
+        * see `Storage.[get_migration_ddl|migrate_db_objects]`
+    * DbSuscriptionStateProvider: `{name}_subscription_state` -> `depeche_subscriptions_{name}`
+        * see `DbSuscriptionStateProvider.[get_migration_ddl|migrate_db_objects]`
+
 # 0.7.1
 
 * Add `global_position_to_positions` method on aggregated stream

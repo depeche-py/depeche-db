@@ -234,7 +234,7 @@ class SubscriptionStateProvider(Protocol):
         This can be used to run the state reads/updates in a transaction
         provided by the client.
 
-        See [DbSubscriptionStateProvider][depeche_db.DbSubscriptionStateProvider]
+        See [DbSubscriptionStateProvider][depeche_db.tools.DbSubscriptionStateProvider]
         for an example implementation.
         """
         raise NotImplementedError

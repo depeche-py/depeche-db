@@ -67,6 +67,10 @@ class NoAckOp:
         )
 
 
+class AckRolledback(Exception):
+    pass
+
+
 class AckOp:
     def __init__(
         self,
@@ -84,6 +88,7 @@ class AckOp:
 
     def execute(self, **subscription_state_provider_kwargs):
         if self._executed:
+            self._check()
             return
 
         if subscription_state_provider_kwargs:
@@ -104,6 +109,11 @@ class AckOp:
             position=self.position,
         )
 
+    def _check(self):
+        state = self._state_provider.read(self.name)
+        if state.positions.get(self.partition, -1) != self.position:
+            raise AckRolledback()
+
     def rollback(self):
         self._rolled_back = True
 
@@ -123,6 +133,8 @@ class ManagedAckStrategy(AckStrategy):
 
 
 class Subscription(Generic[E]):
+    _state_provider: SubscriptionStateProvider
+
     def __init__(
         self,
         name: str,
@@ -236,7 +248,11 @@ class Subscription(Generic[E]):
                         if ack.rolled_back:
                             # the message was not ack'd or the acknolwedgement was rolled back
                             break
-                        ack.execute()
+                        try:
+                            ack.execute()
+                        except AckRolledback:
+                            # the message was not ack'd or the acknolwedgement was rolled back
+                            break
                 break
             finally:
                 self._lock_provider.unlock(lock_key)

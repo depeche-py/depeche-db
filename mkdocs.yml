@@ -12,12 +12,13 @@ extra:
       link: https://pypi.org/project/depeche-db/
 nav:
   - Home: index.md
-  - Getting started:
+  - Walk through:
       - Installation: getting-started/installation.md
       - Writing & reading messages: generated/output/getting-started-write-read.md
       - Aggregated streams: generated/output/getting-started-aggregated-stream.md
       - Subscription: generated/output/getting-started-subscription.md
       - Executor: getting-started/executor.md
+      - Exactly once Delivery: getting-started/ack_in_client_transaction.md
   - Concepts:
     - Data model: concepts/data-model.md
     - Subscriptions: concepts/subscriptions.md
@@ -30,6 +31,7 @@ nav:
     - Data structures: api/datastructures.md
     - Exceptions: api/exceptions.md
     - Event Sourcing: api/event_sourcing.md
+    - Tools: api/tools.md
   - Examples:
     - Bank (event sourced): examples/bank-eventsourced.md
   - Changelog: CHANGELOG.md

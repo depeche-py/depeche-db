@@ -4,10 +4,10 @@ from typing import Iterator, Set
 import sqlalchemy as _sa
 
 from .._compat import SAConnection
-from .._interfaces import SubscriptionState
+from .._interfaces import SubscriptionState, SubscriptionStateProvider
 
 
-class DbSubscriptionStateProvider:
+class DbSubscriptionStateProvider(SubscriptionStateProvider):
     SPECIAL_PARTITION_FOR_INIT_STATE = -1
 
     def __init__(self, name: str, engine: _sa.engine.Engine):
