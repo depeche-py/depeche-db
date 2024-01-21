@@ -134,6 +134,22 @@ class Storage:
         ).scalars():
             yield id
 
+    def delete(
+        self,
+        conn: SAConnection,
+        stream: str,
+        keep_versions_greater_than: int,
+    ) -> int:
+        result = conn.execute(
+            self.message_table.delete().where(
+                _sa.and_(
+                    self.message_table.c.stream == stream,
+                    self.message_table.c.version <= keep_versions_greater_than,
+                )
+            )
+        )
+        return result.rowcount
+
     def read(
         self, conn: SAConnection, stream: str
     ) -> Iterator[Tuple[_uuid.UUID, int, dict, int]]:
