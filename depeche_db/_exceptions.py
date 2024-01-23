@@ -4,3 +4,15 @@ class MessageNotFound(Exception):
 
 class OptimisticConcurrencyError(Exception):
     pass
+
+
+class StreamNotFoundError(Exception):
+    pass
+
+
+class LastMessageCannotBeDeleted(Exception):
+    pass
+
+
+class CannotWriteToDeletedStream(Exception):
+    pass
