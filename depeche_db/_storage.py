@@ -170,6 +170,8 @@ class Storage:
         if max_version == 0:
             raise StreamNotFoundError(stream)
         if keep_versions_greater_than < 0:
+            # TODO this is dangerous, we could do the wrong thing in case
+            # of concurrent write & delete
             keep_versions_greater_than = max_version + keep_versions_greater_than
         if keep_versions_greater_than >= max_version:
             raise LastMessageCannotBeDeleted(stream, max_version)
