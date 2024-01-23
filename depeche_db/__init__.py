@@ -4,8 +4,10 @@ from ._executor import Executor  # noqa: F401
 from ._factories import AggregatedStreamFactory, SubscriptionFactory  # noqa: F401
 from ._interfaces import (  # noqa: F401
     CallMiddleware,
+    DeletedAggregatedStreamMessage,
     ErrorAction,
     HandlerDescriptor,
+    LoadedAggregatedStreamMessage,
     LockProvider,
     MessageHandlerRegisterProtocol,
     MessagePartitioner,

@@ -85,6 +85,7 @@ class LoadedAggregatedStreamReader(Generic[E]):
                     )
                 except KeyError:
                     yield DeletedAggregatedStreamMessage(
+                        message_id=pointer.message_id,
                         partition=pointer.partition,
                         position=pointer.position,
                     )

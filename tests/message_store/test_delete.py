@@ -7,4 +7,4 @@ def test_read_deleted(subject, events):
     with subject.reader() as reader:
         result = list(reader.read(stream="a"))
 
-    assert len(result) == 2
+    assert [msg.message for msg in result] == events[2:]

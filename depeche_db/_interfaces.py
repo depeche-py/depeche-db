@@ -87,10 +87,12 @@ class LoadedAggregatedStreamMessage(Generic[E]):
 class DeletedAggregatedStreamMessage(Generic[E]):
     """
     Attributes:
+        message_id: Message ID
         partition: Partition number
         position: Position in the partition
     """
 
+    message_id: _uuid.UUID
     partition: int
     position: int
 
