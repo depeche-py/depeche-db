@@ -1,7 +1,7 @@
 import contextlib as _contextlib
 import datetime as _dt
 import uuid as _uuid
-from typing import Dict, Generic, Iterator, List, Optional, TypeVar
+from typing import Dict, Generic, Iterable, Iterator, List, Optional, TypeVar, Union
 
 import sqlalchemy as _sa
 from psycopg2.errors import LockNotAvailable
@@ -11,6 +11,8 @@ from ._compat import SAConnection
 from ._factories import SubscriptionFactory
 from ._interfaces import (
     AggregatedStreamMessage,
+    DeletedAggregatedStreamMessage,
+    LoadedAggregatedStreamMessage,
     MessagePartitioner,
     MessageProtocol,
     StreamPartitionStatistic,
@@ -18,6 +20,75 @@ from ._interfaces import (
 from ._message_store import MessageStore
 
 E = TypeVar("E", bound=MessageProtocol)
+
+
+class LoadedAggregatedStreamReader(Generic[E]):
+    def __init__(
+        self,
+        stream: "AggregatedStream[E]",
+    ):
+        self._stream = stream
+
+    def read(
+        self, partition: int
+    ) -> Iterator[
+        Union[LoadedAggregatedStreamMessage[E], DeletedAggregatedStreamMessage[E]]
+    ]:
+        """
+        Read all messages from a partition of the aggregated stream.
+
+        Args:
+            partition: Partition number
+        """
+        return self._load(message_pointers=self._stream.read(partition=partition))
+
+    def read_slice(
+        self, partition: int, start: int, count: int
+    ) -> Iterator[
+        Union[LoadedAggregatedStreamMessage[E], DeletedAggregatedStreamMessage[E]]
+    ]:
+        """
+        Read a slice of messages from a partition of the aggregated stream.
+
+        Args:
+            partition: Partition number
+            start: Start position
+            count: Number of messages to read
+        """
+        return self._load(
+            message_pointers=self._stream.read_slice(
+                partition=partition, start=start, count=count
+            )
+        )
+
+    def _load(
+        self, message_pointers: Iterable[AggregatedStreamMessage]
+    ) -> Iterator[
+        Union[LoadedAggregatedStreamMessage[E], DeletedAggregatedStreamMessage[E]]
+    ]:
+        message_pointers = list(message_pointers)
+        # TODO read in batches
+        with self._stream._store.reader() as reader:
+            stored_messages = {
+                message.message_id: message
+                for message in reader.get_messages_by_ids(
+                    [pointer.message_id for pointer in message_pointers]
+                )
+            }
+
+            for pointer in message_pointers:
+                try:
+                    yield LoadedAggregatedStreamMessage(
+                        partition=pointer.partition,
+                        position=pointer.position,
+                        stored_message=stored_messages[pointer.message_id],
+                    )
+                except KeyError:
+                    yield DeletedAggregatedStreamMessage(
+                        message_id=pointer.message_id,
+                        partition=pointer.partition,
+                        position=pointer.position,
+                    )
 
 
 class AggregatedStream(Generic[E]):
@@ -101,6 +172,10 @@ class AggregatedStream(Generic[E]):
             stream_wildcards=stream_wildcards,
             batch_size=update_batch_size,
         )
+
+    @property
+    def loaded_reader(self) -> LoadedAggregatedStreamReader[E]:
+        return LoadedAggregatedStreamReader(self)
 
     def truncate(self, conn: SAConnection):
         """

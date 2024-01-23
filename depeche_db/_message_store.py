@@ -149,6 +149,31 @@ class MessageStore(Generic[E]):
             self._storage.truncate(conn)
             conn.commit()
 
+    def delete(
+        self,
+        stream: str,
+        keep_versions_greater_than: int,
+        conn: Optional[SAConnection] = None,
+    ) -> int:
+        """
+        Delete messages before a given version from a stream.
+        """
+        if conn is None:
+            with self._get_connection() as conn:
+                result = self._storage.delete(
+                    conn=conn,
+                    stream=stream,
+                    keep_versions_greater_than=keep_versions_greater_than,
+                )
+                conn.commit()
+                return result
+        else:
+            return self._storage.delete(
+                conn=conn,
+                stream=stream,
+                keep_versions_greater_than=keep_versions_greater_than,
+            )
+
     def write(
         self,
         stream: str,

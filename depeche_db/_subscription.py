@@ -14,6 +14,7 @@ from ._aggregated_stream import AggregatedStream
 from ._interfaces import (
     AckOpProtocol,
     CallMiddleware,
+    DeletedAggregatedStreamMessage,
     ErrorAction,
     LockProvider,
     MessageHandlerRegisterProtocol,
@@ -216,43 +217,33 @@ class Subscription(Generic[E]):
                 self._lock_provider.unlock(lock_key)
                 continue
             try:
-                with self._stream._store.reader() as reader:
-                    message_pointers = list(
-                        self._stream.read_slice(
-                            partition=statistic.partition_number,
-                            start=statistic.next_message_position,
-                            count=count,
-                        )
+                for message in self._stream.loaded_reader.read_slice(
+                    partition=statistic.partition_number,
+                    start=statistic.next_message_position,
+                    count=count,
+                ):
+                    if isinstance(message, DeletedAggregatedStreamMessage):
+                        continue
+                    ack = AckOp(
+                        name=self.name,
+                        partition=message.partition,
+                        position=message.position,
+                        state_provider=self._state_provider,
                     )
-                    stored_messages = {
-                        message.message_id: message
-                        for message in reader.get_messages_by_ids(
-                            [pointer.message_id for pointer in message_pointers]
-                        )
-                    }
-
-                    for pointer in message_pointers:
-                        ack = AckOp(
-                            name=self.name,
-                            partition=pointer.partition,
-                            position=pointer.position,
-                            state_provider=self._state_provider,
-                        )
-
-                        yield SubscriptionMessage(
-                            partition=pointer.partition,
-                            position=pointer.position,
-                            stored_message=stored_messages[pointer.message_id],
-                            ack=ack,
-                        )
-                        if ack.rolled_back:
-                            # the message was not ack'd or the acknolwedgement was rolled back
-                            break
-                        try:
-                            ack.execute()
-                        except AckRolledback:
-                            # the message was not ack'd or the acknolwedgement was rolled back
-                            break
+                    yield SubscriptionMessage(
+                        partition=message.partition,
+                        position=message.position,
+                        stored_message=message.stored_message,
+                        ack=ack,
+                    )
+                    if ack.rolled_back:
+                        # the message was not ack'd or the acknolwedgement was rolled back
+                        break
+                    try:
+                        ack.execute()
+                    except AckRolledback:
+                        # the message was not ack'd or the acknolwedgement was rolled back
+                        break
                 break
             finally:
                 self._lock_provider.unlock(lock_key)
