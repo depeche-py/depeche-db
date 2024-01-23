@@ -148,7 +148,7 @@ class Storage:
                 )
             )
         )
-        return result.rowcount
+        return result.rowcount  # type: ignore
 
     def read(
         self, conn: SAConnection, stream: str
