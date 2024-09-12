@@ -70,6 +70,34 @@ class AckOpProtocol(Protocol):
 
 
 @_dc.dataclass(frozen=True)
+class LoadedAggregatedStreamMessage(Generic[E]):
+    """
+    Attributes:
+        partition: Partition number
+        position: Position in the partition
+        stored_message: Stored message (`E` subtype of `MessageProtocol`)
+    """
+
+    partition: int
+    position: int
+    stored_message: StoredMessage[E]
+
+
+@_dc.dataclass(frozen=True)
+class DeletedAggregatedStreamMessage(Generic[E]):
+    """
+    Attributes:
+        message_id: Message ID
+        partition: Partition number
+        position: Position in the partition
+    """
+
+    message_id: _uuid.UUID
+    partition: int
+    position: int
+
+
+@_dc.dataclass(frozen=True)
 class SubscriptionMessage(Generic[E]):
     """
     Subscription message is a message that is received from the subscription.
