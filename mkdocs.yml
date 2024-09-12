@@ -4,6 +4,8 @@ repo_name: depeche-py/depeche-db
 repo_url: https://github.com/depeche-py/depeche-db
 copyright: Copyright &copy; 2023 Martin Vielsmaier
 extra:
+  analytics:
+    provider: custom
   generator: false
   social:
     - icon: fontawesome/brands/github
@@ -58,6 +60,7 @@ plugins:
 theme:
   name: material
   favicon: assets/logo-bg256.png
+  custom_dir: .mkdocs-overrides
   logo: assets/logo512.png
   icon:
     repo: fontawesome/brands/github
