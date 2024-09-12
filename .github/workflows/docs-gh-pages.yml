@@ -9,6 +9,7 @@ on:
       - "depeche_db/**/*.py"
       - ".github/workflows/docs-gh-pages.yml"
       - "mkdocs.yml"
+      - ".mkdocs-overrides/**/*"
   workflow_dispatch:
 
 permissions:
