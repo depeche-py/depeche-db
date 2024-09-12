@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Run dependencies
         run: |
-          docker-compose -f docker-compose.yml up -d
+          docker compose -f docker-compose.yml up -d
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
@@ -34,7 +34,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Run dependencies
         run: |
-          docker-compose -f docker-compose.yml up -d
+          docker compose -f docker-compose.yml up -d
       - name: Install
         run: |
           pipx install poetry
@@ -52,7 +52,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Run dependencies
         run: |
-          POSTGRES_VERSION=${{ matrix.postgres }} docker-compose -f docker-compose.yml up -d
+          POSTGRES_VERSION=${{ matrix.postgres }} docker compose -f docker-compose.yml up -d
       - name: Install
         run: |
           pipx install poetry
@@ -68,7 +68,7 @@ jobs:
       - uses: actions/checkout@v3
       - name: Run dependencies
         run: |
-          docker-compose -f docker-compose.yml up -d
+          docker compose -f docker-compose.yml up -d
       - name: Install
         run: |
           pipx install poetry
