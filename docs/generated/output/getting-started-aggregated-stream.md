@@ -57,6 +57,27 @@ The `AggregatedStreamMessage` object contains minimal metadata about the message
 in the context of the aggregated stream. It does not contain the original message
 though. To get that, we need to use the message store reader.
 
+There is also a reader that will resolve the link to the message store for us:
+
+```python
+print(next(aggregated_stream.loaded_reader.read(partition=2)))
+#  LoadedAggregatedStreamMessage(
+#      partition=2,
+#      position=0,
+#      stored_message=StoredMessage(
+#          message_id=UUID("1f804185-e63d-462e-b996-d6f16e5ff8af"),
+#          stream="aggregate-me-4",
+#          version=1,
+#          message=EventA(
+#              event_id=UUID("1f804185-e63d-462e-b996-d6f16e5ff8af"),
+#              happened_at=datetime.datetime(2024, 1, 21, 20, 25, 7, 217530),
+#              num=194,
+#          ),
+#          global_position=8,
+#      ),
+#  )
+```
+
 Usually though we will not read the aggregated stream directly, but rather use
 a subscription to consume it. We will get to that in the [next
 chapter](getting-started-subscription.md).

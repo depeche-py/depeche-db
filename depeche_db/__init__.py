@@ -1,11 +1,19 @@
 from ._aggregated_stream import AggregatedStream, StreamProjector  # noqa: F401
-from ._exceptions import MessageNotFound, OptimisticConcurrencyError  # noqa: F401
+from ._exceptions import (  # noqa: F401
+    CannotWriteToDeletedStream,
+    LastMessageCannotBeDeleted,
+    MessageNotFound,
+    OptimisticConcurrencyError,
+    StreamNotFoundError,
+)
 from ._executor import Executor  # noqa: F401
 from ._factories import AggregatedStreamFactory, SubscriptionFactory  # noqa: F401
 from ._interfaces import (  # noqa: F401
     CallMiddleware,
+    DeletedAggregatedStreamMessage,
     ErrorAction,
     HandlerDescriptor,
+    LoadedAggregatedStreamMessage,
     LockProvider,
     MessageHandlerRegisterProtocol,
     MessagePartitioner,

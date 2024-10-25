@@ -11,7 +11,12 @@ from sqlalchemy.dialects.postgresql import JSONB as _PostgresJsonb
 from sqlalchemy_utils import UUIDType as _UUIDType
 
 from ._compat import SAConnection
-from ._exceptions import OptimisticConcurrencyError
+from ._exceptions import (
+    CannotWriteToDeletedStream,
+    LastMessageCannotBeDeleted,
+    OptimisticConcurrencyError,
+    StreamNotFoundError,
+)
 from ._interfaces import MessagePosition
 
 
@@ -44,6 +49,14 @@ class Storage:
                 "stream", "version", name=f"depeche_msgs_{name}_version_uq"
             ),
         )
+        self.tombstone_table = _sa.Table(
+            self.tombstone_table_name(name),
+            self.metadata,
+            _sa.Column("stream", _sa.String(255), primary_key=True),
+            _sa.Column(
+                "set_at", _sa.DateTime, nullable=False, server_default=_sa.func.now()
+            ),
+        )
         self.notification_channel = self.notification_channel_name(name)
         ddl = _sa.DDL(
             "\n".join(
@@ -53,7 +66,11 @@ class Storage:
                         tablename=self.message_table.name,
                         notification_channel=self.notification_channel,
                     ),
-                    _write_message_fn(name=name, tablename=self.message_table.name),
+                    _write_message_fn(
+                        name=name,
+                        tablename=self.message_table.name,
+                        tombstone_tablename=self.tombstone_table.name,
+                    ),
                 ]
             )
         )
@@ -95,8 +112,15 @@ class Storage:
                         ).alias()
                     )
                 )
-        except _sa.exc.InternalError:
-            raise OptimisticConcurrencyError("optimistic concurrency failure")
+        except _sa.exc.InternalError as exc:
+            msg = exc.args[0]
+            if "Cannot write to a tombstoned stream" in msg:
+                raise CannotWriteToDeletedStream(stream) from exc
+            elif "Wrong expected version" in msg:
+                raise OptimisticConcurrencyError(
+                    "optimistic concurrency failure"
+                ) from exc
+            raise RuntimeError("unexpected error") from exc
         row = result.fetchone()
         return MessagePosition(
             stream=stream,
@@ -133,6 +157,34 @@ class Storage:
             .order_by(self.message_table.c.version)
         ).scalars():
             yield id
+
+    def delete(
+        self,
+        conn: SAConnection,
+        stream: str,
+        keep_versions_greater_than: int,
+    ) -> int:
+        # TODO this is not atomic
+        # move into a DB function?!
+        max_version = self.get_max_version(conn, stream).version
+        if max_version == 0:
+            raise StreamNotFoundError(stream)
+        if keep_versions_greater_than < 0:
+            # TODO this is dangerous, we could do the wrong thing in case
+            # of concurrent write & delete
+            keep_versions_greater_than = max_version + keep_versions_greater_than
+        if keep_versions_greater_than >= max_version:
+            raise LastMessageCannotBeDeleted(stream, max_version)
+        conn.execute(self.tombstone_table.insert().values(stream=stream))
+        result = conn.execute(
+            self.message_table.delete().where(
+                _sa.and_(
+                    self.message_table.c.stream == stream,
+                    self.message_table.c.version <= keep_versions_greater_than,
+                )
+            )
+        )
+        return result.rowcount  # type: ignore
 
     def read(
         self, conn: SAConnection, stream: str
@@ -215,6 +267,10 @@ class Storage:
         return f"depeche_msgs_{name}"
 
     @staticmethod
+    def tombstone_table_name(name: str) -> str:
+        return f"depeche_tombstones_{name}"
+
+    @staticmethod
     def notification_channel_name(name: str) -> str:
         return f"depeche_{name}_messages"
 
@@ -231,7 +287,11 @@ class Storage:
                     tablename=tablename,
                     notification_channel=cls.notification_channel_name(name),
                 ),
-                _write_message_fn(name=name, tablename=tablename),
+                _write_message_fn(
+                    name=name,
+                    tablename=tablename,
+                    tombstone_tablename=cls.tombstone_table_name(name),
+                ),
             ]
         )
         return f"""
@@ -277,7 +337,7 @@ def _notify_trigger(name: str, tablename: str, notification_channel: str) -> str
      """
 
 
-def _write_message_fn(name: str, tablename: str) -> str:
+def _write_message_fn(name: str, tablename: str, tombstone_tablename: str) -> str:
     function_name = f"depeche_write_message_{name}"
     return f"""
         CREATE OR REPLACE FUNCTION {function_name}(
@@ -292,11 +352,25 @@ def _write_message_fn(name: str, tablename: str) -> str:
         DECLARE
           _stream_hash bigint;
           _stream_version bigint;
+          _tombstone varchar;
           _next_version bigint;
           _next_global_position bigint;
         BEGIN
           _stream_hash := left('x' || md5({function_name}.stream), 17)::bit(64)::bigint;
           PERFORM pg_advisory_xact_lock(_stream_hash);
+
+          SELECT
+            {tombstone_tablename}.stream into _tombstone
+          FROM
+            {tombstone_tablename}
+          WHERE
+            {tombstone_tablename}.stream = {function_name}.stream;
+
+          IF _tombstone IS NOT NULL THEN
+            RAISE EXCEPTION
+              'Cannot write to a tombstoned stream (Stream: %%)',
+              {function_name}.stream;
+          END IF;
 
           SELECT
             max({tablename}.version) into _stream_version

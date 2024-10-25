@@ -6,13 +6,12 @@ import pydantic as _pydantic
 import sqlalchemy as _sa
 
 from depeche_db import (
-    MessageProtocol,
     MessageStore,
 )
 from depeche_db.tools import PydanticMessageSerializer
 
 
-class MyEvent(_pydantic.BaseModel, MessageProtocol):
+class MyEvent(_pydantic.BaseModel):
     event_id: _uuid.UUID = _pydantic.Field(default_factory=_uuid.uuid4)
     num: int
     happened_at: _dt.datetime = _pydantic.Field(default_factory=_dt.datetime.utcnow)
@@ -43,7 +42,7 @@ message_store = MessageStore[EventType](
 )
 
 stream = f"stream-{_uuid.uuid4()}"
-events = [EventA(num=n + 1) for n in range(3)]
+events = [EventA(num=n + 1) for n in range(4)]
 
 result = message_store.write(stream=stream, message=events[0])
 print(result)
@@ -64,4 +63,8 @@ message_store.write(stream=stream, message=events[2], expected_version=2)
 # You can also just use the `synchronize` method to write a list of events
 message_store.synchronize(stream=stream, messages=events, expected_version=3)
 print("Now we have 4 events")
+print([e.message.num for e in message_store.read(stream)])
+
+message_store.delete(stream=stream, keep_versions_greater_than=-2)
+print("Now we have only the last 2 events")
 print([e.message.num for e in message_store.read(stream)])
