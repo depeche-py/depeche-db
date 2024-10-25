@@ -18,3 +18,14 @@ def test_deleted_events_in_stream(db_engine, store_with_events, stream_factory):
         ),
     ]
     assert type(messages[-1]) == LoadedAggregatedStreamMessage
+
+
+def test_case():
+    # TODO:
+    #  * Add 1 message to a stream
+    #  * set up aggregated stream and update it
+    #  * add 2 more messages
+    #  * delete all but the last message
+    #  * update aggregated stream
+    # -> what happened?!
+    pass

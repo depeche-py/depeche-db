@@ -223,6 +223,8 @@ class Subscription(Generic[E]):
                     count=count,
                 ):
                     if isinstance(message, DeletedAggregatedStreamMessage):
+                        # TODO needs to update the state so that we can continue
+                        # if there are more deleted messages in a row than `count`
                         continue
                     ack = AckOp(
                         name=self.name,
