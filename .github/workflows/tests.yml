@@ -25,6 +25,24 @@ jobs:
           poetry install --with dev
       - name: Run tests
         run: poetry run pytest -vv
+  tests-psycopg-version:
+    strategy:
+      matrix:
+        psycopg: ["psycopg2", "psycopg"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run dependencies
+        run: |
+          docker compose -f docker-compose.yml up -d
+      - name: Install
+        run: |
+          pipx install poetry
+          poetry install --with dev
+          poetry add ${{ matrix.psycopg }}
+          poetry show
+      - name: Run tests
+        run: poetry run pytest -vv
   tests-sqlalchemy-versions:
     strategy:
       matrix:

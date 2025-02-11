@@ -6,7 +6,7 @@ import select
 import threading
 from typing import Iterator, Sequence
 
-import psycopg2
+from depeche_db._compat import psycopg as _psycopg
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ class PgNotificationListener:
         self._thread.join()
 
     def _loop(self):
-        conn = psycopg2.connect(self.dsn)
+        conn = _psycopg.connect(self.dsn)
 
         try:
             curs = conn.cursor()

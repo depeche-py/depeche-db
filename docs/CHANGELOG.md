@@ -1,3 +1,7 @@
+# 0.8.1
+
+* Compatibility with psycopg 2 and 3
+
 # 0.8.0
 
 * Allow `ack` in client transaction: This allows for `exactly once` delivery semantics

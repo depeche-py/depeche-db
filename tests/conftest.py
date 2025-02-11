@@ -25,7 +25,7 @@ from . import _tools
 
 @pytest.fixture(scope="session")
 def pg_db():
-    dsn = f"postgresql://depeche:depeche@localhost:4888/depeche_test_{_os.getpid()}"
+    dsn = f"postgresql+psycopg://depeche:depeche@localhost:4888/depeche_test_{_os.getpid()}"
     if _tools.pg_check_if_db_exists(dsn):
         _tools.pg_drop_db(dsn)
     _tools.pg_create_db(dsn)

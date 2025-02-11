@@ -51,3 +51,18 @@ try:
 except ImportError:
     SA_VERSION = "1.4.x"
     from sqlalchemy.engine import Connection as SAConnection  # noqa
+
+# PSYCOPG_VERSION = "2"
+# try:
+#    import psycopg2 as psycopg  # noqa
+#    from psycopg2.errors import LockNotAvailable as PsycoPgLockNotAvailable # noqa
+#    from psycopg2.extras import Json as PsycoPgJson # noqa
+# except ImportError:
+try:
+    import psycopg  # noqa
+    from psycopg.errors import LockNotAvailable as PsycoPgLockNotAvailable  # noqa
+    from psycopg.types.json import Jsonb as PsycoPgJson  # noqa
+
+    PSYCOPG_VERSION = "3"
+except ImportError:
+    raise ImportError("Could not import psycopg2 or psycopg")
