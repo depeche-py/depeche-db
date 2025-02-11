@@ -1,3 +1,7 @@
+# 0.8.1
+
+* Remove direct dependency on psycopg2 -> allow using psycopg2-binary as well
+
 # 0.8.0
 
 * Allow `ack` in client transaction: This allows for `exactly once` delivery semantics

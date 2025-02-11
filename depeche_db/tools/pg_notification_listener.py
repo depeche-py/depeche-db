@@ -6,7 +6,7 @@ import select
 import threading
 from typing import Iterator, Sequence
 
-import psycopg2
+from depeche_db._compat import psycopg2
 
 logger = logging.getLogger(__name__)
 

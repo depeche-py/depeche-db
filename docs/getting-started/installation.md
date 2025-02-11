@@ -3,9 +3,9 @@
 Install from PyPI using your favorite package manager
 
 ```bash
-pip install depeche-db
+pip install depeche-db psycopg2-binary
 # OR
-poetry add depeche-db
+poetry add depeche-db psycopg2-binary
 ```
 
 

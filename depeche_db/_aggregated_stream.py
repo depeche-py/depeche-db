@@ -4,10 +4,9 @@ import uuid as _uuid
 from typing import Dict, Generic, Iterator, List, Optional, TypeVar
 
 import sqlalchemy as _sa
-from psycopg2.errors import LockNotAvailable
 from sqlalchemy_utils import UUIDType as _UUIDType
 
-from ._compat import SAConnection
+from ._compat import PsycoPgLockNotAvailable, SAConnection
 from ._factories import SubscriptionFactory
 from ._interfaces import (
     AggregatedStreamMessage,
@@ -464,7 +463,7 @@ class StreamProjector(Generic[E]):
                     )
                 )
             except _sa.exc.OperationalError as exc:
-                if isinstance(exc.orig, LockNotAvailable):
+                if isinstance(exc.orig, PsycoPgLockNotAvailable):
                     raise _AlreadyUpdating(
                         "Cannot update stream projection, because another process is already updating it."
                     )
