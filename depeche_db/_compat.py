@@ -51,3 +51,12 @@ try:
 except ImportError:
     SA_VERSION = "1.4.x"
     from sqlalchemy.engine import Connection as SAConnection  # noqa
+
+try:
+    import psycopg2  # noqa
+    from psycopg2.errors import LockNotAvailable as PsycoPgLockNotAvailable  # noqa
+    from psycopg2.extras import Json as PsycoPgJson  # noqa
+except ImportError:
+    raise RuntimeError(
+        "DepecheDB requires psycopg2; please install it: e.g. pip install psycopg2-binary"
+    )

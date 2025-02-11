@@ -2,15 +2,15 @@
 The storage implementation in PL/SQL is heavily inspired by
 https://github.com/message-db/message-db
 """
+
 import uuid as _uuid
 from typing import Any, Iterator, Optional, Sequence, Tuple
 
 import sqlalchemy as _sa
-from psycopg2.extras import Json as _PsycoPgJson
 from sqlalchemy.dialects.postgresql import JSONB as _PostgresJsonb
 from sqlalchemy_utils import UUIDType as _UUIDType
 
-from ._compat import SAConnection
+from ._compat import PsycoPgJson, SAConnection
 from ._exceptions import OptimisticConcurrencyError
 from ._interfaces import MessagePosition
 
@@ -91,7 +91,7 @@ class Storage:
                         _sa.column("version"), _sa.column("global_position")
                     ).select_from(
                         func(
-                            message_id, stream, _PsycoPgJson(message), _expected_version
+                            message_id, stream, PsycoPgJson(message), _expected_version
                         ).alias()
                     )
                 )
