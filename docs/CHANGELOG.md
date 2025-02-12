@@ -1,3 +1,7 @@
+# 0.8.2
+
+* Compatibility with psycopg 2 and 3
+
 # 0.8.1
 
 * Remove direct dependency on psycopg2 -> allow using psycopg2-binary as well

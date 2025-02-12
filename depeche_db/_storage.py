@@ -84,7 +84,7 @@ class Storage:
         try:
             for idx, (message_id, message) in enumerate(messages):
                 _expected_version = (
-                    expected_version + idx if expected_version is not None else None,
+                    expected_version + idx if expected_version is not None else None
                 )
                 result: Any = conn.execute(
                     _sa.select(
@@ -95,8 +95,24 @@ class Storage:
                         ).alias()
                     )
                 )
-        except _sa.exc.InternalError:
-            raise OptimisticConcurrencyError("optimistic concurrency failure")
+        except _sa.exc.InternalError as exc:
+            # psycopg2
+            from depeche_db._compat import PsycoPgRaiseException
+
+            if isinstance(exc.orig, PsycoPgRaiseException):
+                raise OptimisticConcurrencyError(
+                    f"optimistic concurrency failure: {exc.orig}"
+                )
+            raise
+        except _sa.exc.ProgrammingError as exc:
+            # psycopg3
+            from depeche_db._compat import PsycoPgRaiseException
+
+            if isinstance(exc.orig, PsycoPgRaiseException):
+                raise OptimisticConcurrencyError(
+                    f"optimistic concurrency failure: {exc.orig}"
+                )
+            raise
         row = result.fetchone()
         return MessagePosition(
             stream=stream,

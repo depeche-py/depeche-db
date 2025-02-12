@@ -9,6 +9,15 @@ poetry add depeche-db psycopg2-binary
 ```
 
 
+Or using psycopg3:
+
+```bash
+pip install depeche-db psycopg
+# OR
+poetry add depeche-db psycopg
+```
+
+
 ## Optional: Run a PostgreSQL database
 
 

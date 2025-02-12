@@ -68,6 +68,7 @@ theme:
     primary: light green
   features:
     - navigation.expand
+    - navigation.footer
 markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true

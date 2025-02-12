@@ -6,6 +6,8 @@ First, create a SQLAlchemy engine with your database connection:
 from sqlalchemy import create_engine
 
 DB_DSN = "postgresql://depeche:depeche@localhost:4888/depeche_demo"
+# If you are using psycopg 3, use the following DSN instead:
+# DB_DSN = "postgresql+psycopg://depeche:depeche@localhost:4888/depeche_demo"
 db_engine = create_engine(DB_DSN)
 ```
 
