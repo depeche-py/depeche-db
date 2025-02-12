@@ -28,7 +28,6 @@ sqlalchemy-utils = "^0.41.1"
 #iterators = "^0.2.0"
 #click = "^8.1.6"
 pals = "^0.3.5"
-psycopg = "^3.2.4"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.3.1"
@@ -39,6 +38,8 @@ python-language-server = "^0.36.2"
 ruff = "^0.0.285"
 pydantic = "^2.4"
 pytest-cov = "^4.1.0"
+psycopg2-binary = "^2.9.10"
+psycopg = {extras = ["binary"], version = "^3.2.4"}
 
 
 [tool.poetry.group.docs.dependencies]
