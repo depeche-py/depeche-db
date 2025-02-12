@@ -28,7 +28,7 @@ sqlalchemy-utils = "^0.41.1"
 #iterators = "^0.2.0"
 #click = "^8.1.6"
 pals = "^0.3.5"
-psycopg2-binary = { version = "^2.9", optional = true }
+psycopg2 = { version = "^2.9", optional = true }
 
 
 [tool.poetry.group.dev.dependencies]
@@ -53,7 +53,7 @@ mkdocs-alias-plugin = "^0.6.0"
 mkdocs-macros-plugin = "^1.0.4"
 
 [tool.poetry.extras]
-psycopg2 = ["psycopg2-binary"]
+psycopg2 = ["psycopg2"]
 
 [build-system]
 requires = ["poetry-core"]
