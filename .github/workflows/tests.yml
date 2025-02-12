@@ -30,7 +30,7 @@ jobs:
   tests-psycopg-version:
     strategy:
       matrix:
-        psycopg: ["psycopg2-binary", "psycopg2-binary==2.9.3", "psycopg-binary", "psycopg-binary==3.1"]
+        psycopg: ["psycopg2-binary", "psycopg2-binary==2.9.3", "psycopg[binary]", "psycopg[binary]==3.1"]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -41,7 +41,7 @@ jobs:
         run: |
           pipx install poetry
           poetry install --with dev
-          poetry add ${{ matrix.psycopg }}
+          poetry add '${{ matrix.psycopg }}'
           poetry show
       - name: Run tests
         run: poetry run pytest -vv
