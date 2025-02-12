@@ -28,15 +28,15 @@ Key features:
 
 * Message store with optimistic concurrency control & strong ordering guarantees
 * Subscriptions with "at least once" semantics
+* Parallel processing of (partitioned) subscriptions
 * No database polling
 
 ## Requirements
 
 Python 3.9+
-
 SQLAlchemy 1.4 or 2+
-
 PostgreSQL 12+
+Psycopg (Version 2 >= 2.9.3 or Version 3 >= 3.1)
 
 
 ## Installation

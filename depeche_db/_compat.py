@@ -58,6 +58,7 @@ try:
     if os.environ.get("DEPECHE_DB_FORCE_PSYCOPG3", "0") != "1":
         import psycopg2 as psycopg  # noqa
         from psycopg2.errors import LockNotAvailable as PsycoPgLockNotAvailable  # noqa
+        from psycopg2.errors import RaiseException as PsycoPgRaiseException  # noqa
         from psycopg2.extras import Json as PsycoPgJson  # noqa
 
         PSYCOPG_VERSION = "2"
@@ -68,7 +69,8 @@ if PSYCOPG_VERSION is None:
     try:
         import psycopg  # noqa
         from psycopg.errors import LockNotAvailable as PsycoPgLockNotAvailable  # noqa
-        from psycopg.types.json import Jsonb as PsycoPgJson  # noqa
+        from psycopg.errors import RaiseException as PsycoPgRaiseException  # noqa
+        from psycopg.types.json import Json as PsycoPgJson  # noqa
 
         PSYCOPG_VERSION = "3"
     except ImportError:

@@ -30,7 +30,7 @@ jobs:
   tests-psycopg-version:
     strategy:
       matrix:
-        psycopg: ["psycopg2", "psycopg"]
+        psycopg: ["psycopg2-binary", "psycopg2-binary==2.9.3", "psycopg-binary", "psycopg-binary==3.1"]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
