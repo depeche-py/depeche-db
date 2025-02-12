@@ -53,7 +53,7 @@ except ImportError:
     SA_VERSION = "1.4.x"
     from sqlalchemy.engine import Connection as SAConnection  # noqa
 
-PSYCOPG_VERSION: str | None = None
+PSYCOPG_VERSION: typing.Union[str, None] = None
 try:
     if os.environ.get("DEPECHE_DB_FORCE_PSYCOPG3", "0") != "1":
         import psycopg2 as psycopg  # noqa
