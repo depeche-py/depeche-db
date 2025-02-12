@@ -889,12 +889,14 @@
 <ul>
 <li>Message store with optimistic concurrency control &amp; strong ordering guarantees</li>
 <li>Subscriptions with "at least once" semantics</li>
+<li>Parallel processing of (partitioned) subscriptions</li>
 <li>No database polling</li>
 </ul>
 <h2 id="requirements">Requirements</h2>
-<p>Python 3.9+</p>
-<p>SQLAlchemy 1.4 or 2+</p>
-<p>PostgreSQL 12+</p>
+<p>Python 3.9+
+SQLAlchemy 1.4 or 2+
+PostgreSQL 12+
+Psycopg (Version 2 &gt;= 2.9.3 or Version 3 &gt;= 3.2)</p>
 <h2 id="installation">Installation</h2>
 <div class="language-bash highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>depeche-db
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># OR</span>
@@ -924,6 +926,8 @@ we can see if your contribution fits the vision of the project.</p>
       </main>
       
         <footer class="md-footer">
+  
+    
   
   <div class="md-footer-meta md-typeset">
     <div class="md-footer-meta__inner md-grid">
@@ -972,7 +976,7 @@ we can see if your contribution fits the vision of the project.</p>
     </div>
     
     
-    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.expand"], "search": "../assets/javascripts/workers/search.f886a092.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.expand", "navigation.footer"], "search": "../assets/javascripts/workers/search.f886a092.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
     
     
       <script src="../assets/javascripts/bundle.aecac24b.min.js"></script>
