@@ -23,6 +23,8 @@ jobs:
           pipx install poetry
           poetry env use ${{ matrix.python }}
           poetry install --with dev
+          poetry add psycopg2-binary
+          poetry show
       - name: Run tests
         run: poetry run pytest -vv
   tests-psycopg-version:
@@ -57,6 +59,7 @@ jobs:
         run: |
           pipx install poetry
           poetry install --with dev
+          poetry add psycopg2-binary
           poetry add sqlalchemy${{ matrix.sqlalchemy }}
           poetry show
       - name: Run tests
@@ -75,6 +78,8 @@ jobs:
         run: |
           pipx install poetry
           poetry install --with dev
+          poetry add psycopg2-binary
+          poetry show
       - name: Run tests
         run: poetry run pytest -vv
   tests-pydantic:
@@ -91,6 +96,7 @@ jobs:
         run: |
           pipx install poetry
           poetry install --with dev
+          poetry add psycopg2-binary
           poetry add --group dev pydantic${{ matrix.pydantic }}
           poetry show
       - name: Run tests

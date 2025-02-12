@@ -13,7 +13,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Cache pre-commit
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           key: ${{ runner.os }}-py3.11-pip-${{ hashFiles('.pre-commit-config.yaml') }}
           path: |

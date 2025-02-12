@@ -65,4 +65,6 @@ try:
 
     PSYCOPG_VERSION = "3"
 except ImportError:
-    raise ImportError("Could not import psycopg2 or psycopg")
+    raise RuntimeError(
+        "DepecheDB requires psycopg2 or psycopg3; please install it: e.g. pip install psycopg2-binary"
+    )
