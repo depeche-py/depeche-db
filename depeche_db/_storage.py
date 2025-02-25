@@ -2,15 +2,15 @@
 The storage implementation in PL/SQL is heavily inspired by
 https://github.com/message-db/message-db
 """
+
 import uuid as _uuid
 from typing import Any, Iterator, Optional, Sequence, Tuple
 
 import sqlalchemy as _sa
-from psycopg2.extras import Json as _PsycoPgJson
 from sqlalchemy.dialects.postgresql import JSONB as _PostgresJsonb
 from sqlalchemy_utils import UUIDType as _UUIDType
 
-from ._compat import SAConnection
+from ._compat import PsycoPgJson, SAConnection
 from ._exceptions import OptimisticConcurrencyError
 from ._interfaces import MessagePosition, SchemaProvider
 
@@ -26,13 +26,13 @@ class Storage:
         self._schema_provider = schema_provider
         self.metadata = _sa.MetaData()
         self.message_table = _sa.Table(
-            f"{name}_messages",
+            self.message_table_name(name),
             self.metadata,
             _sa.Column("message_id", _UUIDType(), primary_key=True),
             _sa.Column(
                 "global_position",
                 _sa.Integer,
-                _sa.Sequence(f"{name}_messages_global_position_seq"),
+                _sa.Sequence(f"depeche_msgs_{name}_global_seq"),
                 unique=True,
                 nullable=False,
             ),
@@ -44,17 +44,19 @@ class Storage:
             _sa.Column("message", _PostgresJsonb, nullable=False),
             # TODO is this still required? only add in tests?
             _sa.UniqueConstraint(
-                "stream", "version", name=f"{name}_stream_version_unique"
+                "stream", "version", name=f"depeche_msgs_{name}_version_uq"
             ),
         )
-        self.notification_channel = f"{name}_messages"
+        self.notification_channel = self.notification_channel_name(name)
         ddl = _sa.DDL(
             "\n".join(
                 [
                     _notify_trigger(
-                        prefix=name, notification_channel=self.notification_channel
+                        name=name,
+                        tablename=self.message_table.name,
+                        notification_channel=self.notification_channel,
                     ),
-                    _write_message_fn(prefix=name),
+                    _write_message_fn(name=name, tablename=self.message_table.name),
                 ]
             )
         )
@@ -82,23 +84,39 @@ class Storage:
         messages: Sequence[Tuple[_uuid.UUID, dict]],
     ) -> MessagePosition:
         assert len(messages) > 0
-        func = getattr(_sa.func, f"{self.name}_write_message")
+        func = getattr(_sa.func, f"depeche_write_message_{self.name}")
         try:
             for idx, (message_id, message) in enumerate(messages):
                 _expected_version = (
-                    expected_version + idx if expected_version is not None else None,
+                    expected_version + idx if expected_version is not None else None
                 )
                 result: Any = conn.execute(
                     _sa.select(
                         _sa.column("version"), _sa.column("global_position")
                     ).select_from(
                         func(
-                            message_id, stream, _PsycoPgJson(message), _expected_version
+                            message_id, stream, PsycoPgJson(message), _expected_version
                         ).alias()
                     )
                 )
-        except _sa.exc.InternalError:
-            raise OptimisticConcurrencyError("optimistic concurrency failure")
+        except _sa.exc.InternalError as exc:
+            # psycopg2
+            from depeche_db._compat import PsycoPgRaiseException
+
+            if isinstance(exc.orig, PsycoPgRaiseException):
+                raise OptimisticConcurrencyError(
+                    f"optimistic concurrency failure: {exc.orig}"
+                )
+            raise
+        except _sa.exc.ProgrammingError as exc:
+            # psycopg3
+            from depeche_db._compat import PsycoPgRaiseException
+
+            if isinstance(exc.orig, PsycoPgRaiseException):
+                raise OptimisticConcurrencyError(
+                    f"optimistic concurrency failure: {exc.orig}"
+                )
+            raise
         row = result.fetchone()
         return MessagePosition(
             stream=stream,
@@ -212,10 +230,51 @@ class Storage:
     def truncate(self, conn: SAConnection):
         conn.execute(self.message_table.delete())
 
+    @staticmethod
+    def message_table_name(name: str) -> str:
+        return f"depeche_msgs_{name}"
 
-def _notify_trigger(prefix: str, notification_channel: str) -> str:
+    @staticmethod
+    def notification_channel_name(name: str) -> str:
+        return f"depeche_{name}_messages"
+
+    @classmethod
+    def get_migration_ddl(cls, name: str):
+        """
+        DDL Script to migrate from <=0.8.0
+        """
+        tablename = cls.message_table_name(name)
+        new_objects = "\n".join(
+            [
+                _notify_trigger(
+                    name=name,
+                    tablename=tablename,
+                    notification_channel=cls.notification_channel_name(name),
+                ),
+                _write_message_fn(name=name, tablename=tablename),
+            ]
+        )
+        return f"""
+            ALTER TABLE {name}_messages
+                 RENAME TO {tablename};
+            DROP TRIGGER {name}_notify_message_inserted;
+            DROP FUNCTION IF EXISTS {name}_notify_message_inserted;
+            DROP FUNCTION IF EXISTS {name}_write_message;
+            {new_objects}
+            """
+
+    @classmethod
+    def migrate_db_objects(cls, name: str, conn: SAConnection):
+        """
+        Migrate from <=0.8.0
+        """
+        conn.execute(cls.get_migration_ddl(name=name))
+
+
+def _notify_trigger(name: str, tablename: str, notification_channel: str) -> str:
+    trigger_name = f"depeche_storage_new_msg_{name}"
     return f"""
-        CREATE OR REPLACE FUNCTION {prefix}_notify_message_inserted()
+        CREATE OR REPLACE FUNCTION {trigger_name}()
           RETURNS trigger AS $$
         DECLARE
         BEGIN
@@ -231,16 +290,17 @@ def _notify_trigger(prefix: str, notification_channel: str) -> str:
         END;
         $$ LANGUAGE plpgsql;
 
-        CREATE TRIGGER {prefix}_notify_message_inserted
-          AFTER INSERT ON {prefix}_messages
+        CREATE TRIGGER {trigger_name}
+          AFTER INSERT ON {tablename}
           FOR EACH ROW
-          EXECUTE PROCEDURE {prefix}_notify_message_inserted();
+          EXECUTE PROCEDURE {trigger_name}();
      """
 
 
-def _write_message_fn(prefix: str) -> str:
+def _write_message_fn(name: str, tablename: str) -> str:
+    function_name = f"depeche_write_message_{name}"
     return f"""
-        CREATE OR REPLACE FUNCTION {prefix}_write_message(
+        CREATE OR REPLACE FUNCTION {function_name}(
           message_id uuid,
           stream varchar,
           message json,
@@ -255,34 +315,34 @@ def _write_message_fn(prefix: str) -> str:
           _next_version bigint;
           _next_global_position bigint;
         BEGIN
-          _stream_hash := left('x' || md5({prefix}_write_message.stream), 17)::bit(64)::bigint;
+          _stream_hash := left('x' || md5({function_name}.stream), 17)::bit(64)::bigint;
           PERFORM pg_advisory_xact_lock(_stream_hash);
 
           SELECT
-            max({prefix}_messages.version) into _stream_version
+            max({tablename}.version) into _stream_version
           FROM
-            {prefix}_messages
+            {tablename}
           WHERE
-            {prefix}_messages.stream = {prefix}_write_message.stream;
+            {tablename}.stream = {function_name}.stream;
 
           IF _stream_version IS NULL THEN
             _stream_version := 0;
           END IF;
 
-          IF {prefix}_write_message.expected_version IS NOT NULL THEN
-            IF {prefix}_write_message.expected_version != _stream_version THEN
+          IF {function_name}.expected_version IS NOT NULL THEN
+            IF {function_name}.expected_version != _stream_version THEN
               RAISE EXCEPTION
                 'Wrong expected version: %% (Stream: %%, Stream Version: %%)',
-                {prefix}_write_message.expected_version,
-                {prefix}_write_message.stream,
+                {function_name}.expected_version,
+                {function_name}.stream,
                 _stream_version;
             END IF;
           END IF;
 
           _next_version := _stream_version + 1;
-          _next_global_position := nextval('{prefix}_messages_global_position_seq');
+          _next_global_position := nextval('depeche_msgs_{name}_global_seq');
 
-          INSERT INTO {prefix}_messages
+          INSERT INTO {tablename}
             (
               message_id,
               stream,
@@ -292,10 +352,10 @@ def _write_message_fn(prefix: str) -> str:
             )
           VALUES
             (
-              {prefix}_write_message.message_id,
-              {prefix}_write_message.stream,
+              {function_name}.message_id,
+              {function_name}.stream,
               _next_version,
-              {prefix}_write_message.message,
+              {function_name}.message,
               _next_global_position
             )
           ;

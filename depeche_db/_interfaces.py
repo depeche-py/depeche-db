@@ -66,6 +66,11 @@ class StoredMessage(Generic[E]):
     global_position: int
 
 
+class AckOpProtocol(Protocol):
+    def execute(self, **kwargs):
+        ...
+
+
 @_dc.dataclass(frozen=True)
 class SubscriptionMessage(Generic[E]):
     """
@@ -80,6 +85,7 @@ class SubscriptionMessage(Generic[E]):
     partition: int
     position: int
     stored_message: StoredMessage[E]
+    ack: AckOpProtocol
 
 
 @_dc.dataclass(frozen=True)
@@ -220,6 +226,18 @@ class SubscriptionStateProvider(Protocol):
     def initialized(self, subscription_name: str) -> bool:
         """
         Returns `True` if the subscription state was already initialized.
+        """
+        raise NotImplementedError
+
+    def session(self, **kwargs) -> "SubscriptionStateProvider":
+        """
+        Returns a session for the subscription state provider.
+
+        This can be used to run the state reads/updates in a transaction
+        provided by the client.
+
+        See [DbSubscriptionStateProvider][depeche_db.tools.DbSubscriptionStateProvider]
+        for an example implementation.
         """
         raise NotImplementedError
 

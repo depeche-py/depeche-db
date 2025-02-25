@@ -13,6 +13,8 @@ doc.md(
 from sqlalchemy import create_engine
 
 DB_DSN = "postgresql://depeche:depeche@localhost:4888/depeche_demo"
+# If you are using psycopg 3, use the following DSN instead:
+# DB_DSN = "postgresql+psycopg://depeche:depeche@localhost:4888/depeche_demo"
 db_engine = create_engine(DB_DSN)
 
 doc.md(
@@ -262,7 +264,7 @@ doc.md(
 )
 
 subscription = aggregated_stream.subscription(
-    name="sub_example_docs_aggregate_me_with_handlers",
+    name="sub_example_docs_with_handlers",
     handlers=handlers,
 )
 

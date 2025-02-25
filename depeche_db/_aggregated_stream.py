@@ -4,10 +4,9 @@ import uuid as _uuid
 from typing import Dict, Generic, Iterator, List, Optional, TypeVar
 
 import sqlalchemy as _sa
-from psycopg2.errors import LockNotAvailable
 from sqlalchemy_utils import UUIDType as _UUIDType
 
-from ._compat import SAConnection
+from ._compat import PsycoPgLockNotAvailable, SAConnection
 from ._factories import SubscriptionFactory
 from ._interfaces import (
     AggregatedStreamMessage,
@@ -56,7 +55,7 @@ class AggregatedStream(Generic[E]):
         self._store = store
         self._metadata = _sa.MetaData()
         self._table = _sa.Table(
-            f"{name}_projected_stream",
+            self.stream_table_name(name),
             self._metadata,
             _sa.Column("message_id", _UUIDType(), primary_key=True),
             _sa.Column("origin_stream", _sa.String(255), nullable=False),
@@ -80,32 +79,16 @@ class AggregatedStream(Generic[E]):
             _sa.UniqueConstraint(
                 "partition",
                 "position",
-                name=f"uq_{name}_partition_position",
+                name=f"depeche_stream_{name}_uq",
             ),
         )
-        self.notification_channel = f"{name}_notifications"
+        self.notification_channel = self.notification_channel_name(name)
         trigger = _sa.DDL(
-            f"""
-            CREATE OR REPLACE FUNCTION {name}_stream_notify_message_inserted()
-              RETURNS trigger AS $$
-            DECLARE
-            BEGIN
-              PERFORM pg_notify(
-                '{self.notification_channel}',
-                json_build_object(
-                    'message_id', NEW.message_id,
-                    'partition', NEW.partition,
-                    'position', NEW.position
-                )::text);
-              RETURN NEW;
-            END;
-            $$ LANGUAGE plpgsql;
-
-            CREATE TRIGGER {name}_stream_notify_message_inserted
-              AFTER INSERT ON {name}_projected_stream
-              FOR EACH ROW
-              EXECUTE PROCEDURE {name}_stream_notify_message_inserted();
-            """
+            _notify_trigger(
+                name=name,
+                tablename=self._table.name,
+                notification_channel=self.notification_channel,
+            )
         )
         _sa.event.listen(
             self._table, "after_create", trigger.execute_if(dialect="postgresql")
@@ -265,6 +248,15 @@ class AggregatedStream(Generic[E]):
             del result
 
     def time_to_positions(self, time: _dt.datetime) -> Dict[int, int]:
+        """
+        Get the positions for each partition at a given time.
+
+        Args:
+            time: Time to get positions for (must be timezone aware)
+
+        Returns:
+            A dictionary mapping partition numbers to positions
+        """
         if time.tzinfo is None:
             raise ValueError("time must be timezone aware")
         with self._connection() as conn:
@@ -300,6 +292,115 @@ class AggregatedStream(Generic[E]):
                 )
             )
             return {row.partition: row.position for row in conn.execute(qry)}
+
+    def global_position_to_positions(self, global_position: int) -> Dict[int, int]:
+        """
+        Get the positions for each partition at a given global position.
+
+        Args:
+            global_position: Global position
+
+        Returns:
+            A dictionary mapping partition numbers to positions
+        """
+        with self._connection() as conn:
+            tbl = self._table.alias()
+            messages_tbl = self._store._storage.message_table.alias()
+
+            positions_upto_global_pos = (
+                _sa.select(
+                    tbl.c.partition,
+                    _sa.func.max(tbl.c.position).label("position"),
+                )
+                .select_from(
+                    tbl.join(
+                        messages_tbl,
+                        messages_tbl.c.message_id == tbl.c.message_id,
+                    )
+                )
+                .where(messages_tbl.c.global_position <= global_position)
+                .group_by(tbl.c.partition)
+                .cte()
+            )
+            partitions = (
+                _sa.select(
+                    tbl.c.partition,
+                )
+                .group_by(tbl.c.partition)
+                .cte()
+            )
+            qry = _sa.select(
+                partitions.c.partition,
+                _sa.func.coalesce(
+                    positions_upto_global_pos.c.position,
+                    -1,
+                ).label("position"),
+            ).select_from(
+                partitions.outerjoin(
+                    positions_upto_global_pos,
+                    partitions.c.partition == positions_upto_global_pos.c.partition,
+                )
+            )
+            return {row.partition: row.position for row in conn.execute(qry)}
+
+    @staticmethod
+    def stream_table_name(name: str) -> str:
+        return f"depeche_stream_{name}"
+
+    @staticmethod
+    def notification_channel_name(name: str) -> str:
+        return f"depeche_{name}_messages"
+
+    @classmethod
+    def get_migration_ddl(cls, name: str):
+        """
+        DDL Script to migrate from <=0.8.0
+        """
+        tablename = cls.stream_table_name(name)
+        new_objects = _notify_trigger(
+            name=name,
+            tablename=tablename,
+            notification_channel=cls.notification_channel_name(name),
+        )
+        return f"""
+            ALTER TABLE "{name}_projected_stream"
+                 RENAME TO {tablename};
+            DROP TRIGGER IF EXISTS {name}_stream_notify_message_inserted;
+            DROP FUNCTION IF EXISTS {name}_stream_notify_message_inserted;
+            {new_objects}
+            """
+
+    @classmethod
+    def migrate_db_objects(cls, name: str, conn: SAConnection):
+        """
+        Migrate from <=0.8.0
+        """
+        conn.execute(cls.get_migration_ddl(name=name))
+
+
+def _notify_trigger(name: str, tablename: str, notification_channel: str) -> str:
+    trigger_name = f"depeche_stream_new_msg_{name}"
+    return f"""
+        CREATE OR REPLACE FUNCTION {trigger_name}()
+          RETURNS trigger AS $$
+        DECLARE
+        BEGIN
+          PERFORM pg_notify(
+            '{notification_channel}',
+            json_build_object(
+                'message_id', NEW.message_id,
+                'partition', NEW.partition,
+                'position', NEW.position
+            )::text);
+          RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+
+        CREATE TRIGGER {trigger_name}
+          AFTER INSERT ON {tablename}
+          FOR EACH ROW
+          EXECUTE PROCEDURE {trigger_name}();
+        """
 
 
 class _AlreadyUpdating(RuntimeError):
@@ -363,7 +464,7 @@ class StreamProjector(Generic[E]):
                     )
                 )
             except _sa.exc.OperationalError as exc:
-                if isinstance(exc.orig, LockNotAvailable):
+                if isinstance(exc.orig, PsycoPgLockNotAvailable):
                     raise _AlreadyUpdating(
                         "Cannot update stream projection, because another process is already updating it."
                     )

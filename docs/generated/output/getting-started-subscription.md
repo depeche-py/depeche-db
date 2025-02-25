@@ -64,7 +64,7 @@ Now we can create a new subscription with these handlers.
 
 ```python
 subscription = aggregated_stream.subscription(
-    name="sub_example_docs_aggregate_me_with_handlers",
+    name="sub_example_docs_with_handlers",
     handlers=handlers,
 )
 ```

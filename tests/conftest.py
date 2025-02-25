@@ -26,7 +26,12 @@ from . import _tools
 
 @_contextlib.contextmanager
 def _pg_db(suffix: str = ""):
-    dsn = f"postgresql://depeche:depeche@localhost:4888/depeche_test_{_os.getpid()}{suffix}"
+    from depeche_db import _compat
+
+    if _compat.PSYCOPG_VERSION == "3":
+        dsn = f"postgresql+psycopg://depeche:depeche@localhost:4888/depeche_test_{_os.getpid()}{suffix}"
+    else:
+        dsn = f"postgresql://depeche:depeche@localhost:4888/depeche_test_{_os.getpid()}{suffix}"
     if _tools.pg_check_if_db_exists(dsn):
         _tools.pg_drop_db(dsn)
     _tools.pg_create_db(dsn)
@@ -158,11 +163,11 @@ def stream_with_events(identifier, db_engine, store_with_events, stream_factory)
 
 @pytest.fixture
 def subscription_factory(identifier, lock_provider):
-    def _inner(stream):
+    def _inner(stream, state_provider=None):
         return stream.subscription(
             name=identifier(),
             lock_provider=lock_provider,
-            state_provider=MyStateProvider(),
+            state_provider=state_provider or MyStateProvider(),
         )
 
     return _inner
@@ -184,6 +189,9 @@ class MyStateProvider:
 
     def initialized(self, subscription_name: str) -> bool:
         return self._initialized
+
+    def session(self, **kwargs):
+        return self
 
 
 @pytest.fixture

@@ -43,3 +43,13 @@ def test_time_to_positions(db_engine, store_with_events, stream_factory):
             sum(position for _, position in subject.time_to_positions(time).items())
             == idx
         )
+
+
+def test_global_position_to_position(db_engine, store_with_events, stream_factory):
+    event_store, account, account2 = store_with_events
+    subject = stream_factory(event_store)
+    subject.projector.update_full()
+
+    assert subject.global_position_to_positions(0) == {1: -1, 2: -1}
+    assert subject.global_position_to_positions(3) == {1: 1, 2: 0}
+    assert subject.global_position_to_positions(5) == {1: 2, 2: 1}

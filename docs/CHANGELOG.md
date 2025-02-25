@@ -1,4 +1,27 @@
-# next
+# 0.8.2
+
+* Compatibility with psycopg 2 and 3
+
+# 0.8.1
+
+* Remove direct dependency on psycopg2 -> allow using psycopg2-binary as well
+
+# 0.8.0
+
+* Allow `ack` in client transaction: This allows for `exactly once` delivery semantics
+* **BREAKING CHANGE**: Change DB object names
+    * AggregatedStream: `{name}_projected_stream` -> `depeche_stream_{name}`
+        * see `AggregatedStream.[get_migration_ddl|migrate_db_objects]`
+    * MessageStore (ie. Storage): `{name}_messages` -> `depeche_msgs_{name}`
+        * see `Storage.[get_migration_ddl|migrate_db_objects]`
+    * DbSuscriptionStateProvider: `{name}_subscription_state` -> `depeche_subscriptions_{name}`
+        * see `DbSuscriptionStateProvider.[get_migration_ddl|migrate_db_objects]`
+
+# 0.7.1
+
+* Add `global_position_to_positions` method on aggregated stream
+
+# 0.7.0
 
 * Add `start_point` to subscriptions
 * Add three implementations for the subscription start point

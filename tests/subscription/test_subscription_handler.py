@@ -35,6 +35,7 @@ SUB_MSG = SubscriptionMessage(
         ),
         global_position=0,
     ),
+    ack=None,
 )
 
 

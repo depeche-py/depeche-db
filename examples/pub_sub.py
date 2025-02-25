@@ -62,11 +62,18 @@ handlers = MessageHandlerRegister[MyMessage]()
 
 @handlers.register
 def handle_event_a(message: SubscriptionMessage[MyMessage]):
-    real_message = message.stored_message.message
-    print(
-        f"Got message #{real_message.content} at {message.partition}:{message.position}"
-    )
-    time.sleep(0.05)
+    with db_engine.connect() as conn:
+        real_message = message.stored_message.message
+        print(
+            f"Got message #{real_message.content} at {message.partition}:{message.position}"
+        )
+        time.sleep(0.05)
+        message.ack.execute(conn=conn)
+        if random.random() < 0.05:
+            print("Simulating error")
+            conn.rollback()
+        else:
+            conn.commit()
 
 
 subscription = stream.subscription(
