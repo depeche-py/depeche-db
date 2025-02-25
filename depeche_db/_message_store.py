@@ -125,7 +125,7 @@ class MessageStore(Generic[E]):
         name: str,
         engine: _sa.engine.Engine,
         serializer: MessageSerializer[E],
-        schema_provider: SchemaProvider | None = None,
+        schema_provider: Optional[SchemaProvider] = None,
     ):
         """
         Message store.
