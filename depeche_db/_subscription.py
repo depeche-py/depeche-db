@@ -55,7 +55,7 @@ class LogAndIgnoreSubscriptionErrorHandler(SubscriptionErrorHandler):
         self, error: Exception, message: SubscriptionMessage[E]
     ) -> ErrorAction:
         self._logger.exception(
-            "Error while handling message {message.stored_message.message_id}:{message.stored_message.message.__class__.__name__}"
+            f"Error while handling message {message.stored_message.message_id}:{message.stored_message.message.__class__.__name__}"
         )
         return ErrorAction.IGNORE
 
