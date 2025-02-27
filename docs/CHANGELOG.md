@@ -1,4 +1,8 @@
-# 0.8.2
+# 0.8.3
+
+* Logging fix in LogAndIgnore error handler
+
+# 0.8.2 (never released)
 
 * Compatibility with psycopg 2 and 3
 
