@@ -1,6 +1,6 @@
 # Depeche DB
 
-Depeche DB is modern Python library for building event-based systems
+Depeche DB is a modern Python library for building event-based systems
 
 Key features:
 
