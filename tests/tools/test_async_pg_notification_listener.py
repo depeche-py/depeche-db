@@ -4,6 +4,7 @@ import uuid
 
 import pytest
 
+from depeche_db import _compat
 from depeche_db.tools.async_pg_notification_listener import (
     AsyncPgNotificationListener,
     PgNotification,
@@ -11,6 +12,7 @@ from depeche_db.tools.async_pg_notification_listener import (
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(not _compat.PSYCOPG3_AVAILABLE, reason="Requires psycopg3")
 async def test_async_notification_listener(pg_db):
     pg_db = pg_db.replace("postgresql+psycopg:", "postgresql:")
     channel = f"test_channel_{uuid.uuid4().hex[:8]}"
@@ -52,6 +54,7 @@ async def test_async_notification_listener(pg_db):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(not _compat.PSYCOPG3_AVAILABLE, reason="Requires psycopg3")
 async def test_async_notification_listener_context_manager(pg_db):
     pg_db = pg_db.replace("postgresql+psycopg:", "postgresql:")
     channel = f"test_channel_{uuid.uuid4().hex[:8]}"
@@ -104,6 +107,7 @@ def _send_notifications(pg_db: str, channel: str, count: int):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(not _compat.PSYCOPG3_AVAILABLE, reason="Requires psycopg3")
 async def test_async_notification_listener_timeout(pg_db):
     pg_db = pg_db.replace("postgresql+psycopg:", "postgresql:")
     channel = f"test_channel_{uuid.uuid4().hex[:8]}"

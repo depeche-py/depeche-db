@@ -20,7 +20,7 @@ def test_reader(store_with_events, stream_factory):
 
 
 @pytest.mark.asyncio
-@pytest.mark.skipif(not _compat.PSYCOPG3_AVAILABLE)
+@pytest.mark.skipif(not _compat.PSYCOPG3_AVAILABLE, reason="Requires psycopg3")
 async def test_async_reader(store_with_events, stream_factory):
     event_store, *_ = store_with_events
     subject = stream_factory(event_store)
