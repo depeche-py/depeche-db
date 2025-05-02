@@ -2,6 +2,8 @@ import asyncio
 
 import pytest
 
+from depeche_db import _compat
+
 
 def test_reader(store_with_events, stream_factory):
     event_store, *_ = store_with_events
@@ -18,6 +20,7 @@ def test_reader(store_with_events, stream_factory):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skipif(not _compat.PSYCOPG3_AVAILABLE)
 async def test_async_reader(store_with_events, stream_factory):
     event_store, *_ = store_with_events
     subject = stream_factory(event_store)
