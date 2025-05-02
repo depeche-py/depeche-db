@@ -41,6 +41,7 @@ class PgNotificationListener:
         while self._keep_running:
             try:
                 yield self._queue.get(block=True, timeout=self._queue_timeout)
+                last_message_at = time.time()
             except queue.Empty:
                 if timeout > 0:
                     if time.time() - last_message_at > timeout:

@@ -101,3 +101,36 @@ def _send_notifications(pg_db: str, channel: str, count: int):
             conn.commit()
     finally:
         conn.close()
+
+
+@pytest.mark.asyncio
+async def test_async_notification_listener_timeout(pg_db):
+    pg_db = pg_db.replace("postgresql+psycopg:", "postgresql:")
+    channel = f"test_channel_{uuid.uuid4().hex[:8]}"
+
+    listener = AsyncPgNotificationListener(
+        dsn=pg_db,
+        channels=[channel],
+        select_timeout=1.0,
+    )
+
+    await listener.start()
+
+    notifications = []
+
+    async def collect_notifications():
+        async for notification in listener.messages(timeout=0.5):
+            notifications.append(notification)
+
+    task = asyncio.create_task(collect_notifications())
+
+    await asyncio.sleep(0.5)
+
+    try:
+        await asyncio.wait_for(task, timeout=5.0)
+    except asyncio.TimeoutError:
+        pass
+
+    await listener.stop()
+
+    assert len(notifications) == 0

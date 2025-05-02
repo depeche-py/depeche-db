@@ -1,6 +1,7 @@
 import asyncio as _asyncio
 import json as _json
 import logging as _logging
+import time
 from typing import AsyncIterator, Sequence
 
 from .. import _compat
@@ -41,22 +42,27 @@ class AsyncPgNotificationListener:
                 await cursor.execute(f"LISTEN {channel};")
             await self._conn.commit()
 
-    async def messages(self) -> AsyncIterator[PgNotification]:
+    async def messages(self, timeout: int = 0) -> AsyncIterator[PgNotification]:
         """Yield notifications as they arrive."""
         if self._conn is None:
             await self.start()
 
+        last_message_at = time.time()
         while self._keep_running:
             try:
+                print("Waiting for notifications...", self.channels)
                 async for notification in self._conn.notifies(
-                    timeout=self._select_timeout
+                    timeout=timeout if timeout > 0 else self._select_timeout
                 ):
                     notification = await self._process_notification(notification)
+                    last_message_at = time.time()
+                    print("Async notification received:", notification)
                     if notification:
                         yield notification
-            except _asyncio.TimeoutError:
-                # No notifications received within timeout
-                pass
+
+                if timeout > 0:
+                    if time.time() - last_message_at > timeout:
+                        break
             except Exception as e:
                 logger.exception(f"Error receiving notifications: {e}")
                 await _asyncio.sleep(0.1)  # Prevent tight loop in case of errors

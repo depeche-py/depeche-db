@@ -419,7 +419,6 @@ class StartAtPointInTime(SubscriptionStartPoint):
         for partition, position in stream.time_to_positions(
             self._point_in_time
         ).items():
-            print(partition, position)
             if position > 0:
                 state_provider.store(
                     subscription_name=subscription_name,

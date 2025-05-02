@@ -18,7 +18,10 @@ from ._interfaces import (
 from ._message_store import MessageStore
 
 if TYPE_CHECKING:
-    from ._aggregated_stream_reader import AggregatedStreamReader
+    from ._aggregated_stream_reader import (
+        AggregatedStreamReader,
+        AsyncAggregatedStreamReader,
+    )
 
 E = TypeVar("E", bound=MessageProtocol)
 
@@ -189,6 +192,13 @@ class AggregatedStream(Generic[E]):
         from ._aggregated_stream_reader import AggregatedStreamReader
 
         return AggregatedStreamReader(self, start_point=start_point)
+
+    def async_reader(
+        self, start_point: Optional[SubscriptionStartPoint] = None
+    ) -> "AsyncAggregatedStreamReader":
+        from ._aggregated_stream_reader import AsyncAggregatedStreamReader
+
+        return AsyncAggregatedStreamReader(self, start_point=start_point)
 
     @_contextlib.contextmanager
     def _connection(self):
