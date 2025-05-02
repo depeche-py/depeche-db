@@ -1,7 +1,7 @@
 import contextlib as _contextlib
 import datetime as _dt
 import uuid as _uuid
-from typing import Dict, Generic, Iterator, List, Optional, TypeVar
+from typing import TYPE_CHECKING, Dict, Generic, Iterator, List, Optional, TypeVar
 
 import sqlalchemy as _sa
 from sqlalchemy_utils import UUIDType as _UUIDType
@@ -13,8 +13,12 @@ from ._interfaces import (
     MessagePartitioner,
     MessageProtocol,
     StreamPartitionStatistic,
+    SubscriptionStartPoint,
 )
 from ._message_store import MessageStore
+
+if TYPE_CHECKING:
+    from ._aggregated_stream_reader import AggregatedStreamReader
 
 E = TypeVar("E", bound=MessageProtocol)
 
@@ -178,6 +182,13 @@ class AggregatedStream(Generic[E]):
                     position=row.position,
                     partition=partition,
                 )
+
+    def reader(
+        self, start_point: Optional[SubscriptionStartPoint] = None
+    ) -> "AggregatedStreamReader":
+        from ._aggregated_stream_reader import AggregatedStreamReader
+
+        return AggregatedStreamReader(self, start_point=start_point)
 
     @_contextlib.contextmanager
     def _connection(self):
