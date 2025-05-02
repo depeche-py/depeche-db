@@ -2,7 +2,7 @@ import asyncio as _asyncio
 import json as _json
 import logging as _logging
 import time
-from typing import AsyncIterator, Sequence
+from typing import Any, AsyncIterator, Sequence
 
 from .. import _compat
 from .pg_notification_listener import PgNotification
@@ -11,6 +11,8 @@ logger = _logging.getLogger(__name__)
 
 
 class AsyncPgNotificationListener:
+    _conn: Any
+
     def __init__(
         self,
         dsn: str,
@@ -35,7 +37,7 @@ class AsyncPgNotificationListener:
 
         dsn = self._parse_dsn(self.dsn)
 
-        self._conn = await _psycopg3.AsyncConnection.connect(dsn)  # type: ignore
+        self._conn = await _psycopg3.AsyncConnection.connect(dsn)
         assert self._conn is not None
 
         async with self._conn.cursor() as cursor:
