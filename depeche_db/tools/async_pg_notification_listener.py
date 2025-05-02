@@ -1,19 +1,12 @@
-import asyncio
-import dataclasses as _dc
-import json
-import logging
+import asyncio as _asyncio
+import json as _json
+import logging as _logging
 from typing import AsyncIterator, Sequence
 
-from depeche_db._compat import PSYCOPG_VERSION
-from depeche_db._compat import psycopg as _psycopg
+from .. import _compat
+from .pg_notification_listener import PgNotification
 
-logger = logging.getLogger(__name__)
-
-
-@_dc.dataclass
-class PgNotification:
-    channel: str
-    payload: dict
+logger = _logging.getLogger(__name__)
 
 
 class AsyncPgNotificationListener:
@@ -34,16 +27,15 @@ class AsyncPgNotificationListener:
 
     async def start(self):
         """Start the notification listener."""
-        dsn, expected_psycopg_version = self._parse_dsn(self.dsn)
-        assert expected_psycopg_version == PSYCOPG_VERSION, "Invalid psycopg version"
-        
-        if PSYCOPG_VERSION == "3":
-            self._conn = await _psycopg.AsyncConnection.connect(dsn)
-        else:
-            # For psycopg2, we need to use the aiopg library
-            import aiopg
-            self._conn = await aiopg.connect(dsn)
-        
+        assert (
+            _compat.PSYCOPG3_AVAILABLE
+        ), "AsyncPgNotificationListener requires psycopg3"
+        import psycopg as _psycopg3
+
+        dsn = self._parse_dsn(self.dsn)
+
+        self._conn = await _psycopg3.AsyncConnection.connect(dsn)
+
         async with self._conn.cursor() as cursor:
             for channel in self.channels:
                 await cursor.execute(f"LISTEN {channel};")
@@ -53,22 +45,21 @@ class AsyncPgNotificationListener:
         """Yield notifications as they arrive."""
         if self._conn is None:
             await self.start()
-            
+
         while self._keep_running:
             try:
-                if PSYCOPG_VERSION == "3":
-                    async for notification in self._conn.notifies(timeout=self._select_timeout):
-                        yield await self._process_notification(notification)
-                else:
-                    # For psycopg2 with aiopg
-                    notification = await self._conn.notifies.get()
-                    yield await self._process_notification(notification)
-            except asyncio.TimeoutError:
+                async for notification in self._conn.notifies(
+                    timeout=self._select_timeout
+                ):
+                    notification = await self._process_notification(notification)
+                    if notification:
+                        yield notification
+            except _asyncio.TimeoutError:
                 # No notifications received within timeout
                 pass
             except Exception as e:
                 logger.exception(f"Error receiving notifications: {e}")
-                await asyncio.sleep(0.1)  # Prevent tight loop in case of errors
+                await _asyncio.sleep(0.1)  # Prevent tight loop in case of errors
 
     async def stop(self):
         """Stop the notification listener and close the connection."""
@@ -77,26 +68,24 @@ class AsyncPgNotificationListener:
             await self._conn.close()
             self._conn = None
 
-    def _parse_dsn(self, dsn: str) -> tuple[str, str]:
+    def _parse_dsn(self, dsn: str) -> str:
         import urllib.parse as _urlparse
 
         parts = list(_urlparse.urlparse(dsn))
-        expected_psycopg_version = "2"
         if parts[0] == "postgresql+psycopg":
             parts[0] = "postgresql"
-            expected_psycopg_version = "3"
         if parts[0] == "postgresql+psycopg2":
             parts[0] = "postgresql"
         dsn = _urlparse.urlunparse(parts)
 
-        return dsn, expected_psycopg_version
+        return dsn
 
     async def _process_notification(self, notification):
         try:
             if self._ignore_payload:
                 payload = {}
             else:
-                payload = json.loads(notification.payload)
+                payload = _json.loads(notification.payload)
             return PgNotification(notification.channel, payload)
         except Exception:
             logger.exception(f"Error processing notification payload: {notification}")
