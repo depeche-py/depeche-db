@@ -36,7 +36,7 @@ class PgNotificationListener:
         self._select_timeout = select_timeout
         self._queue_timeout = select_timeout / 2
 
-    def messages(self, timeout: int = 0) -> Iterator[PgNotification]:
+    def messages(self, timeout: float = 0) -> Iterator[PgNotification]:
         last_message_at = time.time()
         while self._keep_running:
             try:

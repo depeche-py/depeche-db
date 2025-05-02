@@ -35,17 +35,19 @@ class AsyncPgNotificationListener:
 
         dsn = self._parse_dsn(self.dsn)
 
-        self._conn = await _psycopg3.AsyncConnection.connect(dsn)
+        self._conn = await _psycopg3.AsyncConnection.connect(dsn)  # type: ignore
+        assert self._conn is not None
 
         async with self._conn.cursor() as cursor:
             for channel in self.channels:
                 await cursor.execute(f"LISTEN {channel};")
             await self._conn.commit()
 
-    async def messages(self, timeout: int = 0) -> AsyncIterator[PgNotification]:
+    async def messages(self, timeout: float = 0) -> AsyncIterator[PgNotification]:
         """Yield notifications as they arrive."""
         if self._conn is None:
             await self.start()
+        assert self._conn is not None
 
         last_message_at = time.time()
         while self._keep_running:
