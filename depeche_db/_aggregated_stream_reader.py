@@ -32,9 +32,26 @@ class AggregatedStreamReader(Generic[E]):
         )
 
     def start(self):
+        """
+        Start the notification listener.
+
+        This method should be called before calling get_messages.
+
+        The notification listener will listen for notifications on the
+        notification channel of the stream. In order to do so, it creates a
+        a connection to the database and listens for notifications on a separate
+        thread. The connection is closed when the notification listener is stopped.
+        """
         self.notification_listener.start()
 
     def get_messages(self, timeout: int = 0) -> Iterable[StoredMessage[E]]:
+        """
+        On the first call, get all messages in the stream after the start_point.
+        On subsequent calls, get all messages in the stream after the last returned message.
+
+        Args:
+            timeout (int): Only wait for this many seconds when there are no new messages.
+        """
         # Get messages already in the stream (after start_point)
         yield from _exhaust_subscription(self.subscription)
 
@@ -43,6 +60,9 @@ class AggregatedStreamReader(Generic[E]):
             yield from _exhaust_subscription(self.subscription)
 
     def stop(self):
+        """
+        Stop the notification listener.
+        """
         self.notification_listener.stop()
 
 
@@ -66,11 +86,21 @@ class AsyncAggregatedStreamReader(Generic[E]):
         )
 
     async def start(self):
+        """
+        Start the notification listener.
+        """
         await self.notification_listener.start()
 
     async def get_messages(
         self, timeout: int = 0
     ) -> AsyncGenerator[StoredMessage[E], None]:
+        """
+        On the first call, get all messages in the stream after the start_point.
+        On subsequent calls, get all messages in the stream after the last returned message.
+
+        Args:
+            timeout (int): Only wait for this many seconds when there are no new messages.
+        """
         async_exhaust = _asyncer.asyncify(_exhaust_subscription)
 
         # Get messages already in the stream (after start_point)
@@ -83,6 +113,9 @@ class AsyncAggregatedStreamReader(Generic[E]):
                 yield message
 
     async def stop(self):
+        """
+        Stop the notification listener.
+        """
         await self.notification_listener.stop()
 
 

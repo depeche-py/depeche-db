@@ -189,6 +189,12 @@ class AggregatedStream(Generic[E]):
     def reader(
         self, start_point: Optional[SubscriptionStartPoint] = None
     ) -> "AggregatedStreamReader":
+        """
+        Get a reader for the aggregated stream.
+
+        Args:
+            start_point: Start point for the reader
+        """
         from ._aggregated_stream_reader import AggregatedStreamReader
 
         return AggregatedStreamReader(self, start_point=start_point)
@@ -196,6 +202,12 @@ class AggregatedStream(Generic[E]):
     def async_reader(
         self, start_point: Optional[SubscriptionStartPoint] = None
     ) -> "AsyncAggregatedStreamReader":
+        """
+        Get an async reader for the aggregated stream.
+
+        Args:
+            start_point: Start point for the reader
+        """
         from ._aggregated_stream_reader import AsyncAggregatedStreamReader
 
         return AsyncAggregatedStreamReader(self, start_point=start_point)
