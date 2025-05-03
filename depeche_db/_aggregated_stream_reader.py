@@ -1,4 +1,4 @@
-from typing import AsyncGenerator, Generic, Iterable, Optional, TypeVar
+from typing import AsyncGenerator, Generator, Generic, Iterable, Optional, TypeVar
 
 import asyncer as _asyncer
 
@@ -44,7 +44,7 @@ class AggregatedStreamReader(Generic[E]):
         """
         self.notification_listener.start()
 
-    def get_messages(self, timeout: int = 0) -> Iterable[StoredMessage[E]]:
+    def get_messages(self, timeout: int = 0) -> Generator[StoredMessage[E], None, None]:
         """
         On the first call, get all messages in the stream after the start_point.
         On subsequent calls, get all messages in the stream after the last returned message.
