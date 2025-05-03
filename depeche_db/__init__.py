@@ -12,6 +12,7 @@ from ._factories import AggregatedStreamFactory, SubscriptionFactory  # noqa: F4
 from ._interfaces import (  # noqa: F401
     CallMiddleware,
     ErrorAction,
+    FixedTimeBudget,
     HandlerDescriptor,
     LockProvider,
     MessageHandlerRegisterProtocol,
@@ -27,6 +28,7 @@ from ._interfaces import (  # noqa: F401
     SubscriptionStartPoint,
     SubscriptionState,
     SubscriptionStateProvider,
+    TimeBudget,
 )
 from ._message_handler import MessageHandler, MessageHandlerRegister  # noqa: F401
 from ._message_store import MessageStore, MessageStoreReader  # noqa: F401

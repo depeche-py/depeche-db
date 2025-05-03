@@ -5,7 +5,7 @@ import threading as _threading
 import time as _time
 from typing import Dict, List, Optional
 
-from ._interfaces import RunOnNotification
+from ._interfaces import FixedTimeBudget, RunOnNotification
 from .tools import PgNotificationListener
 
 
@@ -82,7 +82,9 @@ class Executor:
             try:
                 handler = self.handler_queue.get(timeout=0.5)
                 try:
-                    handler()
+                    # TODO make time budget configurable (global and per handler)
+                    # TODO make time budget dependent on pressure (e.g. handler queue length)
+                    handler(budget=FixedTimeBudget(seconds=1))
                 except Exception:
                     self._stop()
                     raise

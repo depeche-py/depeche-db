@@ -23,6 +23,7 @@ from ._interfaces import (
     SubscriptionMessage,
     SubscriptionStartPoint,
     SubscriptionStateProvider,
+    TimeBudget,
 )
 
 E = TypeVar("E", bound=MessageProtocol)
@@ -360,19 +361,21 @@ class SubscriptionRunner(Generic[E]):
     def notification_channel(self) -> str:
         return self._subscription._stream.notification_channel
 
-    def run(self):
-        self.run_once()
+    def run(self, budget: Optional[TimeBudget] = None):
+        self.run_once(budget=budget)
 
     def stop(self):
         self._keep_running = False
 
-    def run_once(self):
+    def run_once(self, budget: Optional[TimeBudget] = None):
         while self._keep_running:
             n = 0
             for message in self._subscription.get_next_messages(count=self._batch_size):
                 n += 1
                 self.handle(message)
             if n == 0:
+                break
+            if budget and budget.over_budget():
                 break
 
     def handle(self, message: SubscriptionMessage):

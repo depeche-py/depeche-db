@@ -14,6 +14,7 @@ from ._interfaces import (
     MessageProtocol,
     StreamPartitionStatistic,
     SubscriptionStartPoint,
+    TimeBudget,
 )
 from ._message_store import MessageStore
 
@@ -467,12 +468,12 @@ class StreamProjector(Generic[E]):
         """
         return self.stream._store._storage.notification_channel
 
-    def run(self):
+    def run(self, budget: Optional[TimeBudget] = None):
         """
         Runs the projector once.
         """
         try:
-            self.update_full()
+            self.update_full(budget=budget)
         except _AlreadyUpdating:
             pass
 
@@ -482,7 +483,7 @@ class StreamProjector(Generic[E]):
         """
         pass
 
-    def update_full(self) -> int:
+    def update_full(self, budget: Optional[TimeBudget] = None) -> int:
         """
         Updates the projection from the last known position to the current position.
         """
@@ -504,6 +505,8 @@ class StreamProjector(Generic[E]):
             while True:
                 batch_num = self._update_batch(conn, cutoff)
                 if batch_num == 0:
+                    break
+                if budget and budget.over_budget():
                     break
                 result += batch_num
             conn.commit()
