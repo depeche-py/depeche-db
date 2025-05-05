@@ -12,6 +12,7 @@ from ._interfaces import (
     AggregatedStreamMessage,
     MessagePartitioner,
     MessageProtocol,
+    RunOnNotificationResult,
     StreamPartitionStatistic,
     SubscriptionStartPoint,
     TimeBudget,
@@ -468,14 +469,17 @@ class StreamProjector(Generic[E]):
         """
         return self.stream._store._storage.notification_channel
 
-    def run(self, budget: Optional[TimeBudget] = None):
+    def run(self, budget: Optional[TimeBudget] = None) -> RunOnNotificationResult:
         """
         Runs the projector once.
         """
         try:
             self.update_full(budget=budget)
+            if budget and budget.over_budget():
+                return RunOnNotificationResult.WORK_REMAINING
         except _AlreadyUpdating:
             pass
+        return RunOnNotificationResult.DONE_FOR_NOW
 
     def stop(self):
         """
