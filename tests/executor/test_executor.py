@@ -82,9 +82,13 @@ def test_requeue_when_work_remains(setup):
 def _send_notifications(pg_db: str, channel: str, count: int):
     import json
 
-    import psycopg
+    try:
+        import psycopg
 
-    pg_db = pg_db.replace("postgresql+psycopg:", "postgresql:")
+        pg_db = pg_db.replace("postgresql+psycopg:", "postgresql:")
+    except ImportError:
+        import psycopg2 as psycopg
+
     conn = psycopg.connect(pg_db)
     try:
         with conn.cursor() as cursor:
