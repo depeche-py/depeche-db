@@ -1,3 +1,8 @@
+# 0.9.0
+
+* Add a stateful reader to aggregated streams
+* Make RunOnNotification implementations fair by exiting after time budget is used.
+
 # 0.8.3
 
 * Logging fix in LogAndIgnore error handler

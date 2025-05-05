@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "depeche-db"
-version = "0.8.3"
+version = "0.9.0"
 description = "A library for building event-based systems on top of PostgreSQL"
 authors = ["Martin Vielsmaier <martin@vielsmaier.net>"]
 readme = "README.md"
@@ -13,9 +13,7 @@ classifiers = [
 "Development Status :: 3 - Alpha",
 "Intended Audience :: Developers",
 "License :: OSI Approved :: MIT License",
-"Topic :: Database",
-"Topic :: Software Development :: Libraries",
-]
+"Topic :: Database" ]
 
 [tool.poetry.urls]
 Changelog = "https://depeche-py.github.io/depeche-db/CHANGELOG/"
@@ -29,10 +27,12 @@ sqlalchemy-utils = "^0.41.1"
 #click = "^8.1.6"
 pals = "^0.3.5"
 psycopg2 = { version = "^2.9", optional = true }
+psycopg = { version = ">=3.2.1", optional = true }
+asyncer = "^0.0.8"
 
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^7.3.1"
+pytest = "^8.2.0"
 pytest-watch = "^4.2.0"
 black = "^23.3.0"
 mypy = "^1.3.0"
@@ -40,6 +40,7 @@ python-language-server = "^0.36.2"
 ruff = "^0.0.285"
 pydantic = "^2.4"
 pytest-cov = "^4.1.0"
+pytest-asyncio = "^0.26.0"
 
 
 [tool.poetry.group.docs.dependencies]
@@ -54,6 +55,7 @@ mkdocs-macros-plugin = "^1.0.4"
 
 [tool.poetry.extras]
 psycopg2 = ["psycopg2"]
+psycopg = ["psycopg"]
 
 [build-system]
 requires = ["poetry-core"]
@@ -74,10 +76,8 @@ select = [
     # flake8-comprehensions checks.
     "C4",
     # isort
-    "I",
-]
+    "I", ]
 ignore = [
-    "E501",  # line too long -> enforced by black
-]
+    "E501", ] # line too long -> enforced by black
 [tool.ruff.per-file-ignores]
 "*/tests/**.py" = ["B018"]  # allow useless var access in tests

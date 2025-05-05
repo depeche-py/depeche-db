@@ -53,6 +53,8 @@ except ImportError:
     SA_VERSION = "1.4.x"
     from sqlalchemy.engine import Connection as SAConnection  # noqa
 
+PSYCOPG2_AVAILABLE = False
+PSYCOPG3_AVAILABLE = False
 PSYCOPG_VERSION: typing.Union[str, None] = None
 try:
     if os.environ.get("DEPECHE_DB_FORCE_PSYCOPG3", "0") != "1":
@@ -62,6 +64,7 @@ try:
         from psycopg2.extras import Json as PsycoPgJson  # noqa
 
         PSYCOPG_VERSION = "2"
+        PSYCOPG2_AVAILABLE = True
 except ImportError:
     pass
 
@@ -73,7 +76,15 @@ if PSYCOPG_VERSION is None:
         from psycopg.types.json import Json as PsycoPgJson  # noqa
 
         PSYCOPG_VERSION = "3"
+        PSYCOPG3_AVAILABLE = True
     except ImportError:
         raise RuntimeError(
             "DepecheDB requires psycopg2 or psycopg3; please install it: e.g. pip install psycopg2-binary"
         )
+else:
+    try:
+        import psycopg as _psycopg3  # noqa
+
+        PSYCOPG3_AVAILABLE = True
+    except ImportError:
+        pass

@@ -1,6 +1,11 @@
 
 # Aggregated stream
 
+Aggregated streams are our main way to read and consume messages from multiple streams.
+An aggregated stream contains all the messages from the
+matched streams, partitioned according to a partition scheme.
+See [data model](../../concepts/data-model.md) for more details.
+
 We will use the same message store as in the previous chapter here, but we will
 create a new set of streams within it:
 
@@ -58,5 +63,46 @@ in the context of the aggregated stream. It does not contain the original messag
 though. To get that, we need to use the message store reader.
 
 Usually though we will not read the aggregated stream directly, but rather use
-a subscription to consume it. We will get to that in the [next
+a reader or a subscription to consume it. We will cover subscriptions in the [next
 chapter](getting-started-subscription.md).
+```python
+reader = aggregated_stream.reader()
+reader.start()
+print(next(reader.get_messages(timeout=1)))
+reader.stop()
+#  SubscriptionMessage(
+#      partition=2,
+#      position=0,
+#      stored_message=StoredMessage(
+#          message_id=UUID("1f804185-e63d-462e-b996-d6f16e5ff8af"),
+#          stream="aggregate-me-1",
+#          version=1,
+#          message=EventA(
+#              event_id=UUID("1f804185-e63d-462e-b996-d6f16e5ff8af"),
+#              happened_at=datetime.datetime(2023, 10, 5, 20, 3, 26, 658725),
+#              num=176,
+#          ),
+#          global_position=4,
+#      ),
+#  )
+```
+
+The `AggregatedStreamReader` will read the messages from the aggregated
+stream and record its position in the stream while doing so.
+If you specify a `timeout`, it will wait for that long for new messages before returning.
+The next call to `get_messages` will only return new messages that have been
+written to the stream since the last call.
+
+`aggregated_stream.reader()` takes an optional `start_point` argument, which
+specifies where to start reading from. See the [subscription chapter](getting-started-subscription.md)
+for more details on this.
+
+The main use case of an `AggregatedStreamReader` is for streaming
+information based on messages. E.g. we can use it to implement a
+GraphQL subscription that is used by a UI to live-update.
+
+There is also an asynchonous version of the reader: `aggregated_stream.async_reader()`.
+
+The readers use PostgreSQL's `LISTEN`/`NOTIFY` mechanism to get notified of new messages.
+The synchronous version of the reader starts a new thread to listen for notifications.
+The asynchronous version uses an async listener.
