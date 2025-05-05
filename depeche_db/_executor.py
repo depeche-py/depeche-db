@@ -9,6 +9,7 @@ from ._interfaces import FixedTimeBudget, RunOnNotification
 from .tools import PgNotificationListener
 
 
+# TODO add tests
 class Executor:
     """
     Executor is a class that runs handlers on notifications.
@@ -84,6 +85,7 @@ class Executor:
                 try:
                     # TODO make time budget configurable (global and per handler)
                     # TODO make time budget dependent on pressure (e.g. handler queue length)
+                    # TODO the handler should return if stopped because of time budget, so that we can re-queue it.
                     handler(budget=FixedTimeBudget(seconds=1))
                 except Exception:
                     self._stop()
