@@ -294,6 +294,11 @@ class FixedTimeBudget:
         return _time.time() - self.start_time > self.seconds
 
 
+class RunOnNotificationResult(_enum.Enum):
+    WORK_REMAINING = "work_remaining"
+    DONE_FOR_NOW = "done_for_now"
+
+
 class RunOnNotification(Protocol):
     """
     Run on notification is a protocol that allows objects to be run when a
@@ -312,11 +317,16 @@ class RunOnNotification(Protocol):
         """
         raise NotImplementedError
 
-    def run(self, budget: TimeBudget):
+    def run(self, budget: TimeBudget) -> Optional[RunOnNotificationResult]:
         """
         Runs the object. This method needs to return when a chunk of work has been
         done.
         It needs to return within reasonable time after the given time budget is over.
+
+        Returns:
+            WORK_REMAINING if there is still work to be done
+            DONE_FOR_NOW if there is no work to be done
+            None will be interpreted as DONE_FOR_NOW (backwards compatibility)
         """
         raise NotImplementedError
 
