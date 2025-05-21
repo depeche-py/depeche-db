@@ -85,11 +85,15 @@ def _send_notifications(pg_db: str, channel: str, count: int):
     try:
         import psycopg
 
+        _psycopg = psycopg
+
         pg_db = pg_db.replace("postgresql+psycopg:", "postgresql:")
     except ImportError:
-        import psycopg2 as psycopg
+        import psycopg2
 
-    conn = psycopg.connect(pg_db)
+        _psycopg = psycopg2
+
+    conn = _psycopg.connect(pg_db)
     try:
         with conn.cursor() as cursor:
             for i in range(count):
