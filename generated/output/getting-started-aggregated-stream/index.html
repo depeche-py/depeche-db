@@ -848,6 +848,10 @@
 
 
 <h1 id="aggregated-stream">Aggregated stream</h1>
+<p>Aggregated streams are our main way to read and consume messages from multiple streams.
+An aggregated stream contains all the messages from the
+matched streams, partitioned according to a partition scheme.
+See <a href="../../../concepts/data-model/">data model</a> for more details.</p>
 <p>We will use the same message store as in the previous chapter here, but we will
 create a new set of streams within it:</p>
 <div class="language-python highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span> <span class="nn">random</span>
@@ -891,8 +895,43 @@ We will not have to call this manually though. We can use the
 in the context of the aggregated stream. It does not contain the original message
 though. To get that, we need to use the message store reader.</p>
 <p>Usually though we will not read the aggregated stream directly, but rather use
-a subscription to consume it. We will get to that in the <a href="../getting-started-subscription/">next
-chapter</a>.</p>
+a reader or a subscription to consume it. We will cover subscriptions in the <a href="../getting-started-subscription/">next
+chapter</a>.
+<div class="language-python highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="n">reader</span> <span class="o">=</span> <span class="n">aggregated_stream</span><span class="o">.</span><span class="n">reader</span><span class="p">()</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">reader</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nb">print</span><span class="p">(</span><span class="nb">next</span><span class="p">(</span><span class="n">reader</span><span class="o">.</span><span class="n">get_messages</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mi">1</span><span class="p">)))</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">reader</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="c1">#  SubscriptionMessage(</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="c1">#      partition=2,</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="c1">#      position=0,</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="c1">#      stored_message=StoredMessage(</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="c1">#          message_id=UUID(&quot;1f804185-e63d-462e-b996-d6f16e5ff8af&quot;),</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="c1">#          stream=&quot;aggregate-me-1&quot;,</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="c1">#          version=1,</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="c1">#          message=EventA(</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a><span class="c1">#              event_id=UUID(&quot;1f804185-e63d-462e-b996-d6f16e5ff8af&quot;),</span>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="c1">#              happened_at=datetime.datetime(2023, 10, 5, 20, 3, 26, 658725),</span>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="c1">#              num=176,</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="c1">#          ),</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a><span class="c1">#          global_position=4,</span>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a><span class="c1">#      ),</span>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a><span class="c1">#  )</span>
+</code></pre></div></p>
+<p>The <code>AggregatedStreamReader</code> will read the messages from the aggregated
+stream and record its position in the stream while doing so.
+If you specify a <code>timeout</code>, it will wait for that long for new messages before returning.
+The next call to <code>get_messages</code> will only return new messages that have been
+written to the stream since the last call.</p>
+<p><code>aggregated_stream.reader()</code> takes an optional <code>start_point</code> argument, which
+specifies where to start reading from. See the <a href="../getting-started-subscription/">subscription chapter</a>
+for more details on this.</p>
+<p>The main use case of an <code>AggregatedStreamReader</code> is for streaming
+information based on messages. E.g. we can use it to implement a
+GraphQL subscription that is used by a UI to live-update.</p>
+<p>There is also an asynchonous version of the reader: <code>aggregated_stream.async_reader()</code>.</p>
+<p>The readers use PostgreSQL's <code>LISTEN</code>/<code>NOTIFY</code> mechanism to get notified of new messages.
+The synchronous version of the reader starts a new thread to listen for notifications.
+The asynchronous version uses an async listener.</p>
 
 
   
