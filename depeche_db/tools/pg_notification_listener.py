@@ -4,6 +4,7 @@ import logging
 import queue
 import select
 import threading
+import time
 from typing import Iterator, Sequence
 
 from depeche_db._compat import PSYCOPG_VERSION
@@ -35,11 +36,16 @@ class PgNotificationListener:
         self._select_timeout = select_timeout
         self._queue_timeout = select_timeout / 2
 
-    def messages(self) -> Iterator[PgNotification]:
+    def messages(self, timeout: float = 0) -> Iterator[PgNotification]:
+        last_message_at = time.time()
         while self._keep_running:
             try:
                 yield self._queue.get(block=True, timeout=self._queue_timeout)
+                last_message_at = time.time()
             except queue.Empty:
+                if timeout > 0:
+                    if time.time() - last_message_at > timeout:
+                        break
                 pass
 
     def start(self):

@@ -1,6 +1,7 @@
 import dataclasses as _dc
 import datetime as _dt
 import enum as _enum
+import time as _time
 import uuid as _uuid
 from typing import (
     TYPE_CHECKING,
@@ -273,6 +274,31 @@ class CallMiddleware(Generic[E]):
         raise NotImplementedError
 
 
+class TimeBudget(Protocol):
+    def over_budget(self) -> bool:
+        """
+        Returns `True` if the budget is over.
+        """
+        raise NotImplementedError
+
+
+class FixedTimeBudget:
+    def __init__(self, seconds: float):
+        self.seconds = seconds
+        self.start_time = _time.time()
+
+    def over_budget(self) -> bool:
+        """
+        Returns `True` if the budget is over.
+        """
+        return _time.time() - self.start_time > self.seconds
+
+
+class RunOnNotificationResult(_enum.Enum):
+    WORK_REMAINING = "work_remaining"
+    DONE_FOR_NOW = "done_for_now"
+
+
 class RunOnNotification(Protocol):
     """
     Run on notification is a protocol that allows objects to be run when a
@@ -291,10 +317,16 @@ class RunOnNotification(Protocol):
         """
         raise NotImplementedError
 
-    def run(self):
+    def run(self, budget: TimeBudget) -> Optional[RunOnNotificationResult]:
         """
         Runs the object. This method needs to return when a chunk of work has been
         done.
+        It needs to return within reasonable time after the given time budget is over.
+
+        Returns:
+            WORK_REMAINING if there is still work to be done
+            DONE_FOR_NOW if there is no work to be done
+            None will be interpreted as DONE_FOR_NOW (backwards compatibility)
         """
         raise NotImplementedError
 

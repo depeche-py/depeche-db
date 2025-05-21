@@ -1,10 +1,18 @@
-from ._aggregated_stream import AggregatedStream, StreamProjector  # noqa: F401
+from ._aggregated_stream import (  # noqa: F401
+    AggregatedStream,
+    StreamProjector,
+)
+from ._aggregated_stream_reader import (  # noqa: F401
+    AggregatedStreamReader,
+    AsyncAggregatedStreamReader,
+)
 from ._exceptions import MessageNotFound, OptimisticConcurrencyError  # noqa: F401
 from ._executor import Executor  # noqa: F401
 from ._factories import AggregatedStreamFactory, SubscriptionFactory  # noqa: F401
 from ._interfaces import (  # noqa: F401
     CallMiddleware,
     ErrorAction,
+    FixedTimeBudget,
     HandlerDescriptor,
     LockProvider,
     MessageHandlerRegisterProtocol,
@@ -13,6 +21,7 @@ from ._interfaces import (  # noqa: F401
     MessageProtocol,
     MessageSerializer,
     RunOnNotification,
+    RunOnNotificationResult,
     StoredMessage,
     StreamPartitionStatistic,
     SubscriptionErrorHandler,
@@ -20,6 +29,7 @@ from ._interfaces import (  # noqa: F401
     SubscriptionStartPoint,
     SubscriptionState,
     SubscriptionStateProvider,
+    TimeBudget,
 )
 from ._message_handler import MessageHandler, MessageHandlerRegister  # noqa: F401
 from ._message_store import MessageStore, MessageStoreReader  # noqa: F401

@@ -5,10 +5,11 @@ import threading as _threading
 import time as _time
 from typing import Dict, List, Optional
 
-from ._interfaces import RunOnNotification
+from ._interfaces import FixedTimeBudget, RunOnNotification, RunOnNotificationResult
 from .tools import PgNotificationListener
 
 
+# TODO add tests
 class Executor:
     """
     Executor is a class that runs handlers on notifications.
@@ -25,12 +26,12 @@ class Executor:
 
     listener: Optional[PgNotificationListener] = None
 
-    def __init__(self, db_dsn: str):
+    def __init__(self, db_dsn: str, stimulation_interval: float = 0.5):
         self._db_dsn = db_dsn
         self.channel_register: Dict[
             str, List[RunOnNotification]
         ] = _collections.defaultdict(list)
-        self.stimulation_interval = 0.5
+        self.stimulation_interval = stimulation_interval
         self.keep_running = True
         self.handler_queue = UniqueQueue()
         self.stimulator_thread = _threading.Thread(target=self._stimulate, daemon=True)
@@ -72,7 +73,7 @@ class Executor:
 
         for notification in self.listener.messages():
             for handler in self.channel_register[notification.channel]:
-                self.handler_queue.put(handler.run)
+                self.handler_queue.put(handler)
 
         self.handler_thread.join()
         self.stimulator_thread.join()
@@ -82,7 +83,13 @@ class Executor:
             try:
                 handler = self.handler_queue.get(timeout=0.5)
                 try:
-                    handler()
+                    # TODO make time budget configurable (global and per handler)
+                    # TODO make time budget dependent on pressure (e.g. handler queue length)
+                    result = handler.run(budget=FixedTimeBudget(seconds=1))
+                    result = result or RunOnNotificationResult.DONE_FOR_NOW
+                    if result == RunOnNotificationResult.WORK_REMAINING:
+                        # Re-queue the handler if it has work remaining
+                        self.handler_queue.put(handler)
                 except Exception:
                     self._stop()
                     raise
@@ -93,8 +100,15 @@ class Executor:
         while self.keep_running:
             for handlers in self.channel_register.values():
                 for handler in handlers:
-                    self.handler_queue.put(handler.run)
-            _time.sleep(self.stimulation_interval)
+                    self.handler_queue.put(handler)
+
+            # Wait for the stimulation interval to pass
+            started_at = _time.time()
+            while (
+                self.keep_running
+                and _time.time() - started_at < self.stimulation_interval
+            ):
+                _time.sleep(0.1)
 
 
 class UniqueQueue(_queue.Queue):

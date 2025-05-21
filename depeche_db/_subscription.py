@@ -18,11 +18,13 @@ from ._interfaces import (
     LockProvider,
     MessageHandlerRegisterProtocol,
     MessageProtocol,
+    RunOnNotificationResult,
     StoredMessage,
     SubscriptionErrorHandler,
     SubscriptionMessage,
     SubscriptionStartPoint,
     SubscriptionStateProvider,
+    TimeBudget,
 )
 
 E = TypeVar("E", bound=MessageProtocol)
@@ -360,13 +362,13 @@ class SubscriptionRunner(Generic[E]):
     def notification_channel(self) -> str:
         return self._subscription._stream.notification_channel
 
-    def run(self):
-        self.run_once()
+    def run(self, budget: Optional[TimeBudget] = None) -> RunOnNotificationResult:
+        return self.run_once(budget=budget)
 
     def stop(self):
         self._keep_running = False
 
-    def run_once(self):
+    def run_once(self, budget: Optional[TimeBudget] = None) -> RunOnNotificationResult:
         while self._keep_running:
             n = 0
             for message in self._subscription.get_next_messages(count=self._batch_size):
@@ -374,6 +376,9 @@ class SubscriptionRunner(Generic[E]):
                 self.handle(message)
             if n == 0:
                 break
+            if budget and budget.over_budget():
+                return RunOnNotificationResult.WORK_REMAINING
+        return RunOnNotificationResult.DONE_FOR_NOW
 
     def handle(self, message: SubscriptionMessage):
         self._handler.handle(message)
@@ -419,7 +424,6 @@ class StartAtPointInTime(SubscriptionStartPoint):
         for partition, position in stream.time_to_positions(
             self._point_in_time
         ).items():
-            print(partition, position)
             if position > 0:
                 state_provider.store(
                     subscription_name=subscription_name,

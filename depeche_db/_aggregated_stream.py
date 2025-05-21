@@ -1,7 +1,7 @@
 import contextlib as _contextlib
 import datetime as _dt
 import uuid as _uuid
-from typing import Dict, Generic, Iterator, List, Optional, TypeVar
+from typing import TYPE_CHECKING, Dict, Generic, Iterator, List, Optional, TypeVar
 
 import sqlalchemy as _sa
 from sqlalchemy_utils import UUIDType as _UUIDType
@@ -12,9 +12,18 @@ from ._interfaces import (
     AggregatedStreamMessage,
     MessagePartitioner,
     MessageProtocol,
+    RunOnNotificationResult,
     StreamPartitionStatistic,
+    SubscriptionStartPoint,
+    TimeBudget,
 )
 from ._message_store import MessageStore
+
+if TYPE_CHECKING:
+    from ._aggregated_stream_reader import (
+        AggregatedStreamReader,
+        AsyncAggregatedStreamReader,
+    )
 
 E = TypeVar("E", bound=MessageProtocol)
 
@@ -178,6 +187,32 @@ class AggregatedStream(Generic[E]):
                     position=row.position,
                     partition=partition,
                 )
+
+    def reader(
+        self, start_point: Optional[SubscriptionStartPoint] = None
+    ) -> "AggregatedStreamReader":
+        """
+        Get a reader for the aggregated stream.
+
+        Args:
+            start_point: Start point for the reader
+        """
+        from ._aggregated_stream_reader import AggregatedStreamReader
+
+        return AggregatedStreamReader(self, start_point=start_point)
+
+    def async_reader(
+        self, start_point: Optional[SubscriptionStartPoint] = None
+    ) -> "AsyncAggregatedStreamReader":
+        """
+        Get an async reader for the aggregated stream.
+
+        Args:
+            start_point: Start point for the reader
+        """
+        from ._aggregated_stream_reader import AsyncAggregatedStreamReader
+
+        return AsyncAggregatedStreamReader(self, start_point=start_point)
 
     @_contextlib.contextmanager
     def _connection(self):
@@ -434,14 +469,17 @@ class StreamProjector(Generic[E]):
         """
         return self.stream._store._storage.notification_channel
 
-    def run(self):
+    def run(self, budget: Optional[TimeBudget] = None) -> RunOnNotificationResult:
         """
         Runs the projector once.
         """
         try:
-            self.update_full()
+            self.update_full(budget=budget)
+            if budget and budget.over_budget():
+                return RunOnNotificationResult.WORK_REMAINING
         except _AlreadyUpdating:
             pass
+        return RunOnNotificationResult.DONE_FOR_NOW
 
     def stop(self):
         """
@@ -449,7 +487,7 @@ class StreamProjector(Generic[E]):
         """
         pass
 
-    def update_full(self) -> int:
+    def update_full(self, budget: Optional[TimeBudget] = None) -> int:
         """
         Updates the projection from the last known position to the current position.
         """
@@ -471,6 +509,8 @@ class StreamProjector(Generic[E]):
             while True:
                 batch_num = self._update_batch(conn, cutoff)
                 if batch_num == 0:
+                    break
+                if budget and budget.over_budget():
                     break
                 result += batch_num
             conn.commit()

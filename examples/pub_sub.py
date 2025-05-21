@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import random
 import sys
@@ -22,7 +23,7 @@ from depeche_db import (
 )
 from depeche_db.tools import PydanticMessageSerializer
 
-DB_DSN = "postgresql://depeche:depeche@localhost:4888/depeche_demo"
+DB_DSN = "postgresql+psycopg://depeche:depeche@localhost:4888/depeche_demo"
 db_engine = create_engine(DB_DSN)
 
 
@@ -39,7 +40,7 @@ class MyMessage(pydantic.BaseModel):
 
 
 message_store = MessageStore[MyMessage](
-    name="example_pub_sub",
+    name="store_example_pub_sub",
     engine=db_engine,
     serializer=PydanticMessageSerializer(MyMessage),
 )
@@ -51,7 +52,7 @@ class NumMessagePartitioner:
 
 
 stream = message_store.aggregated_stream(
-    name="example_pub_sub1",
+    name="stream_example_pub_sub1",
     partitioner=NumMessagePartitioner(),
     stream_wildcards=["aggregate-me-%"],
 )
@@ -77,7 +78,9 @@ def handle_event_a(message: SubscriptionMessage[MyMessage]):
 
 
 subscription = stream.subscription(
-    name="example_pub_sub", handlers=handlers, start_point=StartAtNextMessage()
+    name="subscription_example_pub_sub",
+    handlers=handlers,
+    start_point=StartAtNextMessage(),
 )
 
 
@@ -93,11 +96,37 @@ def pub():
         time.sleep(0.08)
 
 
+def projector():
+    executor = Executor(db_dsn=DB_DSN)
+    executor.register(stream.projector)
+    executor.run()
+
+
 def sub():
     executor = Executor(db_dsn=DB_DSN)
     executor.register(stream.projector)
     executor.register(subscription.runner)
     executor.run()
+
+
+def reader():
+    reader = stream.reader()
+    reader.start()
+    try:
+        for stored_message in reader.get_messages():
+            print(f"Reader got message: {stored_message.message.content}")
+    finally:
+        reader.stop()
+
+
+async def async_reader():
+    reader = stream.async_reader()
+    await reader.start()
+    try:
+        async for stored_message in reader.get_messages():
+            print(f"Async reader got message: {stored_message.message.content}")
+    finally:
+        await reader.stop()
 
 
 def usage():
@@ -113,6 +142,12 @@ def main():
         pub()
     elif sys.argv[1] == "sub":
         sub()
+    elif sys.argv[1] == "projector":
+        projector()
+    elif sys.argv[1] == "reader":
+        reader()
+    elif sys.argv[1] == "async_reader":
+        asyncio.run(async_reader())
     else:
         usage()
 
