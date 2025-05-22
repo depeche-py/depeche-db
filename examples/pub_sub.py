@@ -109,6 +109,11 @@ def sub():
     executor.run()
 
 
+def sub_direct():
+    while True:
+        subscription.runner.run_once()
+
+
 def reader():
     reader = stream.reader()
     reader.start()
@@ -142,6 +147,8 @@ def main():
         pub()
     elif sys.argv[1] == "sub":
         sub()
+    elif sys.argv[1] == "sub_direct":
+        sub_direct()
     elif sys.argv[1] == "projector":
         projector()
     elif sys.argv[1] == "reader":
