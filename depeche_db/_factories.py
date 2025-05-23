@@ -62,6 +62,7 @@ class AggregatedStreamFactory(Generic[E]):
             name=name,
             partitioner=partitioner,
             stream_wildcards=stream_wildcards,
+            update_batch_size=update_batch_size,
         )
 
 
@@ -124,4 +125,5 @@ class SubscriptionFactory(Generic[E]):
             state_provider=state_provider,
             lock_provider=lock_provider,
             start_point=start_point,
+            batch_size=batch_size,
         )

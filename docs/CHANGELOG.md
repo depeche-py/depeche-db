@@ -1,3 +1,7 @@
+# 0.9.1
+
+* Fix passing of batch size in stream/subscription factory
+
 # 0.9.0
 
 * Add a stateful reader to aggregated streams

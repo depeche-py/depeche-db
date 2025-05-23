@@ -1,4 +1,5 @@
-from depeche_db import MessageHandlerRegister, MessagePartitioner, StoredMessage
+from depeche_db import MessagePartitioner, StoredMessage
+from depeche_db._message_store import MessageStore
 from tests._account_example import (
     AccountEvent,
 )
@@ -10,18 +11,12 @@ class MyPartitioner(MessagePartitioner[AccountEvent]):
 
 
 def test_factory(store_factory, identifier):
-    handlers = MessageHandlerRegister[AccountEvent]()
-    store = store_factory()
+    store: MessageStore = store_factory()
     stream = store.aggregated_stream(
         name=identifier(),
         partitioner=MyPartitioner(),
         stream_wildcards=["%"],
+        update_batch_size=1,
     )
-    subscription = stream.subscription(
-        name=identifier(),
-        handlers=handlers,
-        batch_size=1,
-    )
-
-    assert subscription.runner._handler._register is handlers
-    assert subscription.runner._batch_size == 1
+    assert stream.projector.batch_size == 1
+    assert stream.projector.stream_wildcards == ["%"]
