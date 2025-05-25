@@ -1929,6 +1929,18 @@ files = [
 ]
 
 [[package]]
+name = "types-pytz"
+version = "2025.2.0.20250516"
+description = "Typing stubs for pytz"
+optional = false
+python-versions = ">=3.9"
+groups = ["dev"]
+files = [
+    {file = "types_pytz-2025.2.0.20250516-py3-none-any.whl", hash = "sha256:e0e0c8a57e2791c19f718ed99ab2ba623856b11620cb6b637e5f62ce285a7451"},
+    {file = "types_pytz-2025.2.0.20250516.tar.gz", hash = "sha256:e1216306f8c0d5da6dafd6492e72eb080c9a166171fa80dd7a1990fd8be7a7b3"},
+]
+
+[[package]]
 name = "typing-extensions"
 version = "4.13.2"
 description = "Backported and Experimental Type Hints for Python 3.8+"
@@ -2177,4 +2189,4 @@ psycopg2 = ["psycopg2"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.9"
-content-hash = "9a9b9bdc3ec4d628a99a4e68e8ffa82a38bfda5fd42cda2fe29a3d3e82db46e6"
+content-hash = "49654083640a29d814b7d9d61715ab4498c984d54d4174f59b3edaa1287c8d7a"

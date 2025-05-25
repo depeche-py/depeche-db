@@ -40,7 +40,7 @@ def connect(*args, **kwargs):
     return original_connect(*args, **kwargs)
 
 
-db_engine.connect = connect
+db_engine.connect = connect  # type: ignore
 
 
 class MyMessage(pydantic.BaseModel):

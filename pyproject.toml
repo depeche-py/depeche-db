@@ -43,6 +43,7 @@ pytest-cov = "^4.1.0"
 pytest-asyncio = "^0.26.0"
 pytz = "^2025.2"
 yappi = "^1.6.10"
+types-pytz = "^2025.2.0.20250516"
 
 
 [tool.poetry.group.docs.dependencies]
