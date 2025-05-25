@@ -1,3 +1,11 @@
+# 0.10.0
+
+* Add batched acknowledgement strategy
+* Performance improvements
+  * Use less connections on load in subscription
+  * Pre-calculate hot SqlA queries
+  * Improved Performance in pydantic (de)serialization
+
 # 0.9.1
 
 * Fix passing of batch size in stream/subscription factory
