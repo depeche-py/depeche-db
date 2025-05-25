@@ -147,6 +147,7 @@ class AggregatedStream(Generic[E]):
         Args:
             partition: Partition number
         """
+        # TODO allow passing connection
         with self._connection() as conn:
             for row in conn.execute(
                 _sa.select(self._table.c.message_id, self._table.c.position)
@@ -170,6 +171,7 @@ class AggregatedStream(Generic[E]):
             start: Start position
             count: Number of messages to read
         """
+        # TODO allow passing connection
         with self._connection() as conn:
             for row in conn.execute(
                 _sa.select(self._table.c.message_id, self._table.c.position)
@@ -231,6 +233,7 @@ class AggregatedStream(Generic[E]):
         Get partition statistics for deciding which partitions to read from. This
         is used by subscriptions.
         """
+        # TODO allow passing connection
         with self._connection() as conn:
             position_limits = position_limits or {-1: -1}
             tbl = self._table.alias()
