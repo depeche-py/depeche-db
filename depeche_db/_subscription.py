@@ -132,6 +132,7 @@ class AckOp:
 
 class Subscription(Generic[E]):
     _state_provider: SubscriptionStateProvider
+    runner: "Union[SubscriptionRunner[E], BatchedAckSubscriptionRunner[E]]"
 
     def __init__(
         self,
