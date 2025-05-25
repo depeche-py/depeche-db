@@ -329,6 +329,7 @@ doc.md(
     In a real application, we would not call `run_once` directly, but we would use
     the [`Executor`](../../getting-started/executor.md) to do it for us.
 
+    ## Starting position
 
     A subscription by default starts at the beginning of the stream. If we want to
     change this behaviour, we can pass in a `SubscriptionStartPosition` object when we
@@ -348,4 +349,26 @@ subscription_point_in_time = aggregated_stream.subscription(
     start_point=StartAtPointInTime(
         datetime(2023, 10, 5, 14, 0, 0, 0, tzinfo=timezone.utc)
     ),
+)
+
+
+doc.md(
+    """\
+    ## Acknowledgement strategy
+
+    By default, a subscription will use `AckStrategy.SINGLE` which acknowledges
+    messages as soon as they are processed. This gives you the best guarantees
+    for message delivery, but it can lead to performance issues if you have a
+    lot of messages. It is a database write for each message after all.
+
+    If your application has to process a high number of messages, you can use
+    `AckStrategy.BATCHED` which will acknowledge messages in batches. Together with
+    the `batch_size` parameter, you can control how many messages will be
+    processed (at most) before an acknowledgement is forced.
+
+    You can change the acknowledgement strategy of a subscription. Thus, it is
+    possible to use the batched strategy for the initial processing of a high
+    number of messages and then switch to the single strategy for continuous
+    processing of new messages.\
+    """
 )

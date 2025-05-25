@@ -2,7 +2,9 @@
 
 If the actions that follow the consumption of messages in a subscription take
 place in the **same** database that is also used for the subscription state
-recording, you can achieve `exactly once` delivery.
+recording, you can achieve `exactly once` delivery. You need to use
+`ack_strategy=AckStrategy.SINGLE`, otherwise `message.ack.execute` will
+raise a `RuntimeError`.
 
 Consider the following code:
 

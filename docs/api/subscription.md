@@ -20,6 +20,8 @@
 ---
 ::: depeche_db.SubscriptionRunner
 ---
+::: depeche_db.BatchedAckSubscriptionRunner
+---
 ::: depeche_db.LockProvider
     options:
       show_signature_annotations: true
