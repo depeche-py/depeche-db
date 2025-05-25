@@ -146,7 +146,7 @@ def test_subscription_runner(
 ):
     events = []
 
-    handlers = MessageHandlerRegister()
+    handlers = MessageHandlerRegister[AccountEvent]()
 
     @handlers.register
     def handle_account_event(event: SubscriptionMessage[AccountEvent]):
@@ -174,7 +174,7 @@ def test_subscription_runner_time_budget(
 ):
     events = []
 
-    handlers = MessageHandlerRegister()
+    handlers = MessageHandlerRegister[AccountEvent]()
 
     @handlers.register
     def handle_account_event(event: SubscriptionMessage[AccountEvent]):

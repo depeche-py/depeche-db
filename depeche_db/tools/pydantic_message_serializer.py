@@ -31,7 +31,7 @@ def _get_de_serializer(
         return type_.parse_obj(message)
 
     def serializer(message: T) -> dict:
-        return make_jsonable(message.dict())  # type: ignore[return-value]
+        return make_jsonable(message.dict())  # type: ignore[no-any-return]
 
     return deserializer, serializer
 
