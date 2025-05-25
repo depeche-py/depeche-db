@@ -460,7 +460,6 @@ class BatchedAckSubscriptionRunner(SubscriptionRunner[E]):
                 for message in message_batch.messages:
                     self.handle(message)
                     message_batch.ack(message)
-                    # TODO check budget here?
             finally:
                 self._subscription.ack_message_batch(
                     message_batch=message_batch, success=True
