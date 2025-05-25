@@ -35,6 +35,8 @@ from ._message_handler import MessageHandler, MessageHandlerRegister  # noqa: F4
 from ._message_store import MessageStore, MessageStoreReader  # noqa: F401
 from ._storage import Storage  # noqa: F401
 from ._subscription import (  # noqa: F401
+    AckStrategy,
+    BatchedAckSubscriptionRunner,
     ExitSubscriptionErrorHandler,  # move somewhere else
     LogAndIgnoreSubscriptionErrorHandler,  # move somewhere else
     StartAtNextMessage,

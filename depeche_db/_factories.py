@@ -20,7 +20,7 @@ from ._interfaces import (
 if TYPE_CHECKING:
     from ._aggregated_stream import AggregatedStream
     from ._message_store import MessageStore
-    from ._subscription import Subscription
+    from ._subscription import AckStrategy, Subscription
 
 E = TypeVar("E", bound=MessageProtocol)
 
@@ -93,6 +93,7 @@ class SubscriptionFactory(Generic[E]):
         state_provider: Optional[SubscriptionStateProvider] = None,
         lock_provider: Optional[LockProvider] = None,
         start_point: Optional[SubscriptionStartPoint] = None,
+        ack_strategy: Optional["AckStrategy"] = None,
     ) -> "Subscription[E]":
         """
         Create a subscription.
@@ -106,9 +107,10 @@ class SubscriptionFactory(Generic[E]):
             state_provider: Provider for the subscription state, defaults to a PostgreSQL provider
             lock_provider: Provider for the locks, defaults to a PostgreSQL provider
             start_point: The start point for the subscription, defaults to beginning of the stream
+            ack_strategy: Strategy for acknowledging messages, defaults to AckStrategy.SINGLE
         """
         from ._message_handler import MessageHandlerRegister
-        from ._subscription import Subscription, SubscriptionMessageHandler
+        from ._subscription import AckStrategy, Subscription, SubscriptionMessageHandler
 
         if handlers is None:
             # allow constructing a subscription without handlers
@@ -126,4 +128,5 @@ class SubscriptionFactory(Generic[E]):
             lock_provider=lock_provider,
             start_point=start_point,
             batch_size=batch_size,
+            ack_strategy=ack_strategy or AckStrategy.SINGLE,
         )

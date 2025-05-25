@@ -1,6 +1,7 @@
 import dataclasses as _dc
 import datetime as _dt
 import enum as _enum
+import functools as _ft
 import time as _time
 import uuid as _uuid
 from typing import (
@@ -85,6 +86,40 @@ class SubscriptionMessage(Generic[E]):
     position: int
     stored_message: StoredMessage[E]
     ack: AckOpProtocol
+
+
+@_dc.dataclass()
+class SubscriptionMessageBatch(Generic[E]):
+    """
+
+    Attributes:
+    """
+
+    partition: int
+    first_position: int
+    last_position: int
+    lock_key: str
+    messages: list[SubscriptionMessage[E]]
+    ackd_position: int = -1
+
+    @_ft.cached_property
+    def message_ids(self) -> set[_uuid.UUID]:
+        return {message.stored_message.message_id for message in self.messages}
+
+    def ack(self, message: SubscriptionMessage[E]):
+        """
+        Acknowledges a message. This method is used to acknowledge messages in a batch.
+        """
+        if message.stored_message.message_id in self.message_ids:
+            if self.ackd_position == -1:
+                self.ackd_position = message.position
+            else:
+                assert (
+                    self.ackd_position + 1 == message.position
+                ), "You cannot leave gaps in the acknowledged messages"
+                self.ackd_position = message.position
+        else:
+            raise ValueError("Message not found in the batch")
 
 
 @_dc.dataclass(frozen=True)

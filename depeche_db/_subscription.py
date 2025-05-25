@@ -1,4 +1,5 @@
 import datetime as _dt
+import enum as _enum
 import logging as _logging
 from typing import (
     Callable,
@@ -12,7 +13,6 @@ from typing import (
 from . import tools as _tools
 from ._aggregated_stream import AggregatedStream
 from ._interfaces import (
-    AckOpProtocol,
     CallMiddleware,
     ErrorAction,
     LockProvider,
@@ -22,6 +22,7 @@ from ._interfaces import (
     StoredMessage,
     SubscriptionErrorHandler,
     SubscriptionMessage,
+    SubscriptionMessageBatch,
     SubscriptionStartPoint,
     SubscriptionStateProvider,
     TimeBudget,
@@ -62,10 +63,15 @@ class LogAndIgnoreSubscriptionErrorHandler(SubscriptionErrorHandler):
         return ErrorAction.IGNORE
 
 
+class AckStrategy(_enum.Enum):
+    SINGLE = "single"
+    BATCHED = "batched"
+
+
 class NoAckOp:
     def execute(self, **kwargs):
         raise RuntimeError(
-            "NoAckOp cannot be executed, choose a different Ack strategy to use this operation"
+            "NoAckOp cannot be executed, choose AckStrategy.SINGLE if you want to use this operation"
         )
 
 
@@ -124,16 +130,6 @@ class AckOp:
         return self._rolled_back
 
 
-class AckStrategy:
-    def get_op(self) -> AckOpProtocol:
-        raise NotImplementedError()
-
-
-class ManagedAckStrategy(AckStrategy):
-    def get_op(self) -> AckOpProtocol:
-        return NoAckOp()
-
-
 class Subscription(Generic[E]):
     _state_provider: SubscriptionStateProvider
 
@@ -146,6 +142,7 @@ class Subscription(Generic[E]):
         state_provider: Optional[SubscriptionStateProvider] = None,
         lock_provider: Optional[LockProvider] = None,
         start_point: Optional[SubscriptionStartPoint] = None,
+        ack_strategy: AckStrategy = AckStrategy.SINGLE,
     ):
         """
         A subscription is a way to read messages from an aggregated stream.
@@ -160,6 +157,7 @@ class Subscription(Generic[E]):
             state_provider: Provider for the subscription state, defaults to a PostgreSQL provider
             lock_provider: Provider for the locks, defaults to a PostgreSQL provider
             start_point: The start point for the subscription, defaults to beginning of the stream
+            ack_strategy: The strategy to use for acknowledging messages, defaults to AckStrategy.SINGLE.
         """
         assert name.isidentifier(), "Group name must be a valid identifier"
         self.name = name
@@ -171,11 +169,20 @@ class Subscription(Generic[E]):
             name, self._stream._store.engine
         )
         self._start_point = start_point
-        self.runner = SubscriptionRunner(
-            subscription=self,
-            message_handler=message_handler,
-            batch_size=batch_size,
-        )
+        if ack_strategy == AckStrategy.BATCHED:
+            self.runner = BatchedAckSubscriptionRunner(
+                subscription=self,
+                message_handler=message_handler,
+                batch_size=batch_size,
+            )
+        elif ack_strategy == AckStrategy.SINGLE:
+            self.runner = SubscriptionRunner(
+                subscription=self,
+                message_handler=message_handler,
+                batch_size=batch_size,
+            )
+        else:
+            raise NotImplementedError(f"Ack strategy {ack_strategy} is not implemented")
 
     def _init_state(self):
         if not self._state_provider.initialized(self.name):
@@ -194,7 +201,77 @@ class Subscription(Generic[E]):
             finally:
                 self._lock_provider.unlock(lock_key)
 
+    def get_next_message_batch(
+        self, count: int
+    ) -> Optional[SubscriptionMessageBatch[E]]:
+        if not self._state_provider.initialized(self.name):
+            self._init_state()
+        assert self._state_provider.initialized(self.name)
+
+        state = self._state_provider.read(self.name)
+        statistics = list(
+            self._stream.get_partition_statistics(
+                position_limits=state.positions, result_limit=10
+            )
+        )
+        for statistic in statistics:
+            lock_key = f"subscription-{self.name}-{statistic.partition_number}"
+            if not self._lock_provider.lock(lock_key):
+                continue
+            # now we have the lock, we need to check if the position is still valid
+            # if not, we need to release the lock and try the next partition
+            state = self._state_provider.read(self.name)
+            if state.positions.get(statistic.partition_number, -1) != (
+                statistic.next_message_position - 1
+            ):
+                self._lock_provider.unlock(lock_key)
+                continue
+
+            message_pointers = list(
+                self._stream.read_slice(
+                    partition=statistic.partition_number,
+                    start=statistic.next_message_position,
+                    count=count,
+                )
+            )
+            with self._stream._store.reader() as reader:
+                stored_messages = {
+                    message.message_id: message
+                    for message in reader.get_messages_by_ids(
+                        [pointer.message_id for pointer in message_pointers]
+                    )
+                }
+            messages = [
+                SubscriptionMessage(
+                    partition=pointer.partition,
+                    position=pointer.position,
+                    stored_message=stored_messages[pointer.message_id],
+                    ack=NoAckOp(),
+                )
+                for pointer in message_pointers
+            ]
+            return SubscriptionMessageBatch(
+                partition=statistic.partition_number,
+                first_position=min(msg.position for msg in messages),
+                last_position=max(msg.position for msg in messages),
+                lock_key=lock_key,
+                messages=messages,
+            )
+        return None
+
+    def ack_message_batch(
+        self, message_batch: SubscriptionMessageBatch[E], success: bool
+    ) -> None:
+        if success:
+            self._state_provider.store(
+                subscription_name=self.name,
+                partition=message_batch.partition,
+                position=message_batch.ackd_position,
+            )
+        self._lock_provider.unlock(message_batch.lock_key)
+
     def get_next_messages(self, count: int) -> Iterator[SubscriptionMessage[E]]:
+        # TODO use get_next_message_batch
         if not self._state_provider.initialized(self.name):
             self._init_state()
         assert self._state_provider.initialized(self.name)
@@ -219,6 +296,7 @@ class Subscription(Generic[E]):
                 continue
             try:
                 with self._stream._store.reader() as reader:
+                    # TODO use common connection for these two reads!
                     message_pointers = list(
                         self._stream.read_slice(
                             partition=statistic.partition_number,
@@ -233,28 +311,29 @@ class Subscription(Generic[E]):
                         )
                     }
 
-                    for pointer in message_pointers:
-                        ack = AckOp(
-                            name=self.name,
-                            partition=pointer.partition,
-                            position=pointer.position,
-                            state_provider=self._state_provider,
-                        )
+                # TODO if this is moved out of the reader context? Should save a connection!
+                for pointer in message_pointers:
+                    ack = AckOp(
+                        name=self.name,
+                        partition=pointer.partition,
+                        position=pointer.position,
+                        state_provider=self._state_provider,
+                    )
 
-                        yield SubscriptionMessage(
-                            partition=pointer.partition,
-                            position=pointer.position,
-                            stored_message=stored_messages[pointer.message_id],
-                            ack=ack,
-                        )
-                        if ack.rolled_back:
-                            # the message was not ack'd or the acknolwedgement was rolled back
-                            break
-                        try:
-                            ack.execute()
-                        except AckRolledback:
-                            # the message was not ack'd or the acknolwedgement was rolled back
-                            break
+                    yield SubscriptionMessage(
+                        partition=pointer.partition,
+                        position=pointer.position,
+                        stored_message=stored_messages[pointer.message_id],
+                        ack=ack,
+                    )
+                    if ack.rolled_back:
+                        # the message was not ack'd or the acknolwedgement was rolled back
+                        break
+                    try:
+                        ack.execute()
+                    except AckRolledback:
+                        # the message was not ack'd or the acknolwedgement was rolled back
+                        break
                 break
             finally:
                 self._lock_provider.unlock(lock_key)
@@ -310,23 +389,6 @@ class SubscriptionMessageHandler(Generic[E]):
 
 
 class SubscriptionRunner(Generic[E]):
-    @classmethod
-    def create(
-        cls,
-        subscription: Subscription[E],
-        handlers: MessageHandlerRegisterProtocol[E],
-        call_middleware: Optional[CallMiddleware[E]] = None,
-        error_handler: Optional[SubscriptionErrorHandler[E]] = None,
-    ) -> "SubscriptionRunner[E]":
-        return cls(
-            subscription=subscription,
-            message_handler=SubscriptionMessageHandler(
-                handler_register=handlers,
-                call_middleware=call_middleware,
-                error_handler=error_handler,
-            ),
-        )
-
     def __init__(
         self,
         subscription: Subscription[E],
@@ -374,6 +436,7 @@ class SubscriptionRunner(Generic[E]):
             for message in self._subscription.get_next_messages(count=self._batch_size):
                 n += 1
                 self.handle(message)
+                # TODO check budget here?
             if n == 0:
                 break
             if budget and budget.over_budget():
@@ -382,6 +445,28 @@ class SubscriptionRunner(Generic[E]):
 
     def handle(self, message: SubscriptionMessage):
         self._handler.handle(message)
+
+
+class BatchedAckSubscriptionRunner(SubscriptionRunner[E]):
+    def run_once(self, budget: Optional[TimeBudget] = None) -> RunOnNotificationResult:
+        while self._keep_running:
+            message_batch = self._subscription.get_next_message_batch(
+                count=self._batch_size
+            )
+            if message_batch is None:
+                break
+            try:
+                for message in message_batch.messages:
+                    self.handle(message)
+                    message_batch.ack(message)
+                    # TODO check budget here?
+            finally:
+                self._subscription.ack_message_batch(
+                    message_batch=message_batch, success=True
+                )
+            if budget and budget.over_budget():
+                return RunOnNotificationResult.WORK_REMAINING
+        return RunOnNotificationResult.DONE_FOR_NOW
 
 
 class StartAtNextMessage(SubscriptionStartPoint):
