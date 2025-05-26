@@ -3,6 +3,7 @@
 * Add batched acknowledgement strategy
 * Performance improvements
   * Use less connections on load in subscription
+  * Removed overly defensive check in acknowledgement operation
   * Pre-calculate hot SqlA queries
   * Improved Performance in pydantic (de)serialization
 
