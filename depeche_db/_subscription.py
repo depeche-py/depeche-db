@@ -277,59 +277,22 @@ class Subscription(Generic[E]):
         self._lock_provider.unlock(message_batch.lock_key)
 
     def get_next_messages(self, count: int) -> Iterator[SubscriptionMessage[E]]:
-        # TODO use get_next_message_batch
-        if not self._state_provider.initialized(self.name):
-            self._init_state()
-        assert self._state_provider.initialized(self.name)
-
-        state = self._state_provider.read(self.name)
-        statistics = list(
-            self._stream.get_partition_statistics(
-                position_limits=state.positions, result_limit=10
-            )
-        )
-        for statistic in statistics:
-            lock_key = f"subscription-{self.name}-{statistic.partition_number}"
-            if not self._lock_provider.lock(lock_key):
-                continue
-            # now we have the lock, we need to check if the position is still valid
-            # if not, we need to release the lock and try the next partition
-            state = self._state_provider.read(self.name)
-            if state.positions.get(statistic.partition_number, -1) != (
-                statistic.next_message_position - 1
-            ):
-                self._lock_provider.unlock(lock_key)
-                continue
-            try:
-                with self._stream._store.reader() as reader:
-                    # TODO use common connection for these two reads!
-                    message_pointers = list(
-                        self._stream.read_slice(
-                            partition=statistic.partition_number,
-                            start=statistic.next_message_position,
-                            count=count,
-                        )
-                    )
-                    stored_messages = {
-                        message.message_id: message
-                        for message in reader.get_messages_by_ids(
-                            [pointer.message_id for pointer in message_pointers]
-                        )
-                    }
-
-                # TODO if this is moved out of the reader context? Should save a connection!
-                for pointer in message_pointers:
+        batch = None
+        try:
+            batch = self.get_next_message_batch(count=count)
+            if batch:
+                for message in batch.messages:
                     ack = AckOp(
                         name=self.name,
-                        partition=pointer.partition,
-                        position=pointer.position,
+                        partition=message.partition,
+                        position=message.position,
                         state_provider=self._state_provider,
                     )
 
                     yield SubscriptionMessage(
-                        partition=pointer.partition,
-                        position=pointer.position,
-                        stored_message=stored_messages[pointer.message_id],
+                        partition=message.partition,
+                        position=message.position,
+                        stored_message=message.stored_message,
                         ack=ack,
                     )
                     if ack.rolled_back:
@@ -340,9 +303,9 @@ class Subscription(Generic[E]):
                     except AckRolledback:
                         # the message was not ack'd or the acknolwedgement was rolled back
                         break
-                break
-            finally:
-                self._lock_provider.unlock(lock_key)
+        finally:
+            if batch:
+                self.unlock_message_batch(batch)
 
 
 class SubscriptionMessageHandler(Generic[E]):
