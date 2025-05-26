@@ -2,7 +2,16 @@ import threading
 import time
 from typing import List
 
-from depeche_db import SubscriptionMessage
+import pytest
+
+from depeche_db import (
+    AckStrategy,
+    FixedTimeBudget,
+    MessageHandlerRegister,
+    RunOnNotificationResult,
+    Subscription,
+    SubscriptionMessage,
+)
 from depeche_db.tools import DbSubscriptionStateProvider
 
 # from ._tools import MyLockProvider, MyStateProvider, MyThreadLockProvider
@@ -12,7 +21,7 @@ from tests._account_example import (
 
 
 def test_subscription(db_engine, stream_with_events, subscription_factory):
-    subject = subscription_factory(stream_with_events)
+    subject: Subscription = subscription_factory(stream_with_events)
 
     events = []
     while True:
@@ -33,7 +42,7 @@ def test_db_subscription_state(
     identifier, db_engine, stream_with_events, lock_provider
 ):
     state_provider_name = identifier()
-    subject = stream_with_events.subscription(
+    subject: Subscription = stream_with_events.subscription(
         name=identifier(),
         lock_provider=lock_provider,
         state_provider=DbSubscriptionStateProvider(
@@ -64,8 +73,44 @@ def test_db_subscription_state(
         raise AssertionError("Should not have any more events")
 
 
+def test_db_subscription_state_batched(
+    identifier, db_engine, stream_with_events, lock_provider
+):
+    state_provider_name = identifier()
+    subject: Subscription = stream_with_events.subscription(
+        name=identifier(),
+        lock_provider=lock_provider,
+        state_provider=DbSubscriptionStateProvider(
+            engine=db_engine, name=state_provider_name
+        ),
+    )
+
+    events = []
+    while True:
+        batch = subject.get_next_message_batch(count=100)
+        if not batch or not batch.messages:
+            break
+        for event in batch.messages:
+            events.append(event)
+            batch.ack(event)
+        subject.ack_message_batch(batch, success=True)
+
+    assert_subscription_event_order(events)
+
+    subject = stream_with_events.subscription(
+        name=subject.name,
+        lock_provider=lock_provider,
+        state_provider=DbSubscriptionStateProvider(
+            engine=db_engine, name=state_provider_name
+        ),
+    )
+
+    for _ in subject.get_next_messages(count=100):
+        raise AssertionError("Should not have any more events")
+
+
 def test_subscription_in_parallel(db_engine, stream_with_events, subscription_factory):
-    subject = subscription_factory(stream_with_events)
+    subject: Subscription = subscription_factory(stream_with_events)
 
     start = time.time()
     events = []
@@ -93,6 +138,62 @@ def test_subscription_in_parallel(db_engine, stream_with_events, subscription_fa
         t.join(timeout=2)
 
     assert_subscription_event_order([e for e, _ in sorted(events, key=lambda x: x[-1])])
+
+
+@pytest.mark.parametrize("ack_strategy", [AckStrategy.SINGLE, AckStrategy.BATCHED])
+def test_subscription_runner(
+    db_engine, stream_with_events, lock_provider, identifier, ack_strategy
+):
+    events = []
+
+    handlers = MessageHandlerRegister[AccountEvent]()
+
+    @handlers.register
+    def handle_account_event(event: SubscriptionMessage[AccountEvent]):
+        events.append(event)
+
+    subject: Subscription = stream_with_events.subscription(
+        name=identifier(),
+        lock_provider=lock_provider,
+        handlers=handlers,
+        ack_strategy=ack_strategy,
+    )
+
+    result = subject.runner.run_once()
+    assert result == RunOnNotificationResult.DONE_FOR_NOW
+
+    assert_subscription_event_order(events)
+
+    for _ in subject.get_next_messages(count=100):
+        raise AssertionError("Should not have any more events")
+
+
+@pytest.mark.parametrize("ack_strategy", [AckStrategy.SINGLE, AckStrategy.BATCHED])
+def test_subscription_runner_time_budget(
+    db_engine, stream_with_events, lock_provider, identifier, ack_strategy
+):
+    events = []
+
+    handlers = MessageHandlerRegister[AccountEvent]()
+
+    @handlers.register
+    def handle_account_event(event: SubscriptionMessage[AccountEvent]):
+        events.append(event)
+        # run over time budget to test that we stop processing
+        time.sleep(0.1)
+
+    subject: Subscription = stream_with_events.subscription(
+        name=identifier(),
+        lock_provider=lock_provider,
+        handlers=handlers,
+        ack_strategy=ack_strategy,
+    )
+
+    result = subject.runner.run_once(FixedTimeBudget(0.1))
+    assert result == RunOnNotificationResult.WORK_REMAINING
+
+    assert len(events) > 0, "Should have processed some events"
+    assert_subscription_event_order(events)
 
 
 def assert_subscription_event_order(events: List[SubscriptionMessage[AccountEvent]]):

@@ -1,11 +1,12 @@
 import datetime as dt
 
 from depeche_db import StreamPartitionStatistic
+from depeche_db._aggregated_stream import AggregatedStream
 
 
 def test_stream_statisitics(db_engine, store_with_events, stream_factory):
     event_store, account, account2 = store_with_events
-    subject = stream_factory(event_store)
+    subject: AggregatedStream = stream_factory(event_store)
     subject.projector.update_full()
 
     assert [msg.message_id for msg in subject.read(partition=1)] == [
@@ -47,9 +48,25 @@ def test_time_to_positions(db_engine, store_with_events, stream_factory):
 
 def test_global_position_to_position(db_engine, store_with_events, stream_factory):
     event_store, account, account2 = store_with_events
-    subject = stream_factory(event_store)
+    subject: AggregatedStream = stream_factory(event_store)
     subject.projector.update_full()
 
     assert subject.global_position_to_positions(0) == {1: -1, 2: -1}
     assert subject.global_position_to_positions(3) == {1: 1, 2: 0}
     assert subject.global_position_to_positions(5) == {1: 2, 2: 1}
+
+
+def test_passing_connection(db_engine, store_with_events, stream_factory):
+    event_store, _, _ = store_with_events
+    subject: AggregatedStream = stream_factory(event_store)
+    subject.projector.update_full()
+    with db_engine.connect() as conn:
+        assert list(subject.read(partition=1)) == list(
+            subject.read(partition=1, conn=conn)
+        )
+        assert list(subject.read_slice(partition=1, start=0, count=2)) == list(
+            subject.read_slice(partition=1, start=0, count=2, conn=conn)
+        )
+        assert list(subject.get_partition_statistics(position_limits={1: 1})) == list(
+            subject.get_partition_statistics(position_limits={1: 1}, conn=conn)
+        )

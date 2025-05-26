@@ -61,6 +61,19 @@ class Storage:
             self.message_table, "after_create", ddl.execute_if(dialect="postgresql")
         )
         self.metadata.create_all(engine, checkfirst=True)
+        self._select = _sa.select(
+            self.message_table.c.message_id,
+            self.message_table.c.stream,
+            self.message_table.c.version,
+            self.message_table.c.message,
+            self.message_table.c.global_position,
+        )
+        self._select_without_stream = _sa.select(
+            self.message_table.c.message_id,
+            self.message_table.c.version,
+            self.message_table.c.message,
+            self.message_table.c.global_position,
+        )
 
     def add(
         self,
@@ -133,9 +146,7 @@ class Storage:
                 _sa.func.max(self.message_table.c.global_position).label(
                     "global_position"
                 ),
-            )
-            .select_from(self.message_table)
-            .where(self.message_table.c.stream == stream),
+            ).where(self.message_table.c.stream == stream),
         ).fetchone()
         if not row or row.version is None:
             return MessagePosition(stream, 0, None)
@@ -144,7 +155,6 @@ class Storage:
     def get_message_ids(self, conn: SAConnection, stream: str) -> Iterator[_uuid.UUID]:
         for id in conn.execute(
             _sa.select(self.message_table.c.message_id)
-            .select_from(self.message_table)
             .where(self.message_table.c.stream == stream)
             .order_by(self.message_table.c.version)
         ).scalars():
@@ -154,73 +164,41 @@ class Storage:
         self, conn: SAConnection, stream: str
     ) -> Iterator[Tuple[_uuid.UUID, int, dict, int]]:
         return conn.execute(  # type: ignore
-            _sa.select(
-                self.message_table.c.message_id,
-                self.message_table.c.version,
-                self.message_table.c.message,
-                self.message_table.c.global_position,
-            )
-            .select_from(self.message_table)
-            .where(self.message_table.c.stream == stream)
-            .order_by(self.message_table.c.version)
+            self._select_without_stream.where(
+                self.message_table.c.stream == stream
+            ).order_by(self.message_table.c.version)
         )
 
     def read_multiple(
         self, conn: SAConnection, streams: Sequence[str]
     ) -> Iterator[Tuple[_uuid.UUID, str, int, dict, int]]:
         return conn.execute(  # type: ignore
-            _sa.select(
-                self.message_table.c.message_id,
-                self.message_table.c.stream,
-                self.message_table.c.version,
-                self.message_table.c.message,
-                self.message_table.c.global_position,
+            self._select.where(self.message_table.c.stream.in_(streams)).order_by(
+                self.message_table.c.global_position
             )
-            .select_from(self.message_table)
-            .where(self.message_table.c.stream.in_(streams))
-            .order_by(self.message_table.c.global_position)
         )
 
     def read_wildcard(
         self, conn: SAConnection, stream_wildcard: str
     ) -> Iterator[Tuple[_uuid.UUID, str, int, dict, int]]:
         return conn.execute(  # type: ignore
-            _sa.select(
-                self.message_table.c.message_id,
-                self.message_table.c.stream,
-                self.message_table.c.version,
-                self.message_table.c.message,
-                self.message_table.c.global_position,
-            )
-            .select_from(self.message_table)
-            .where(self.message_table.c.stream.like(stream_wildcard))
-            .order_by(self.message_table.c.global_position)
+            self._select.where(
+                self.message_table.c.stream.like(stream_wildcard)
+            ).order_by(self.message_table.c.global_position)
         )
 
     def get_message_by_id(
         self, conn: SAConnection, message_id: _uuid.UUID
     ) -> Tuple[_uuid.UUID, str, int, dict, int]:
         return conn.execute(  # type: ignore
-            _sa.select(
-                self.message_table.c.message_id,
-                self.message_table.c.stream,
-                self.message_table.c.version,
-                self.message_table.c.message,
-                self.message_table.c.global_position,
-            ).where(self.message_table.c.message_id == message_id)
+            self._select.where(self.message_table.c.message_id == message_id)
         ).first()
 
     def get_messages_by_ids(
         self, conn: SAConnection, message_ids: Sequence[_uuid.UUID]
     ) -> Iterator[Tuple[_uuid.UUID, str, int, dict, int]]:
         return conn.execute(  # type: ignore
-            _sa.select(
-                self.message_table.c.message_id,
-                self.message_table.c.stream,
-                self.message_table.c.version,
-                self.message_table.c.message,
-                self.message_table.c.global_position,
-            ).where(self.message_table.c.message_id.in_(message_ids))
+            self._select.where(self.message_table.c.message_id.in_(message_ids))
         )
 
     def truncate(self, conn: SAConnection):

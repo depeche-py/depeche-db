@@ -2,7 +2,8 @@ import os
 import random
 import sys
 import time
-from datetime import datetime
+from datetime import date, datetime, timedelta
+import pytz
 from uuid import UUID, uuid4
 
 import pydantic
@@ -19,14 +20,27 @@ from depeche_db import (
     SubscriptionRunner,
     MessageHandlerRegister,
 )
+from depeche_db._subscription import AckStrategy, StartAtPointInTime
 from depeche_db.tools import (
     DbLockProvider,
     DbSubscriptionStateProvider,
     PydanticMessageSerializer,
 )
 
-DB_DSN = "postgresql://depeche:depeche@localhost:4888/depeche_demo"
+DB_DSN = "postgresql+psycopg://depeche:depeche@localhost:4888/depeche_demo"
 db_engine = create_engine(DB_DSN)
+original_connect = db_engine.connect
+
+CONNECTIONS = 0
+
+
+def connect(*args, **kwargs):
+    global CONNECTIONS
+    CONNECTIONS += 1
+    return original_connect(*args, **kwargs)
+
+
+db_engine.connect = connect  # type: ignore
 
 
 class MyMessage(pydantic.BaseModel):
@@ -60,61 +74,101 @@ stream = message_store.aggregated_stream(
 )
 
 HANDLED = 0
+HANDLER_DELAY = 0.02
 handlers = MessageHandlerRegister[MyMessage]()
 
 
 @handlers.register
 def handle_event_a(message: SubscriptionMessage[MyMessage]):
+    global HANDLED
+    HANDLED += 1
     real_message = message.stored_message.message
-    print(
-        f"Got message #{real_message.content} at {message.partition}:{message.position}"
-    )
-    time.sleep(0.05)
+    # print(
+    #    f"Got message #{real_message.content} at {message.partition}:{message.position}"
+    # )
+    time.sleep(HANDLER_DELAY)
 
 
-subscription = stream.subscription(name="example_pub_sub", handlers=handlers)
+subscription = stream.subscription(
+    name="example_pub_sub",
+    handlers=handlers,
+    # batch_size=100,
+    # ack_strategy=AckStrategy.BATCHED,
+    start_point=StartAtPointInTime(
+        datetime.utcnow().replace(tzinfo=pytz.UTC) - timedelta(days=1)
+    ),
+)
 
 
 def pub():
-    print("Publishing messages")
     start = time.time()
     n = 0
-    while time.time() - start < 10:
+    while time.time() - start < 30:
         n += 1
         stream = random.choice(["aggregate-me-1", "aggregate-me-2"])
         message_store.write(
             stream=stream,
             message=MyMessage(content=random.randint(1, 100)),
         )
-    print(f"Publisher sent {n / (time.time() - start):.2f} msg/s")
+    duration = time.time() - start
+    print(f"Publisher sent {n / duration:.2f} msg/s (Duration: {duration:.2f}s)")
+
+
+STIMULATION_INTERVAL = 5
+
+
+def projector():
+    executor = Executor(db_dsn=DB_DSN, stimulation_interval=STIMULATION_INTERVAL)
+    executor.register(stream.projector)
+    executor.run()
 
 
 def sub():
-    print("Subscribing to messages")
-    executor = Executor(db_dsn=DB_DSN)
-    executor.register(stream.projector)
+    executor = Executor(db_dsn=DB_DSN, stimulation_interval=STIMULATION_INTERVAL)
     executor.register(subscription.runner)
     start = time.time()
     executor.run()
-    print(f"Subscriber handled {HANDLED / (time.time() - start):.2f} mgs/s")
+    duration = time.time() - start
+    min_run_time = HANDLER_DELAY * HANDLED
+    overhead = duration - min_run_time
+    print(
+        f"Subscriber handled {HANDLED / duration:.2f} mgs/s "
+        f"(Time overhead: {overhead:.2f}s ({overhead / duration * 100:.1f}% {overhead / HANDLED * 1000:.2f}ms per message)) "
+        f"(Used {CONNECTIONS / HANDLED:.2f} connections per message)"
+    )
 
 
 def run_test():
     import subprocess
     import select
 
+    print("Starting publisher and subscribers...")
+    print(
+        f"{STIMULATION_INTERVAL=} {subscription.runner._batch_size=}, {subscription.runner.__class__.__name__}"
+    )
     pub = subprocess.Popen(
         ["python", "-u", "-m", "examples.pub_sub_performance", "pub"],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
     )
+    projector = subprocess.Popen(
+        ["python", "-u", "-m", "examples.pub_sub_performance", "projector"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
     subs = [
         subprocess.Popen(
-            ["python", "-u", "-m", "examples.pub_sub_performance", "sub"],
+            [
+                "python",
+                "-u",
+                "-m",
+                "examples.pub_sub_performance",
+                "sub_profile" if i == 0 else "sub",
+            ],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
         )
-        for _ in range(4)
+        for i in range(3)
     ]
     pub_done = False
     try:
@@ -138,6 +192,7 @@ def run_test():
                 print("sub", line.decode("utf-8"), end="")
     finally:
         pub.kill()
+        projector.kill()
         for sub in subs:
             sub.kill()
 
@@ -155,6 +210,15 @@ def main():
         pub()
     elif sys.argv[1] == "sub":
         sub()
+    elif sys.argv[1] == "sub_profile":
+        import yappi
+
+        yappi.start()
+        sub()
+        yappi.stop()
+        yappi.get_func_stats().save("yappi_profile.prof", "callgrind")
+    elif sys.argv[1] == "projector":
+        projector()
     elif sys.argv[1] == "run_test":
         run_test()
     else:
