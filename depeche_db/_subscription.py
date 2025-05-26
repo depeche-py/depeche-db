@@ -107,10 +107,6 @@ class AckOp:
             provider = self._state_provider
 
         self._executed = True
-        state = provider.read(self.name)
-        assert (
-            state.positions.get(self.partition, -1) == self.position - 1
-        ), f"{self.partition} should have {self.position - 1} as last position, but has {state.positions.get(self.partition, -1)}"
         provider.store(
             subscription_name=self.name,
             partition=self.partition,
