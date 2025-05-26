@@ -141,7 +141,7 @@ class AggregatedStream(Generic[E]):
         )
 
     def read(
-        self, partition: int, conn: _sa.Connection | None = None
+        self, partition: int, conn: Optional[SAConnection] = None
     ) -> Iterator[AggregatedStreamMessage]:
         """
         Read all messages from a partition of the aggregated stream.
@@ -170,7 +170,11 @@ class AggregatedStream(Generic[E]):
             yield from _inner(conn)
 
     def read_slice(
-        self, partition: int, start: int, count: int, conn: _sa.Connection | None = None
+        self,
+        partition: int,
+        start: int,
+        count: int,
+        conn: Optional[SAConnection] = None,
     ) -> Iterator[AggregatedStreamMessage]:
         """
         Read a slice of messages from a partition of the aggregated stream.
@@ -242,9 +246,9 @@ class AggregatedStream(Generic[E]):
 
     def get_partition_statistics(
         self,
-        position_limits: Dict[int, int] | None = None,
+        position_limits: Optional[Dict[int, int]] = None,
         result_limit: Optional[int] = None,
-        conn: SAConnection | None = None,
+        conn: Optional[SAConnection] = None,
     ) -> Iterator[StreamPartitionStatistic]:
         """
         Get partition statistics for deciding which partitions to read from. This
