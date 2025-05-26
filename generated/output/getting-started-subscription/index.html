@@ -355,6 +355,17 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Subscription
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -364,6 +375,39 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#starting-position" class="md-nav__link">
+    Starting position
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#acknowledgement-strategy" class="md-nav__link">
+    Acknowledgement strategy
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -831,6 +875,28 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#starting-position" class="md-nav__link">
+    Starting position
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#acknowledgement-strategy" class="md-nav__link">
+    Acknowledgement strategy
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -918,6 +984,7 @@ the registered handlers (if any).</p>
 the registered handlers (if any).</p>
 <p>In a real application, we would not call <code>run_once</code> directly, but we would use
 the <a href="../../../getting-started/executor/"><code>Executor</code></a> to do it for us.</p>
+<h2 id="starting-position">Starting position</h2>
 <p>A subscription by default starts at the beginning of the stream. If we want to
 change this behaviour, we can pass in a <code>SubscriptionStartPosition</code> object when we
 create the subscription. This object can be one of the following:
@@ -935,6 +1002,19 @@ create the subscription. This object can be one of the following:
 <a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>    <span class="p">),</span>
 <a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a><span class="p">)</span>
 </code></pre></div></p>
+<h2 id="acknowledgement-strategy">Acknowledgement strategy</h2>
+<p>By default, a subscription will use <code>AckStrategy.SINGLE</code> which acknowledges
+messages as soon as they are processed. This gives you the best guarantees
+for message delivery, but it can lead to performance issues if you have a
+lot of messages. It is a database write for each message after all.</p>
+<p>If your application has to process a high number of messages, you can use
+<code>AckStrategy.BATCHED</code> which will acknowledge messages in batches. Together with
+the <code>batch_size</code> parameter, you can control how many messages will be
+processed (at most) before an acknowledgement is forced.</p>
+<p>You can change the acknowledgement strategy of a subscription. Thus, it is
+possible to use the batched strategy for the initial processing of a high
+number of messages and then switch to the single strategy for continuous
+processing of new messages.</p>
 
 
   

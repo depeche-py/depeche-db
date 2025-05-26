@@ -720,6 +720,13 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#depeche_db.BatchedAckSubscriptionRunner" class="md-nav__link">
+    BatchedAckSubscriptionRunner
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#depeche_db.LockProvider" class="md-nav__link">
     LockProvider
   </a>
@@ -1175,6 +1182,13 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#depeche_db.BatchedAckSubscriptionRunner" class="md-nav__link">
+    BatchedAckSubscriptionRunner
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#depeche_db.LockProvider" class="md-nav__link">
     LockProvider
   </a>
@@ -1351,7 +1365,7 @@ subscription = stream.subscription(
 
 
 <h3 id="depeche_db.SubscriptionFactory.__call__" class="doc doc-heading">
-          <code class="highlight language-python"><span class="fm">__call__</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">handlers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">call_middleware</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">error_handler</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">state_provider</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lock_provider</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">start_point</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+          <code class="highlight language-python"><span class="fm">__call__</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">handlers</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">call_middleware</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">error_handler</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">state_provider</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lock_provider</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">start_point</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ack_strategy</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 </h3>
 
@@ -1485,6 +1499,20 @@ subscription = stream.subscription(
                 <code>None</code>
           </td>
         </tr>
+        <tr>
+          <td><code>ack_strategy</code></td>
+          <td>
+                <code><span title="typing.Optional">Optional</span>[<span title="depeche_db._subscription.AckStrategy">AckStrategy</span>]</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>Strategy for acknowledging messages, defaults to AckStrategy.SINGLE</p>
+            </div>
+          </td>
+          <td>
+                <code>None</code>
+          </td>
+        </tr>
     </tbody>
   </table>
 
@@ -1507,7 +1535,7 @@ subscription = stream.subscription(
 
 
 <h2 id="depeche_db.Subscription" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">depeche_db</span><span class="o">.</span><span class="n">Subscription</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">stream</span><span class="p">,</span> <span class="n">message_handler</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">state_provider</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lock_provider</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">start_point</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">depeche_db</span><span class="o">.</span><span class="n">Subscription</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">stream</span><span class="p">,</span> <span class="n">message_handler</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">state_provider</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lock_provider</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">start_point</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">ack_strategy</span><span class="o">=</span><span class="n">AckStrategy</span><span class="o">.</span><span class="n">SINGLE</span><span class="p">)</span></code>
 
 </h2>
 
@@ -1629,6 +1657,20 @@ subscription = stream.subscription(
           </td>
           <td>
                 <code>None</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>ack_strategy</code></td>
+          <td>
+                <code><span title="depeche_db._subscription.AckStrategy">AckStrategy</span></code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>The strategy to use for acknowledging messages, defaults to AckStrategy.SINGLE.</p>
+            </div>
+          </td>
+          <td>
+                <code><span title="depeche_db._subscription.AckStrategy.SINGLE">SINGLE</span></code>
           </td>
         </tr>
     </tbody>
@@ -2170,6 +2212,113 @@ See <a class="autorefs autorefs-internal" href="../message_handlers/#depeche_db.
   <div class="doc doc-contents first">
           <p class="doc doc-class-bases">
             Bases: <code><span title="typing.Generic">Generic</span>[<span title="depeche_db._subscription.E">E</span>]</code></p>
+
+  
+      <p>Handles messages from a subscription using a handler</p>
+<p>The <code>batch_size</code> argument controls how many messages to handle in each
+batch. If not provided, the default is 10. A larger batch size will
+result less round trips to the database, but will also make it more
+likely that messages from <em>different partitions</em> will be processed out of
+the order defined by their <code>global_position</code> on the message store.</p>
+<p>A batch size of 1 will ensure that messages are processed in order
+regarding to their <code>global_position</code>.
+Messages in the same partition will always be processed in order.</p>
+<p>Implements: <a class="autorefs autorefs-internal" href="../executor/#depeche_db.RunOnNotification">RunOnNotification</a></p>
+
+
+
+  <p><strong>Parameters:</strong></p>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Description</th>
+        <th>Default</th>
+      </tr>
+    </thead>
+    <tbody>
+        <tr>
+          <td><code>subscription</code></td>
+          <td>
+                <code><a class="autorefs autorefs-internal" title="depeche_db._subscription.Subscription" href="#depeche_db.Subscription">Subscription</a>[<span title="depeche_db._subscription.E">E</span>]</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>The subscription to handle</p>
+            </div>
+          </td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>message_handler</code></td>
+          <td>
+                <code><a class="autorefs autorefs-internal" title="depeche_db._subscription.SubscriptionMessageHandler" href="#depeche_db.SubscriptionMessageHandler">SubscriptionMessageHandler</a></code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>The handler to use</p>
+            </div>
+          </td>
+          <td>
+              <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>batch_size</code></td>
+          <td>
+                <code><span title="typing.Optional">Optional</span>[int]</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>The number of messages to handle in each batch, defaults to 10</p>
+            </div>
+          </td>
+          <td>
+                <code>None</code>
+          </td>
+        </tr>
+    </tbody>
+  </table>
+
+
+  
+
+  <div class="doc doc-children">
+
+
+
+
+
+
+
+
+
+
+
+  </div>
+
+  </div>
+
+</div><hr />
+
+
+<div class="doc doc-object doc-class">
+
+
+
+
+<h2 id="depeche_db.BatchedAckSubscriptionRunner" class="doc doc-heading">
+            <code class="highlight language-python"><span class="n">depeche_db</span><span class="o">.</span><span class="n">BatchedAckSubscriptionRunner</span><span class="p">(</span><span class="n">subscription</span><span class="p">,</span> <span class="n">message_handler</span><span class="p">,</span> <span class="n">batch_size</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+
+</h2>
+
+
+  <div class="doc doc-contents first">
+          <p class="doc doc-class-bases">
+            Bases: <code><a class="autorefs autorefs-internal" title="depeche_db._subscription.SubscriptionRunner" href="#depeche_db.SubscriptionRunner">SubscriptionRunner</a>[<span title="depeche_db._subscription.E">E</span>]</code></p>
 
   
       <p>Handles messages from a subscription using a handler</p>

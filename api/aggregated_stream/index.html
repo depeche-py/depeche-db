@@ -1734,7 +1734,7 @@ also in higher memory usage.</p>
 
 
 <h3 id="depeche_db.AggregatedStream.get_partition_statistics" class="doc doc-heading">
-          <code class="highlight language-python"><span class="n">get_partition_statistics</span><span class="p">(</span><span class="n">position_limits</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">result_limit</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
+          <code class="highlight language-python"><span class="n">get_partition_statistics</span><span class="p">(</span><span class="n">position_limits</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">result_limit</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">conn</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 </h3>
 
@@ -1853,7 +1853,7 @@ is used by subscriptions.</p>
 
 
 <h3 id="depeche_db.AggregatedStream.read" class="doc doc-heading">
-          <code class="highlight language-python"><span class="n">read</span><span class="p">(</span><span class="n">partition</span><span class="p">)</span></code>
+          <code class="highlight language-python"><span class="n">read</span><span class="p">(</span><span class="n">partition</span><span class="p">,</span> <span class="n">conn</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 </h3>
 
@@ -1889,6 +1889,20 @@ is used by subscriptions.</p>
               <em>required</em>
           </td>
         </tr>
+        <tr>
+          <td><code>conn</code></td>
+          <td>
+                <code><span title="typing.Optional">Optional</span>[<span title="depeche_db._compat.SAConnection">SAConnection</span>]</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>Optional connection to use for reading. If not provided, a new connection will be created.</p>
+            </div>
+          </td>
+          <td>
+                <code>None</code>
+          </td>
+        </tr>
     </tbody>
   </table>
 
@@ -1903,7 +1917,7 @@ is used by subscriptions.</p>
 
 
 <h3 id="depeche_db.AggregatedStream.read_slice" class="doc doc-heading">
-          <code class="highlight language-python"><span class="n">read_slice</span><span class="p">(</span><span class="n">partition</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">count</span><span class="p">)</span></code>
+          <code class="highlight language-python"><span class="n">read_slice</span><span class="p">(</span><span class="n">partition</span><span class="p">,</span> <span class="n">start</span><span class="p">,</span> <span class="n">count</span><span class="p">,</span> <span class="n">conn</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 </h3>
 
@@ -1965,6 +1979,20 @@ is used by subscriptions.</p>
           </td>
           <td>
               <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>conn</code></td>
+          <td>
+                <code><span title="typing.Optional">Optional</span>[<span title="depeche_db._compat.SAConnection">SAConnection</span>]</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>Optional connection to use for reading. If not provided, a new connection will be created.</p>
+            </div>
+          </td>
+          <td>
+                <code>None</code>
           </td>
         </tr>
     </tbody>
