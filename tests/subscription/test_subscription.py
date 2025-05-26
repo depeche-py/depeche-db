@@ -21,7 +21,7 @@ from tests._account_example import (
 
 
 def test_subscription(db_engine, stream_with_events, subscription_factory):
-    subject = subscription_factory(stream_with_events)
+    subject: Subscription = subscription_factory(stream_with_events)
 
     events = []
     while True:
@@ -42,7 +42,7 @@ def test_db_subscription_state(
     identifier, db_engine, stream_with_events, lock_provider
 ):
     state_provider_name = identifier()
-    subject = stream_with_events.subscription(
+    subject: Subscription = stream_with_events.subscription(
         name=identifier(),
         lock_provider=lock_provider,
         state_provider=DbSubscriptionStateProvider(
@@ -110,7 +110,7 @@ def test_db_subscription_state_batched(
 
 
 def test_subscription_in_parallel(db_engine, stream_with_events, subscription_factory):
-    subject = subscription_factory(stream_with_events)
+    subject: Subscription = subscription_factory(stream_with_events)
 
     start = time.time()
     events = []
