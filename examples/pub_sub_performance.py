@@ -20,7 +20,7 @@ from depeche_db import (
     SubscriptionRunner,
     MessageHandlerRegister,
 )
-from depeche_db._subscription import StartAtPointInTime
+from depeche_db._subscription import AckStrategy, StartAtPointInTime
 from depeche_db.tools import (
     DbLockProvider,
     DbSubscriptionStateProvider,
@@ -93,7 +93,7 @@ subscription = stream.subscription(
     name="example_pub_sub",
     handlers=handlers,
     # batch_size=100,
-    # batched_runner=True,
+    # ack_strategy=AckStrategy.BATCHED,
     start_point=StartAtPointInTime(
         datetime.utcnow().replace(tzinfo=pytz.UTC) - timedelta(days=1)
     ),

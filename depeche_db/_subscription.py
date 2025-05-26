@@ -210,55 +210,57 @@ class Subscription(Generic[E]):
         assert self._state_provider.initialized(self.name)
 
         state = self._state_provider.read(self.name)
-        statistics = list(
-            self._stream.get_partition_statistics(
-                position_limits=state.positions, result_limit=10
+        with self._stream._store.engine.connect() as conn:
+            statistics = list(
+                self._stream.get_partition_statistics(
+                    position_limits=state.positions, result_limit=10, conn=conn
+                )
             )
-        )
-        for statistic in statistics:
-            lock_key = f"subscription-{self.name}-{statistic.partition_number}"
-            if not self._lock_provider.lock(lock_key):
-                continue
-            # now we have the lock, we need to check if the position is still valid
-            # if not, we need to release the lock and try the next partition
-            state = self._state_provider.read(self.name)
-            if state.positions.get(statistic.partition_number, -1) != (
-                statistic.next_message_position - 1
-            ):
-                self._lock_provider.unlock(lock_key)
-                continue
+            for statistic in statistics:
+                lock_key = f"subscription-{self.name}-{statistic.partition_number}"
+                if not self._lock_provider.lock(lock_key):
+                    continue
+                # now we have the lock, we need to check if the position is still valid
+                # if not, we need to release the lock and try the next partition
+                state = self._state_provider.read(self.name)
+                if state.positions.get(statistic.partition_number, -1) != (
+                    statistic.next_message_position - 1
+                ):
+                    self._lock_provider.unlock(lock_key)
+                    continue
 
-            message_pointers = list(
-                self._stream.read_slice(
-                    partition=statistic.partition_number,
-                    start=statistic.next_message_position,
-                    count=count,
-                )
-            )
-            with self._stream._store.reader() as reader:
-                stored_messages = {
-                    message.message_id: message
-                    for message in reader.get_messages_by_ids(
-                        [pointer.message_id for pointer in message_pointers]
+                message_pointers = list(
+                    self._stream.read_slice(
+                        partition=statistic.partition_number,
+                        start=statistic.next_message_position,
+                        count=count,
+                        conn=conn,
                     )
-                }
-            messages = [
-                SubscriptionMessage(
-                    partition=pointer.partition,
-                    position=pointer.position,
-                    stored_message=stored_messages[pointer.message_id],
-                    ack=NoAckOp(),
                 )
-                for pointer in message_pointers
-            ]
-            return SubscriptionMessageBatch(
-                partition=statistic.partition_number,
-                first_position=min(msg.position for msg in messages),
-                last_position=max(msg.position for msg in messages),
-                lock_key=lock_key,
-                messages=messages,
-            )
-        return None
+                with self._stream._store.reader(conn=conn) as reader:
+                    stored_messages = {
+                        message.message_id: message
+                        for message in reader.get_messages_by_ids(
+                            [pointer.message_id for pointer in message_pointers]
+                        )
+                    }
+                messages = [
+                    SubscriptionMessage(
+                        partition=pointer.partition,
+                        position=pointer.position,
+                        stored_message=stored_messages[pointer.message_id],
+                        ack=NoAckOp(),
+                    )
+                    for pointer in message_pointers
+                ]
+                return SubscriptionMessageBatch(
+                    partition=statistic.partition_number,
+                    first_position=min(msg.position for msg in messages),
+                    last_position=max(msg.position for msg in messages),
+                    lock_key=lock_key,
+                    messages=messages,
+                )
+            return None
 
     def ack_message_batch(
         self, message_batch: SubscriptionMessageBatch[E], success: bool
@@ -269,6 +271,9 @@ class Subscription(Generic[E]):
                 partition=message_batch.partition,
                 position=message_batch.ackd_position,
             )
+        self.unlock_message_batch(message_batch)
+
+    def unlock_message_batch(self, message_batch: SubscriptionMessageBatch[E]) -> None:
         self._lock_provider.unlock(message_batch.lock_key)
 
     def get_next_messages(self, count: int) -> Iterator[SubscriptionMessage[E]]:

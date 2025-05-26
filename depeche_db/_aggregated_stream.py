@@ -140,15 +140,18 @@ class AggregatedStream(Generic[E]):
             )
         )
 
-    def read(self, partition: int) -> Iterator[AggregatedStreamMessage]:
+    def read(
+        self, partition: int, conn: _sa.Connection | None = None
+    ) -> Iterator[AggregatedStreamMessage]:
         """
         Read all messages from a partition of the aggregated stream.
 
         Args:
             partition: Partition number
+            conn: Optional connection to use for reading. If not provided, a new connection will be created.
         """
-        # TODO allow passing connection
-        with self._connection() as conn:
+
+        def _inner(conn):
             for row in conn.execute(
                 _sa.select(self._table.c.message_id, self._table.c.position)
                 .where(self._table.c.partition == partition)
@@ -160,8 +163,14 @@ class AggregatedStream(Generic[E]):
                     partition=partition,
                 )
 
+        if conn is None:
+            with self._connection() as conn:
+                yield from _inner(conn)
+        else:
+            yield from _inner(conn)
+
     def read_slice(
-        self, partition: int, start: int, count: int
+        self, partition: int, start: int, count: int, conn: _sa.Connection | None = None
     ) -> Iterator[AggregatedStreamMessage]:
         """
         Read a slice of messages from a partition of the aggregated stream.
@@ -170,9 +179,10 @@ class AggregatedStream(Generic[E]):
             partition: Partition number
             start: Start position
             count: Number of messages to read
+            conn: Optional connection to use for reading. If not provided, a new connection will be created.
         """
-        # TODO allow passing connection
-        with self._connection() as conn:
+
+        def _inner(conn):
             for row in conn.execute(
                 _sa.select(self._table.c.message_id, self._table.c.position)
                 .where(
@@ -189,6 +199,12 @@ class AggregatedStream(Generic[E]):
                     position=row.position,
                     partition=partition,
                 )
+
+        if conn is None:
+            with self._connection() as conn:
+                yield from _inner(conn)
+        else:
+            yield from _inner(conn)
 
     def reader(
         self, start_point: Optional[SubscriptionStartPoint] = None
@@ -226,16 +242,18 @@ class AggregatedStream(Generic[E]):
 
     def get_partition_statistics(
         self,
-        position_limits: Dict[int, int] = None,
+        position_limits: Dict[int, int] | None = None,
         result_limit: Optional[int] = None,
+        conn: SAConnection | None = None,
     ) -> Iterator[StreamPartitionStatistic]:
         """
         Get partition statistics for deciding which partitions to read from. This
         is used by subscriptions.
         """
-        # TODO allow passing connection
-        with self._connection() as conn:
-            position_limits = position_limits or {-1: -1}
+
+        position_limits = position_limits or {-1: -1}
+
+        def _inner(conn):
             tbl = self._table.alias()
             next_messages_tbl = (
                 _sa.select(
@@ -283,6 +301,12 @@ class AggregatedStream(Generic[E]):
                 )
             result.close()
             del result
+
+        if conn is None:
+            with self._connection() as conn:
+                yield from _inner(conn)
+        else:
+            yield from _inner(conn)
 
     def time_to_positions(self, time: _dt.datetime) -> Dict[int, int]:
         """
