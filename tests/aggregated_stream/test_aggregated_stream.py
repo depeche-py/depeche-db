@@ -27,7 +27,7 @@ def test_stream_statisitics(db_engine, store_with_events, stream_factory):
     )
 
 
-def test_stream_statisitics_ignore_partition(
+def test_stream_statistics_ignore_partition(
     db_engine, store_with_events, stream_factory
 ):
     event_store, account, account2 = store_with_events
