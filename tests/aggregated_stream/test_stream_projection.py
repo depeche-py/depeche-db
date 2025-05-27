@@ -4,6 +4,7 @@ import uuid as _uuid
 import pytest
 import sqlalchemy as _sa
 
+from depeche_db._aggregated_stream import AggregatedStream, SelectedOriginStream
 from tests._account_example import Account, AccountRepository
 
 
@@ -33,6 +34,53 @@ def test_stream_projector(db_engine, store_factory, stream_factory, account_ids)
     assert subject.projector.update_full() == 4
 
     assert_stream_projection(subject, db_engine, account, account2)
+
+
+def test_stream_projector_origin_selection(
+    db_engine, store_factory, stream_factory, account_ids
+):
+    ACCOUNT1_ID, ACCOUNT2_ID = account_ids
+    store = store_factory()
+    subject: AggregatedStream = stream_factory(store)
+    subject.projector.batch_size = 2
+    subject.projector.update_full()
+
+    def get_select_origin_streams():
+        with db_engine.connect() as conn:
+            return subject.projector._select_origin_streams(conn=conn, cutoff_cond=[])
+
+    account_repo = AccountRepository(store)
+
+    account = Account.register(id=ACCOUNT1_ID, owner_id=_uuid.uuid4(), number="123")
+    account.credit(100)
+    account.credit(100)
+    account_repo.save(account, expected_version=0)
+
+    assert get_select_origin_streams() == [
+        SelectedOriginStream(f"account-{account.id}", 0, 1, 3)
+    ]
+
+    account2 = Account.register(id=ACCOUNT2_ID, owner_id=_uuid.uuid4(), number="234")
+    account2.credit(100)
+    account2.credit(100)
+    account2.credit(100)
+    account_repo.save(account2, expected_version=0)
+
+    assert get_select_origin_streams() == [
+        SelectedOriginStream(f"account-{account.id}", 0, 1, 3),
+        # account 2 is beyond the batch size, so it is not selected yet
+    ]
+    assert subject.projector.update_full() == 7
+
+    account.credit(100)
+    account_repo.save(account, expected_version=3)
+    account2.credit(100)
+    account_repo.save(account2, expected_version=4)
+
+    assert get_select_origin_streams() == [
+        SelectedOriginStream(f"account-{account.id}", 3, 1, 1),
+        SelectedOriginStream(f"account-{account2.id}", 4, 4, 1),
+    ]
 
 
 def test_stream_projector_cutoff(db_engine, store_factory, stream_factory, account_ids):

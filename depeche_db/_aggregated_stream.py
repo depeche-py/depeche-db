@@ -483,7 +483,7 @@ class _AlreadyUpdating(RuntimeError):
 
 SelectedOriginStream = namedtuple(
     "SelectedOriginStream",
-    ["stream", "max_aggregated_stream_version", "min_global_position"],
+    ["stream", "max_aggregated_stream_version", "min_global_position", "message_count"],
 )
 
 
@@ -646,6 +646,7 @@ class StreamProjector(Generic[E]):
                     row.stream,
                     row.max_aggregated_stream_version,
                     row.min_global_position,
+                    row.message_count,
                 )
             )
         return selected_streams
