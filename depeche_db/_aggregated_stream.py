@@ -568,6 +568,8 @@ class StreamProjector(Generic[E]):
         tbl = self.stream._table.alias()
         message_table = self.stream._store._storage.message_table
         max_origin_stream_version = (
+            # Versions of the origin streams, used to determine which streams
+            # have new messages.
             _sa.select(
                 message_table.c.stream,
                 _sa.func.max(message_table.c.version).label(
@@ -592,6 +594,7 @@ class StreamProjector(Generic[E]):
             .cte("max_origin_stream_version")
         )
         max_aggregated_stream_version = (
+            # Current version of all the streams in the aggregated stream.
             _sa.select(
                 tbl.c.origin_stream,
                 _sa.func.max(tbl.c.origin_stream_version).label(
@@ -635,6 +638,7 @@ class StreamProjector(Generic[E]):
             # Oldest (= first message the oldest) streams first
             .order_by(max_origin_stream_version.c.min_global_position)
         )
+
         selected_streams = []
         message_count = 0
         for row in conn.execute(streams_to_be_updated):
