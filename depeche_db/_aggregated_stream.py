@@ -661,6 +661,10 @@ class StreamProjector(Generic[E]):
         if not selected_streams:
             return 0
 
+        # Minimal global_position from the relevant streams. This can/will be a lot
+        # lower than the global position of the messages that need to be added
+        # to the stream. It still is a helpful optimization as it limits the
+        # amount of messages which have to be considered in the query below.
         min_global_position = min(
             selected_stream.min_global_position for selected_stream in selected_streams
         )
