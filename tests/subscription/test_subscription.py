@@ -17,6 +17,7 @@ from depeche_db.tools import DbSubscriptionStateProvider
 # from ._tools import MyLockProvider, MyStateProvider, MyThreadLockProvider
 from tests._account_example import (
     AccountEvent,
+    AccountRepository,
 )
 
 
@@ -36,6 +37,65 @@ def test_subscription(db_engine, stream_with_events, subscription_factory):
         raise AssertionError("Should not have any more events")
 
     assert_subscription_event_order(events)
+
+
+def test_subscription_cached_stats_update_via_state(
+    db_engine, stream_with_events, subscription_factory
+):
+    subject: Subscription = subscription_factory(stream_with_events)
+
+    def get_stats():
+        with db_engine.connect() as conn:
+            return {
+                stat.partition_number: stat
+                for stat in subject._get_cached_partition_statistics(conn)
+            }
+
+    stats = get_stats()
+    assert stats[1].next_message_position == 0
+
+    subject._state_provider.store(
+        subscription_name=subject.name, partition=1, position=0
+    )
+    stats_after_state_update = get_stats()
+    assert stats_after_state_update[1].next_message_position == 1
+    assert stats_after_state_update[2] == stats[2]
+
+
+def test_subscription_cached_stats_update_via_stream_update(
+    db_engine, stream_with_events, subscription_factory, store_with_events
+):
+    subject: Subscription = subscription_factory(stream_with_events)
+
+    def get_stats():
+        with db_engine.connect() as conn:
+            return {
+                stat.partition_number: stat
+                for stat in subject._get_cached_partition_statistics(conn)
+            }
+
+    # Initial load with empty cache
+    stats = get_stats()
+    assert 1 in stats
+
+    # We "consume" the events in partition 1
+    subject._state_provider.store(
+        subscription_name=subject.name, partition=1, position=2
+    )
+    stats = get_stats()
+    assert 1 not in stats
+
+    # Another event is added to partition 1
+    store, account, _ = store_with_events
+    account_repo = AccountRepository(store)
+    account.credit(100)
+    account_repo.save(account, expected_version=3)
+    stream_with_events.projector.update_full()
+
+    # The stats should now reflect the new event
+    stats_after_state_update = get_stats()
+    assert 1 in stats_after_state_update
+    assert stats_after_state_update[1].next_message_position == 3
 
 
 def test_db_subscription_state(

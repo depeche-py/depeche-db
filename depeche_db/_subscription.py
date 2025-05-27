@@ -3,9 +3,11 @@ import enum as _enum
 import logging as _logging
 from typing import (
     Callable,
+    Dict,
     Generic,
     Iterator,
     Optional,
+    Tuple,
     TypeVar,
     Union,
 )
@@ -20,6 +22,7 @@ from ._interfaces import (
     MessageProtocol,
     RunOnNotificationResult,
     StoredMessage,
+    StreamPartitionStatistic,
     SubscriptionErrorHandler,
     SubscriptionMessage,
     SubscriptionMessageBatch,
@@ -180,6 +183,9 @@ class Subscription(Generic[E]):
             )
         else:
             raise NotImplementedError(f"Ack strategy {ack_strategy} is not implemented")
+        self._partition_statistics_cache: Dict[
+            int, Tuple[StreamPartitionStatistic, int]
+        ] = {}
 
     def _init_state(self):
         if not self._state_provider.initialized(self.name):
@@ -198,6 +204,49 @@ class Subscription(Generic[E]):
             finally:
                 self._lock_provider.unlock(lock_key)
 
+    def _get_cached_partition_statistics(self, conn):
+        # The AggregatedStream.get_partition_statistics call is expensive and
+        # becomes more expensive the more `position_limits` we pass.
+        # Therefore, we cache the statistics for all partitions whose state did not
+        # change since the last run of this method.
+        state = self._state_provider.read(self.name)
+
+        # Remove statistics if state changed on the partition
+        self._partition_statistics_cache = {
+            partition: (statistic, state_position)
+            for partition, (
+                statistic,
+                state_position,
+            ) in self._partition_statistics_cache.items()
+            if state_position == state.positions.get(partition, -1)
+        }
+
+        # Update cache for partitions that were handled since the last run of this method.
+        interesting_positions = {
+            partition: position
+            for partition, position in state.positions.items()
+            if partition not in self._partition_statistics_cache
+        }
+
+        # Update cache for partitions that saw new messages since the last run of this method.
+        # TODO is this necessary??
+
+        for statistic in self._stream.get_partition_statistics(
+            position_limits=interesting_positions,
+            ignore_partitions=list(self._partition_statistics_cache.keys()),
+            conn=conn,
+        ):
+            self._partition_statistics_cache[statistic.partition_number] = (
+                statistic,
+                state.positions.get(statistic.partition_number, -1),
+            )
+
+        # get_next_message_batch expects this to be sorted by next_message_occurred_at
+        return sorted(
+            [statistic for (statistic, _) in self._partition_statistics_cache.values()],
+            key=lambda statisitic: statisitic.next_message_occurred_at,
+        )
+
     def get_next_message_batch(
         self, count: int
     ) -> Optional[SubscriptionMessageBatch[E]]:
@@ -205,14 +254,8 @@ class Subscription(Generic[E]):
             self._init_state()
         assert self._state_provider.initialized(self.name)
 
-        state = self._state_provider.read(self.name)
         with self._stream._store.engine.connect() as conn:
-            statistics = list(
-                self._stream.get_partition_statistics(
-                    position_limits=state.positions, result_limit=10, conn=conn
-                )
-            )
-            for statistic in statistics:
+            for statistic in self._get_cached_partition_statistics(conn=conn):
                 lock_key = f"subscription-{self.name}-{statistic.partition_number}"
                 if not self._lock_provider.lock(lock_key):
                     continue

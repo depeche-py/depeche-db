@@ -27,6 +27,33 @@ def test_stream_statisitics(db_engine, store_with_events, stream_factory):
     )
 
 
+def test_stream_statistics_ignore_partition(
+    db_engine, store_with_events, stream_factory
+):
+    event_store, account, account2 = store_with_events
+    subject: AggregatedStream = stream_factory(event_store)
+    subject.projector.update_full()
+
+    assert [msg.message_id for msg in subject.read(partition=1)] == [
+        evt.event_id for evt in account.events
+    ]
+    assert [msg.message_id for msg in subject.read(partition=2)] == [
+        evt.event_id for evt in account2.events
+    ]
+
+    assert list(
+        subject.get_partition_statistics(
+            position_limits={1: 1}, ignore_partitions=[2], result_limit=1
+        )
+    )[0] == StreamPartitionStatistic(
+        partition_number=1,
+        next_message_id=account.events[2].event_id,
+        next_message_position=2,
+        next_message_occurred_at=account.events[2].occurred_at,
+        max_position=2,
+    )
+
+
 def test_time_to_positions(db_engine, store_with_events, stream_factory):
     event_store, account, account2 = store_with_events
     times = [
