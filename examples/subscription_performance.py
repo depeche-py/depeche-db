@@ -38,7 +38,7 @@ def measure_timing(name: str, fn: Callable) -> Callable:
             return fn(*args, **kwargs)
         finally:
             duration = time.time() - start
-            print(f"{name} took {duration:.2f}s")
+            print(f"{name}:{duration:.6f}")
 
     return wrapper
 
@@ -131,6 +131,10 @@ def pub():
 
 
 def project():
+    stream.projector._update_batch = measure_timing(
+        "update_batch", stream.projector._update_batch
+    )
+    stream.projector._add = measure_timing("add", stream.projector._add)
     start = time.time()
     stream.projector.run()
     duration = time.time() - start
