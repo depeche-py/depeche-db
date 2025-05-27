@@ -3,6 +3,7 @@ import random
 import sys
 import time
 from datetime import date, datetime, timedelta
+from typing import Callable
 import pytz
 from uuid import UUID, uuid4
 
@@ -28,6 +29,19 @@ from depeche_db.tools import (
     PydanticMessageSerializer,
 )
 from depeche_db.tools.immem_subscription import InMemorySubscriptionState
+
+
+def measure_timing(name: str, fn: Callable) -> Callable:
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        try:
+            return fn(*args, **kwargs)
+        finally:
+            duration = time.time() - start
+            print(f"{name} took {duration:.2f}s")
+
+    return wrapper
+
 
 DB_DSN = "postgresql+psycopg://depeche:depeche@localhost:4888/depeche_demo"
 db_engine = create_engine(DB_DSN)
@@ -70,7 +84,7 @@ class NumMessagePartitioner:
 
 
 stream: AggregatedStream = message_store.aggregated_stream(
-    name="ex_perf",
+    name="ex_perf2",
     partitioner=NumMessagePartitioner(),
     stream_wildcards=["aggregate-me-%"],
 )
@@ -106,15 +120,21 @@ subscription: Subscription = stream.subscription(
 def pub():
     start = time.time()
     n = 0
-    while n < 10000:
+    while n < 50000:
         n += 1
         message_store.write(
-            stream=random.choice(["aggregate-me-1", "aggregate-me-2"]),
+            stream=f"aggregate-me-{random.randint(1, 500)}",
             message=MyMessage(content=random.randint(1, 1000)),
         )
-    stream.projector.run()
     duration = time.time() - start
     print(f"Publisher sent {n / duration:.2f} msg/s (Duration: {duration:.2f}s)")
+
+
+def project():
+    start = time.time()
+    stream.projector.run()
+    duration = time.time() - start
+    print("Projector finished in {:.2f}s".format(duration))
 
 
 def sub():
@@ -141,6 +161,8 @@ def main():
 
     if sys.argv[1] == "pub":
         pub()
+    elif sys.argv[1] == "project":
+        project()
     elif sys.argv[1] == "sub":
         sub()
     else:
