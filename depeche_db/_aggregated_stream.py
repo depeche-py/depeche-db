@@ -15,7 +15,7 @@ from typing import (
 import sqlalchemy as _sa
 from sqlalchemy_utils import UUIDType as _UUIDType
 
-from ._compat import PsycoPgLockNotAvailable, SAConnection
+from ._compat import PsycoPgLockNotAvailable, SAColumnElement, SAConnection
 from ._factories import SubscriptionFactory
 from ._interfaces import (
     AggregatedStreamMessage,
@@ -563,7 +563,7 @@ class StreamProjector(Generic[E]):
         return result
 
     def _select_origin_streams(
-        self, conn: SAConnection, cutoff_cond: List[_sa.ColumnElement[bool]]
+        self, conn: SAConnection, cutoff_cond: List[SAColumnElement[bool]]
     ) -> List[SelectedOriginStream]:
         tbl = self.stream._table.alias()
         message_table = self.stream._store._storage.message_table

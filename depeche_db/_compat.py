@@ -49,9 +49,11 @@ def get_union_members(union_or_type) -> typing.Generator[typing.Type, None, None
 SA_VERSION = "2.x"
 try:
     from sqlalchemy import Connection as SAConnection  # noqa
+    from sqlalchemy import ColumnElement as SAColumnElement  # noqa
 except ImportError:
     SA_VERSION = "1.4.x"
     from sqlalchemy.engine import Connection as SAConnection  # noqa
+    from sqlalchemy.sql.expression import ColumnElement as SAColumnElement  # noqa
 
 PSYCOPG2_AVAILABLE = False
 PSYCOPG3_AVAILABLE = False
