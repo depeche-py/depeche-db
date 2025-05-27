@@ -44,12 +44,11 @@ def test_stream_projector_origin_selection(
     subject: AggregatedStream = stream_factory(store)
     subject.projector.batch_size = 2
     subject.projector.update_full()
+    account_repo = AccountRepository(store)
 
     def get_select_origin_streams():
         with db_engine.connect() as conn:
             return subject.projector._select_origin_streams(conn=conn, cutoff_cond=[])
-
-    account_repo = AccountRepository(store)
 
     account = Account.register(id=ACCOUNT1_ID, owner_id=_uuid.uuid4(), number="123")
     account.credit(100)
@@ -81,6 +80,57 @@ def test_stream_projector_origin_selection(
         SelectedOriginStream(f"account-{account.id}", 3, 1, 1),
         SelectedOriginStream(f"account-{account2.id}", 4, 4, 1),
     ]
+    assert subject.projector.update_full() == 2
+    assert_stream_projection(subject, db_engine, account, account2)
+
+
+def test_stream_projector_origin_selection_late_commit(
+    db_engine, store_factory, stream_factory, account_ids
+):
+    ACCOUNT1_ID, ACCOUNT2_ID = account_ids
+    store = store_factory()
+    subject: AggregatedStream = stream_factory(store)
+    subject.projector.update_full()
+    account_repo = AccountRepository(store)
+
+    def get_select_origin_streams():
+        with db_engine.connect() as conn:
+            return subject.projector._select_origin_streams(conn=conn, cutoff_cond=[])
+
+    with db_engine.connect() as long_running_conn:
+        # Simulate a long-running transaction that commits later
+        # This object's events will not be visible to the projector until the transaction commits
+        account = Account.register(id=ACCOUNT1_ID, owner_id=_uuid.uuid4(), number="123")
+        account.credit(100)
+        account_repo._event_store.synchronize(
+            stream=f"account-{account.id}",
+            messages=account.events,
+            expected_version=0,
+            conn=long_running_conn,
+        )
+
+        assert get_select_origin_streams() == []
+
+        account2 = Account.register(
+            id=ACCOUNT2_ID, owner_id=_uuid.uuid4(), number="234"
+        )
+        account2.credit(100)
+        account_repo.save(account2, expected_version=0)
+        assert get_select_origin_streams() == [
+            # min_global_position == 3 here because the events above already
+            # consumed sequence numbers 1 and 2 even though they are not visible yet
+            SelectedOriginStream(f"account-{account2.id}", 0, 3, 2),
+        ]
+        assert subject.projector.update_full() == 2
+        long_running_conn.commit()
+
+    assert get_select_origin_streams() == [
+        # min_global_position == 1 because the events from the long-running
+        # transaction are now visible
+        SelectedOriginStream(f"account-{account.id}", 0, 1, 2),
+    ]
+    assert subject.projector.update_full() == 2
+    assert_stream_projection(subject, db_engine, account, account2)
 
 
 def test_stream_projector_cutoff(db_engine, store_factory, stream_factory, account_ids):
