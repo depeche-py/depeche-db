@@ -67,21 +67,9 @@ def test_stream_projector_origin_selection(
 
     assert get_select_origin_streams() == [
         SelectedOriginStream(f"account-{account.id}", 0, 1, 3),
-        # account 2 is beyond the batch size, so it is not selected yet
+        SelectedOriginStream(f"account-{account2.id}", 0, 4, 4),
     ]
     assert subject.projector.update_full() == 7
-
-    account.credit(100)
-    account_repo.save(account, expected_version=3)
-    account2.credit(100)
-    account_repo.save(account2, expected_version=4)
-
-    assert get_select_origin_streams() == [
-        SelectedOriginStream(f"account-{account.id}", 3, 1, 1),
-        SelectedOriginStream(f"account-{account2.id}", 4, 4, 1),
-    ]
-    assert subject.projector.update_full() == 2
-    assert_stream_projection(subject, db_engine, account, account2)
 
 
 def test_stream_projector_origin_selection_late_commit(

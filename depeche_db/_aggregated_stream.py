@@ -640,11 +640,12 @@ class StreamProjector(Generic[E]):
         )
 
         selected_streams = []
-        message_count = 0
         for row in conn.execute(streams_to_be_updated):
-            if message_count >= self.batch_size:
+            if len(selected_streams) >= min(self.batch_size, 20):
+                # We select the 20 oldest streams to help with staying true
+                # to our best effort guarantee of a.global_position < b.global_position
+                # => a.position_in_partition < b.position_in_partition.
                 break
-            message_count += row.message_count
             selected_streams.append(
                 SelectedOriginStream(
                     row.stream,
