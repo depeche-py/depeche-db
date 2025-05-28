@@ -1,11 +1,15 @@
+# 0.10.1
+
+* Fix performance of aggregated stream projection
+
 # 0.10.0
 
 * Add batched acknowledgement strategy
 * Performance improvements
-  * Use less connections on load in subscription
-  * Removed overly defensive check in acknowledgement operation
-  * Pre-calculate hot SqlA queries
-  * Improved Performance in pydantic (de)serialization
+    * Use less connections on load in subscription
+    * Removed overly defensive check in acknowledgement operation
+    * Pre-calculate hot SqlA queries
+    * Improved Performance in pydantic (de)serialization
 
 # 0.9.1
 
