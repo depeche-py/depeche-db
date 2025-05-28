@@ -639,7 +639,7 @@ class StreamProjector(Generic[E]):
             .order_by(max_origin_stream_version.c.min_global_position)
         )
 
-        selected_streams = []
+        selected_streams: list[SelectedOriginStream] = []
         for row in conn.execute(streams_to_be_updated):
             if len(selected_streams) >= min(self.batch_size, 20):
                 # We select the 20 oldest streams to help with staying true
