@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#0100" class="md-skip">
+        <a href="#0101" class="md-skip">
           Skip to content
         </a>
       
@@ -845,14 +845,20 @@
   
 
 
+<h1 id="0101">0.10.1</h1>
+<ul>
+<li>Fix performance of aggregated stream projection</li>
+</ul>
 <h1 id="0100">0.10.0</h1>
 <ul>
 <li>Add batched acknowledgement strategy</li>
-<li>Performance improvements</li>
+<li>Performance improvements<ul>
 <li>Use less connections on load in subscription</li>
 <li>Removed overly defensive check in acknowledgement operation</li>
 <li>Pre-calculate hot SqlA queries</li>
 <li>Improved Performance in pydantic (de)serialization</li>
+</ul>
+</li>
 </ul>
 <h1 id="091">0.9.1</h1>
 <ul>
