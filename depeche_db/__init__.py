@@ -6,7 +6,11 @@ from ._aggregated_stream_reader import (  # noqa: F401
     AggregatedStreamReader,
     AsyncAggregatedStreamReader,
 )
-from ._exceptions import MessageNotFound, OptimisticConcurrencyError  # noqa: F401
+from ._exceptions import (  # noqa: F401
+    MessageIdMismatchError,
+    MessageNotFound,
+    OptimisticConcurrencyError,
+)
 from ._executor import Executor  # noqa: F401
 from ._factories import AggregatedStreamFactory, SubscriptionFactory  # noqa: F401
 from ._interfaces import (  # noqa: F401

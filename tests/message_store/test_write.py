@@ -2,7 +2,11 @@ import uuid as _uuid
 
 import pytest
 
-from depeche_db import MessagePosition, OptimisticConcurrencyError
+from depeche_db import (
+    MessageIdMismatchError,
+    MessagePosition,
+    OptimisticConcurrencyError,
+)
 
 from ._my_event import MyEvent
 
@@ -61,7 +65,7 @@ def test_synchronize_idempotency(subject, events):
 def test_synchronize_id_mismatch(subject, events):
     subject.synchronize(stream=STREAM, expected_version=0, messages=events)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(MessageIdMismatchError):
         subject.synchronize(
             stream=STREAM,
             expected_version=4,
@@ -86,7 +90,7 @@ def test_synchronize_with_connection(db_engine, subject, events):
 
 def test_synchronize_fails_on_missing_message(subject, events):
     subject.synchronize(stream=STREAM, expected_version=0, messages=events)
-    with pytest.raises(ValueError):
+    with pytest.raises(MessageIdMismatchError):
         subject.synchronize(stream=STREAM, expected_version=4, messages=events[1:])
 
 

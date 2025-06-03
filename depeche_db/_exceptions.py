@@ -4,3 +4,7 @@ class MessageNotFound(Exception):
 
 class OptimisticConcurrencyError(Exception):
     pass
+
+
+class MessageIdMismatchError(ValueError):
+    pass

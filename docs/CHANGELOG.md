@@ -1,3 +1,7 @@
+# 0.10.2
+
+* Make exception on Message ID mismatch in `MessageStore.synchronize` more specific.
+
 # 0.10.1
 
 * Fix performance of aggregated stream projection
