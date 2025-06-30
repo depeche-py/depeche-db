@@ -1,6 +1,5 @@
 import contextlib as _contextlib
 import datetime as _dt
-import uuid as _uuid
 from collections import namedtuple
 from typing import (
     TYPE_CHECKING,
@@ -22,6 +21,7 @@ from ._interfaces import (
     MessagePartitioner,
     MessageProtocol,
     RunOnNotificationResult,
+    StoredMessage,
     StreamPartitionStatistic,
     SubscriptionStartPoint,
     TimeBudget,
@@ -125,29 +125,12 @@ class AggregatedStream(Generic[E]):
         """
         conn.execute(self._table.delete())
 
-    def add(
+    def _add(
         self,
         conn: SAConnection,
-        message_id: _uuid.UUID,
-        stream: str,
-        stream_version: int,
-        partition: int,
-        position: int,
-        message_occurred_at: _dt.datetime,
+        rows,
     ) -> None:
-        # TODO assert message_occurred_at is UTC (or time zone aware)
-        if partition < 0:
-            raise ValueError("partition must be >= 0")
-        conn.execute(
-            self._table.insert().values(
-                message_id=message_id,
-                origin_stream=stream,
-                origin_stream_version=stream_version,
-                partition=partition,
-                position=position,
-                message_occurred_at=message_occurred_at,
-            )
-        )
+        conn.execute(self._table.insert().values(rows))
 
     def read(
         self, partition: int, conn: Optional[SAConnection] = None
@@ -678,6 +661,8 @@ class StreamProjector(Generic[E]):
                 message_table.c.message_id,
                 message_table.c.stream,
                 message_table.c.version,
+                message_table.c.message,
+                message_table.c.global_position,
             )
             .where(
                 _sa.and_(
@@ -716,25 +701,31 @@ class StreamProjector(Generic[E]):
             )
         }
 
-        with self.stream._store.reader(conn) as reader:
-            stored_messages = {
-                message.message_id: message
-                for message in reader.get_messages_by_ids(
-                    [message_id for message_id, *_ in messages]
-                )
-            }
-
-        for message_id, stream, version in messages:
-            message = stored_messages[message_id]
-            partition = self.partitioner.get_partition(message)
-            position = positions.get(partition, -1) + 1
-            self.stream.add(
-                conn=conn,
+        rows = []
+        for message_id, stream, version, message, global_position in messages:
+            message = StoredMessage(
                 message_id=message_id,
                 stream=stream,
-                stream_version=version,
-                partition=partition,
-                position=position,
-                message_occurred_at=message.message.get_message_time(),
+                version=version,
+                message=self.stream._store._serializer.deserialize(message),
+                global_position=global_position,
             )
+            partition = self.partitioner.get_partition(message)
+            if partition < 0:
+                raise ValueError("partition must be >= 0")
+            position = positions.get(partition, -1) + 1
             positions[partition] = position
+            rows.append(
+                (
+                    message_id,
+                    stream,
+                    version,
+                    partition,
+                    position,
+                    message.message.get_message_time(),
+                )
+            )
+        self.stream._add(
+            conn=conn,
+            rows=rows,
+        )
