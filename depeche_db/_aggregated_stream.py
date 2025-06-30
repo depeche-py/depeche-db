@@ -641,8 +641,7 @@ class StreamProjector(Generic[E]):
         if cutoff is not None:
             cutoff_cond = [origin_table.c.global_position <= cutoff]
 
-        with catchtime("stream_positions"):
-            stream_positions = self.cached_stream_positions(conn)
+        stream_positions = self.cached_stream_positions(conn)
         largest_known_global_position = min(
             (
                 row.max_aggregated_stream_global_position
@@ -658,11 +657,9 @@ class StreamProjector(Generic[E]):
         min_global_position = max(
             0, largest_known_global_position - estimated_lookback_global_position
         )
-        print(min_global_position, cutoff)
 
-        with catchtime("origin_streams"):
-            print(conn)
-            cur = conn.execute(
+        origin_streams = list(
+            conn.execute(
                 _sa.select(
                     origin_table.c.stream,
                     _sa.func.max(origin_table.c.global_position).label(
@@ -685,39 +682,34 @@ class StreamProjector(Generic[E]):
                     )
                 )
                 .group_by(origin_table.c.stream)
-            )
+            ).fetchall()
+        )
 
-        with catchtime("origin_streams"):
-            rows = cur.fetchall()
-
-        origin_streams = list(rows)
-
-        with catchtime("candidate_streams"):
-            candidate_streams = []
-            for (
-                stream,
-                max_global_position,
-                min_global_position,
-            ) in origin_streams:
-                stream_position = stream_positions.get(stream)
-                if stream_position is None:
-                    candidate_streams.append(
-                        SelectedOriginStream2(
-                            stream=stream,
-                            start_at_global_position=min_global_position,
-                        )
+        candidate_streams = []
+        for (
+            stream,
+            max_global_position,
+            min_global_position,
+        ) in origin_streams:
+            stream_position = stream_positions.get(stream)
+            if stream_position is None:
+                candidate_streams.append(
+                    SelectedOriginStream2(
+                        stream=stream,
+                        start_at_global_position=min_global_position,
                     )
-                elif (
-                    stream_position.max_aggregated_stream_global_position
-                    < max_global_position
-                ):
-                    candidate_streams.append(
-                        SelectedOriginStream2(
-                            stream=stream,
-                            start_at_global_position=stream_position.max_aggregated_stream_global_position
-                            + 1,
-                        )
+                )
+            elif (
+                stream_position.max_aggregated_stream_global_position
+                < max_global_position
+            ):
+                candidate_streams.append(
+                    SelectedOriginStream2(
+                        stream=stream,
+                        start_at_global_position=stream_position.max_aggregated_stream_global_position
+                        + 1,
                     )
+                )
         # TODO random sample? order by start_at_global_position?
         return candidate_streams
 
