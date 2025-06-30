@@ -5,7 +5,7 @@ from typing import Generic, Iterator, Optional, Sequence, TypeVar
 import sqlalchemy as _sa
 
 from ._compat import SAConnection
-from ._exceptions import MessageNotFound
+from ._exceptions import MessageIdMismatchError, MessageNotFound
 from ._factories import AggregatedStreamFactory
 from ._interfaces import (
     MessagePosition,
@@ -277,7 +277,9 @@ class MessageStore(Generic[E]):
             message_ids = [message.get_message_id() for message in messages]
             for stored, given in zip(stored_ids, message_ids):
                 if stored != given:
-                    raise ValueError("Message ID mismatch")
+                    raise MessageIdMismatchError(
+                        "Message ID mismatch, has the stream been modified in the meantime?"
+                    )
             messages = messages[len(stored_ids) :]
         if messages:
             result = self._storage.add_all(

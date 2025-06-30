@@ -26,7 +26,12 @@ class Executor:
 
     listener: Optional[PgNotificationListener] = None
 
-    def __init__(self, db_dsn: str, stimulation_interval: float = 0.5):
+    def __init__(
+        self,
+        db_dsn: str,
+        stimulation_interval: float = 0.5,
+        disable_signals: bool = False,
+    ):
         self._db_dsn = db_dsn
         self.channel_register: Dict[
             str, List[RunOnNotification]
@@ -37,8 +42,9 @@ class Executor:
         self.stimulator_thread = _threading.Thread(target=self._stimulate, daemon=True)
         self.handler_thread = _threading.Thread(target=self._run_handlers, daemon=True)
         self.listener = None
-        _signal.signal(_signal.SIGINT, lambda *_: self._stop())
-        _signal.signal(_signal.SIGTERM, lambda *_: self._stop())
+        if not disable_signals:
+            _signal.signal(_signal.SIGINT, lambda *_: self._stop())
+            _signal.signal(_signal.SIGTERM, lambda *_: self._stop())
 
     def register(self, handler: RunOnNotification):
         """

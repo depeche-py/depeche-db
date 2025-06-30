@@ -1,11 +1,23 @@
+# 0.10.3
+
+* Use one insert operation per batch in aggregated stream update instead of one per message
+
+# 0.10.2
+
+* Make exception on Message ID mismatch in `MessageStore.synchronize` more specific.
+
+# 0.10.1
+
+* Fix performance of aggregated stream projection
+
 # 0.10.0
 
 * Add batched acknowledgement strategy
 * Performance improvements
-  * Use less connections on load in subscription
-  * Removed overly defensive check in acknowledgement operation
-  * Pre-calculate hot SqlA queries
-  * Improved Performance in pydantic (de)serialization
+    * Use less connections on load in subscription
+    * Removed overly defensive check in acknowledgement operation
+    * Pre-calculate hot SqlA queries
+    * Improved Performance in pydantic (de)serialization
 
 # 0.9.1
 

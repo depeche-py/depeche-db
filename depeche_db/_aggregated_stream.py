@@ -1,18 +1,27 @@
 import contextlib as _contextlib
 import datetime as _dt
-import uuid as _uuid
-from typing import TYPE_CHECKING, Dict, Generic, Iterator, List, Optional, TypeVar
+from collections import namedtuple
+from typing import (
+    TYPE_CHECKING,
+    Dict,
+    Generic,
+    Iterator,
+    List,
+    Optional,
+    TypeVar,
+)
 
 import sqlalchemy as _sa
 from sqlalchemy_utils import UUIDType as _UUIDType
 
-from ._compat import PsycoPgLockNotAvailable, SAConnection
+from ._compat import PsycoPgLockNotAvailable, SAColumnElement, SAConnection
 from ._factories import SubscriptionFactory
 from ._interfaces import (
     AggregatedStreamMessage,
     MessagePartitioner,
     MessageProtocol,
     RunOnNotificationResult,
+    StoredMessage,
     StreamPartitionStatistic,
     SubscriptionStartPoint,
     TimeBudget,
@@ -116,29 +125,12 @@ class AggregatedStream(Generic[E]):
         """
         conn.execute(self._table.delete())
 
-    def add(
+    def _add(
         self,
         conn: SAConnection,
-        message_id: _uuid.UUID,
-        stream: str,
-        stream_version: int,
-        partition: int,
-        position: int,
-        message_occurred_at: _dt.datetime,
+        rows,
     ) -> None:
-        # TODO assert message_occurred_at is UTC (or time zone aware)
-        if partition < 0:
-            raise ValueError("partition must be >= 0")
-        conn.execute(
-            self._table.insert().values(
-                message_id=message_id,
-                origin_stream=stream,
-                origin_stream_version=stream_version,
-                partition=partition,
-                position=position,
-                message_occurred_at=message_occurred_at,
-            )
-        )
+        conn.execute(self._table.insert().values(rows))
 
     def read(
         self, partition: int, conn: Optional[SAConnection] = None
@@ -474,6 +466,12 @@ class _AlreadyUpdating(RuntimeError):
     pass
 
 
+SelectedOriginStream = namedtuple(
+    "SelectedOriginStream",
+    ["stream", "max_aggregated_stream_version", "min_global_position", "message_count"],
+)
+
+
 class StreamProjector(Generic[E]):
     def __init__(
         self,
@@ -549,32 +547,22 @@ class StreamProjector(Generic[E]):
             conn.commit()
         return result
 
-    def _update_batch(self, conn, cutoff: Optional[int] = None) -> int:
+    def _select_origin_streams(
+        self, conn: SAConnection, cutoff_cond: List[SAColumnElement[bool]]
+    ) -> List[SelectedOriginStream]:
         tbl = self.stream._table.alias()
         message_table = self.stream._store._storage.message_table
-        last_seen = (
+        max_origin_stream_version = (
+            # Versions of the origin streams, used to determine which streams
+            # have new messages.
             _sa.select(
-                tbl.c.origin_stream,
-                _sa.func.max(tbl.c.origin_stream_version).label("max_version"),
-            )
-            .group_by(tbl.c.origin_stream)
-            .cte()
-        )
-        cutoff_cond = []
-        if cutoff is not None:
-            cutoff_cond = [message_table.c.global_position <= cutoff]
-        q = (
-            _sa.select(
-                message_table.c.message_id,
                 message_table.c.stream,
-                message_table.c.version,
-            )
-            .select_from(
-                message_table.join(
-                    last_seen,
-                    message_table.c.stream == last_seen.c.origin_stream,
-                    isouter=True,
-                )
+                _sa.func.max(message_table.c.version).label(
+                    "max_origin_stream_version"
+                ),
+                _sa.func.min(message_table.c.global_position).label(
+                    "min_global_position"
+                ),
             )
             .where(
                 _sa.and_(
@@ -584,17 +572,123 @@ class StreamProjector(Generic[E]):
                             for wildcard in self.stream_wildcards
                         ]
                     ),
-                    _sa.or_(
-                        message_table.c.version > last_seen.c.max_version,
-                        last_seen.c.max_version.is_(None),
-                    ),
                     *cutoff_cond,
+                )
+            )
+            .group_by(message_table.c.stream)
+            .cte("max_origin_stream_version")
+        )
+        max_aggregated_stream_version = (
+            # Current version of all the streams in the aggregated stream.
+            _sa.select(
+                tbl.c.origin_stream,
+                _sa.func.max(tbl.c.origin_stream_version).label(
+                    "max_aggregated_stream_version"
+                ),
+            )
+            .group_by(tbl.c.origin_stream)
+            .cte("max_aggregated_stream_version")
+        )
+        streams_to_be_updated = (
+            _sa.select(
+                max_origin_stream_version.c.stream,
+                _sa.func.coalesce(
+                    max_aggregated_stream_version.c.max_aggregated_stream_version, 0
+                ).label("max_aggregated_stream_version"),
+                max_origin_stream_version.c.min_global_position,
+                (
+                    max_origin_stream_version.c.max_origin_stream_version
+                    - _sa.func.coalesce(
+                        max_aggregated_stream_version.c.max_aggregated_stream_version, 0
+                    )
+                ).label("message_count"),
+            )
+            .select_from(
+                max_origin_stream_version.join(
+                    max_aggregated_stream_version,
+                    max_origin_stream_version.c.stream
+                    == max_aggregated_stream_version.c.origin_stream,
+                    isouter=True,
+                )
+            )
+            .where(
+                _sa.or_(
+                    max_aggregated_stream_version.c.max_aggregated_stream_version.is_(
+                        None
+                    ),
+                    max_origin_stream_version.c.max_origin_stream_version
+                    > max_aggregated_stream_version.c.max_aggregated_stream_version,
+                )
+            )
+            # Oldest (= first message the oldest) streams first
+            .order_by(max_origin_stream_version.c.min_global_position)
+        )
+
+        selected_streams: list[SelectedOriginStream] = []
+        for row in conn.execute(streams_to_be_updated):
+            if len(selected_streams) >= min(self.batch_size, 20):
+                # We select the 20 oldest streams to help with staying true
+                # to our best effort guarantee of a.global_position < b.global_position
+                # => a.position_in_partition < b.position_in_partition.
+                break
+            selected_streams.append(
+                SelectedOriginStream(
+                    row.stream,
+                    row.max_aggregated_stream_version,
+                    row.min_global_position,
+                    row.message_count,
+                )
+            )
+        return selected_streams
+
+    def _update_batch(self, conn: SAConnection, cutoff: Optional[int] = None) -> int:
+        message_table = self.stream._store._storage.message_table
+        cutoff_cond = []
+        if cutoff is not None:
+            cutoff_cond = [message_table.c.global_position <= cutoff]
+
+        selected_streams = self._select_origin_streams(conn, cutoff_cond=cutoff_cond)
+        if not selected_streams:
+            return 0
+
+        # Minimal global_position from the relevant streams. This can/will be a lot
+        # lower than the global position of the messages that need to be added
+        # to the stream. It still is a helpful optimization as it limits the
+        # amount of messages which have to be considered in the query below.
+        min_global_position = min(
+            selected_stream.min_global_position for selected_stream in selected_streams
+        )
+        qry = (
+            _sa.select(
+                message_table.c.message_id,
+                message_table.c.stream,
+                message_table.c.version,
+                message_table.c.message,
+                message_table.c.global_position,
+            )
+            .where(
+                _sa.and_(
+                    message_table.c.global_position >= min_global_position,
+                    *cutoff_cond,
+                    _sa.or_(
+                        *[
+                            _sa.and_(
+                                message_table.c.stream == selected_stream.stream,
+                                message_table.c.version
+                                > selected_stream.max_aggregated_stream_version,
+                            )
+                            for selected_stream in selected_streams
+                        ]
+                    ),
                 )
             )
             .order_by(message_table.c.global_position)
             .limit(self.batch_size)
         )
-        messages = list(conn.execute(q))
+        messages = list(conn.execute(qry))
+        if not messages:
+            return 0
+
         self._add(conn, messages)
         return len(messages)
 
@@ -609,25 +703,31 @@ class StreamProjector(Generic[E]):
             )
         }
 
-        with self.stream._store.reader(conn) as reader:
-            stored_messages = {
-                message.message_id: message
-                for message in reader.get_messages_by_ids(
-                    [message_id for message_id, *_ in messages]
-                )
-            }
-
-        for message_id, stream, version in messages:
-            message = stored_messages[message_id]
-            partition = self.partitioner.get_partition(message)
-            position = positions.get(partition, -1) + 1
-            self.stream.add(
-                conn=conn,
+        rows = []
+        for message_id, stream, version, message, global_position in messages:
+            message = StoredMessage(
                 message_id=message_id,
                 stream=stream,
-                stream_version=version,
-                partition=partition,
-                position=position,
-                message_occurred_at=message.message.get_message_time(),
+                version=version,
+                message=self.stream._store._serializer.deserialize(message),
+                global_position=global_position,
             )
+            partition = self.partitioner.get_partition(message)
+            if partition < 0:
+                raise ValueError("partition must be >= 0")
+            position = positions.get(partition, -1) + 1
             positions[partition] = position
+            rows.append(
+                (
+                    message_id,
+                    stream,
+                    version,
+                    partition,
+                    position,
+                    message.message.get_message_time(),
+                )
+            )
+        self.stream._add(
+            conn=conn,
+            rows=rows,
+        )
