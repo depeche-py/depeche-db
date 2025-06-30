@@ -22,6 +22,8 @@ class Executor:
 
     Args:
         db_dsn: DSN for the PostgreSQL database
+        stimulation_interval: Seconds; Every interval, all the handlers will run once. Zero & negative values disable stimulation.
+        disable_signals: Disable catching SIGINT/SIGTERM, useful if you want to run the Executor in a sub-thread
     """
 
     listener: Optional[PgNotificationListener] = None
@@ -70,7 +72,7 @@ class Executor:
         self.listener = PgNotificationListener(
             dsn=self._db_dsn,
             channels=list(self.channel_register),
-            ignore_payload=True,
+            ignore_payload=False,
         )
 
         self.handler_thread.start()
@@ -79,7 +81,9 @@ class Executor:
 
         for notification in self.listener.messages():
             for handler in self.channel_register[notification.channel]:
-                self.handler_queue.put(handler)
+                if handler.interested_in_notification(notification.payload):
+                    handler.take_notification_hint(notification.payload)
+                    self.handler_queue.put(handler)
 
         self.handler_thread.join()
         self.stimulator_thread.join()
@@ -103,6 +107,8 @@ class Executor:
                 pass
 
     def _stimulate(self):
+        if self.stimulation_interval <= 0:
+            return
         while self.keep_running:
             for handlers in self.channel_register.values():
                 for handler in handlers:

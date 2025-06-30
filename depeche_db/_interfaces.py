@@ -352,6 +352,25 @@ class RunOnNotification(Protocol):
         """
         raise NotImplementedError
 
+    def interested_in_notification(self, notification: dict) -> bool:
+        """
+        Signals whether the object is interested in a notification.
+        If this method returns `False`, the object's `run` method will not be called
+        because of this notification.
+        """
+        raise NotImplementedError
+
+    def take_notification_hint(self, notification: dict):
+        """
+        This will be called when a notification is received. Make sure that
+        the implementation of this method is fast, as it will be called for every
+        notification received on the channel.
+        Also make sure that this method is thread-safe, as it can be called
+        from different threads. Especially, it should be thread-safe against
+        the `run` method.
+        """
+        raise NotImplementedError
+
     def run(self, budget: TimeBudget) -> Optional[RunOnNotificationResult]:
         """
         Runs the object. This method needs to return when a chunk of work has been

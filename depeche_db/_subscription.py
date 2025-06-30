@@ -385,6 +385,12 @@ class SubscriptionRunner(Generic[E]):
         self._keep_running = True
         self._handler = message_handler
 
+    def interested_in_notification(self, notification: dict) -> bool:
+        return True
+
+    def take_notification_hint(self, notification: dict):
+        pass
+
     @property
     def notification_channel(self) -> str:
         return self._subscription._stream.notification_channel

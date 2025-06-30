@@ -150,11 +150,12 @@ def stream_with_events(identifier, db_engine, store_with_events, stream_factory)
 
 @pytest.fixture
 def subscription_factory(identifier, lock_provider):
-    def _inner(stream, state_provider=None):
+    def _inner(stream, state_provider=None, handlers=None):
         return stream.subscription(
             name=identifier(),
             lock_provider=lock_provider,
             state_provider=state_provider or MyStateProvider(),
+            handlers=handlers,
         )
 
     return _inner
