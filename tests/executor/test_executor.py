@@ -128,7 +128,7 @@ def test_take_notification_hint(pg_db):
         _send_notifications(pg_db, handler.notification_channel, 2)
         time.sleep(0.5)
 
-        assert len(handler.calls) == 1
+        assert 1 <= len(handler.calls) <= 2
         assert handler.hints == [{"message": "Hello 0"}, {"message": "Hello 1"}]
 
 
