@@ -15,7 +15,7 @@ def test_it(pg_db, db_engine, stream_factory, store_factory, subscription_factor
     store = store_factory()
     stream: AggregatedStream = stream_factory(store)
 
-    handlers = MessageHandlerRegister()
+    handlers = MessageHandlerRegister[AccountEvent]()
 
     msg_sub_recv = []
 
