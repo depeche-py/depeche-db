@@ -1,3 +1,7 @@
+# 0.10.3
+
+* Use one insert operation per batch in aggregated stream update instead of one per message
+
 # 0.10.2
 
 * Make exception on Message ID mismatch in `MessageStore.synchronize` more specific.
