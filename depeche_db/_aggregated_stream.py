@@ -14,7 +14,7 @@ from typing import (
 import sqlalchemy as _sa
 from sqlalchemy_utils import UUIDType as _UUIDType
 
-from ._compat import PsycoPgLockNotAvailable, SAColumnElement, SAConnection
+from ._compat import PsycoPgLockNotAvailable, SAConnection
 from ._factories import SubscriptionFactory
 from ._interfaces import (
     AggregatedStreamMessage,
@@ -78,6 +78,12 @@ class AggregatedStream(Generic[E]):
             _sa.Column("message_id", _UUIDType(), primary_key=True),
             _sa.Column("origin_stream", _sa.String(255), nullable=False),
             _sa.Column("origin_stream_version", _sa.Integer, nullable=False),
+            _sa.Column(
+                "origin_stream_global_position", _sa.Integer, nullable=False, index=True
+            ),
+            _sa.Column(
+                "origin_stream_added_at", _sa.DateTime, nullable=False, index=True
+            ),
             _sa.Column(
                 "partition",
                 _sa.Integer,
@@ -469,6 +475,23 @@ SelectedOriginStream = namedtuple(
     ["stream", "max_aggregated_stream_version", "min_global_position", "message_count"],
 )
 
+SelectedOriginStream2 = namedtuple(
+    "SelectedOriginStream2",
+    [
+        "stream",
+        "start_at_global_position",
+    ],
+)
+
+StreamPositon = namedtuple(
+    "StreamPositon",
+    [
+        "origin_stream",
+        "max_aggregated_stream_global_position",
+        "max_aggregated_stream_added_at",
+    ],
+)
+
 
 class StreamProjector(Generic[E]):
     def __init__(
@@ -490,6 +513,8 @@ class StreamProjector(Generic[E]):
         self.stream_wildcards = stream_wildcards
         self.partitioner = partitioner
         self.batch_size = batch_size or 100
+        self._stream_positions_cache = None
+        self._messages_per_hour_cache: Optional[int] = None
 
     def interested_in_notification(self, notification: dict) -> bool:
         return True
@@ -540,6 +565,7 @@ class StreamProjector(Generic[E]):
                 )
             except _sa.exc.OperationalError as exc:
                 if isinstance(exc.orig, PsycoPgLockNotAvailable):
+                    self._stream_positions_cache = None
                     raise _AlreadyUpdating(
                         "Cannot update stream projection, because another process is already updating it."
                     )
@@ -554,11 +580,155 @@ class StreamProjector(Generic[E]):
             conn.commit()
         return result
 
+    def get_messages_per_hour(self, conn: SAConnection) -> int:
+        # TODO invalidate cache (time based?)
+        if self._messages_per_hour_cache is None:
+            hours = 24 * 14
+            origin_table = self.stream._store._storage.message_table
+            start = _dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(hours=hours)
+            message_in_timeframe = conn.execute(
+                _sa.select(_sa.func.count())
+                .select_from(origin_table)
+                .where(origin_table.c.added_at >= start)
+            ).scalar_one()
+            self._messages_per_hour_cache = max(int(message_in_timeframe / hours), 50)
+        return self._messages_per_hour_cache
+
+    def cached_stream_positions(self, conn: SAConnection) -> Dict[str, StreamPositon]:
+        stream_table = self.stream._table.alias()
+        if self._stream_positions_cache is not None:
+            max_cached_global_position = max(
+                (
+                    row.max_aggregated_stream_global_position
+                    for row in self._stream_positions_cache.values()
+                ),
+                default=-1,
+            )
+            max_live_global_position = conn.execute(
+                _sa.select(_sa.func.max(stream_table.c.origin_stream_global_position))
+            ).scalar_one()
+            if max_cached_global_position != max_live_global_position:
+                # invalidate the cache
+                print("invalidating stream positions cache")
+                self._stream_positions_cache = None
+
+        if not self._stream_positions_cache:
+            self._stream_positions_cache = {
+                row.origin_stream: StreamPositon(
+                    origin_stream=row.origin_stream,
+                    max_aggregated_stream_global_position=row.max_aggregated_stream_global_position,
+                    max_aggregated_stream_added_at=row.max_aggregated_stream_added_at,
+                )
+                for row in conn.execute(
+                    _sa.select(
+                        stream_table.c.origin_stream,
+                        _sa.func.max(
+                            stream_table.c.origin_stream_global_position
+                        ).label("max_aggregated_stream_global_position"),
+                        _sa.func.max(stream_table.c.origin_stream_added_at).label(
+                            "max_aggregated_stream_added_at"
+                        ),
+                    ).group_by(stream_table.c.origin_stream)
+                )
+            }
+        return self._stream_positions_cache
+
+    def _select_origin_streams_naive(
+        self, conn: SAConnection, cutoff: Optional[int] = None
+    ) -> List[SelectedOriginStream2]:
+        origin_table = self.stream._store._storage.message_table
+        cutoff_cond = []
+        if cutoff is not None:
+            cutoff_cond = [origin_table.c.global_position <= cutoff]
+
+        with catchtime("stream_positions"):
+            stream_positions = self.cached_stream_positions(conn)
+        largest_known_global_position = min(
+            (
+                row.max_aggregated_stream_global_position
+                for row in stream_positions.values()
+            ),
+            default=0,
+        )
+        # TODO configurable
+        lookback_for_gaps_hours = 6
+        estimated_lookback_global_position = (
+            self.get_messages_per_hour(conn) * lookback_for_gaps_hours
+        )
+        min_global_position = max(
+            0, largest_known_global_position - estimated_lookback_global_position
+        )
+        print(min_global_position, cutoff)
+
+        with catchtime("origin_streams"):
+            print(conn)
+            cur = conn.execute(
+                _sa.select(
+                    origin_table.c.stream,
+                    _sa.func.max(origin_table.c.global_position).label(
+                        "max_origin_stream_global_position"
+                    ),
+                    _sa.func.min(origin_table.c.global_position).label(
+                        "min_origin_stream_global_position"
+                    ),
+                )
+                .where(
+                    _sa.and_(
+                        origin_table.c.global_position >= min_global_position,
+                        _sa.or_(
+                            *[
+                                origin_table.c.stream.like(wildcard)
+                                for wildcard in self.stream_wildcards
+                            ]
+                        ),
+                        *cutoff_cond,
+                    )
+                )
+                .group_by(origin_table.c.stream)
+            )
+
+        with catchtime("origin_streams"):
+            rows = cur.fetchall()
+
+        origin_streams = list(rows)
+
+        with catchtime("candidate_streams"):
+            candidate_streams = []
+            for (
+                stream,
+                max_global_position,
+                min_global_position,
+            ) in origin_streams:
+                stream_position = stream_positions.get(stream)
+                if stream_position is None:
+                    candidate_streams.append(
+                        SelectedOriginStream2(
+                            stream=stream,
+                            start_at_global_position=min_global_position,
+                        )
+                    )
+                elif (
+                    stream_position.max_aggregated_stream_global_position
+                    < max_global_position
+                ):
+                    candidate_streams.append(
+                        SelectedOriginStream2(
+                            stream=stream,
+                            start_at_global_position=stream_position.max_aggregated_stream_global_position
+                            + 1,
+                        )
+                    )
+        # TODO random sample? order by start_at_global_position?
+        return candidate_streams
+
     def _select_origin_streams(
-        self, conn: SAConnection, cutoff_cond: List[SAColumnElement[bool]]
+        self, conn: SAConnection, cutoff: Optional[int] = None
     ) -> List[SelectedOriginStream]:
         tbl = self.stream._table.alias()
         message_table = self.stream._store._storage.message_table
+        cutoff_cond = []
+        if cutoff is not None:
+            cutoff_cond = [message_table.c.global_position <= cutoff]
         max_origin_stream_version = (
             # Versions of the origin streams, used to determine which streams
             # have new messages.
@@ -650,11 +820,8 @@ class StreamProjector(Generic[E]):
 
     def _update_batch(self, conn: SAConnection, cutoff: Optional[int] = None) -> int:
         message_table = self.stream._store._storage.message_table
-        cutoff_cond = []
-        if cutoff is not None:
-            cutoff_cond = [message_table.c.global_position <= cutoff]
 
-        selected_streams = self._select_origin_streams(conn, cutoff_cond=cutoff_cond)
+        selected_streams = self._select_origin_streams_naive(conn, cutoff=cutoff)
         if not selected_streams:
             return 0
 
@@ -663,8 +830,13 @@ class StreamProjector(Generic[E]):
         # to the stream. It still is a helpful optimization as it limits the
         # amount of messages which have to be considered in the query below.
         min_global_position = min(
-            selected_stream.min_global_position for selected_stream in selected_streams
+            selected_stream.start_at_global_position
+            for selected_stream in selected_streams
+            # selected_stream.min_global_position for selected_stream in selected_streams
         )
+        cutoff_cond = []
+        if cutoff is not None:
+            cutoff_cond = [message_table.c.global_position <= cutoff]
         qry = (
             _sa.select(
                 message_table.c.message_id,
@@ -672,6 +844,7 @@ class StreamProjector(Generic[E]):
                 message_table.c.version,
                 message_table.c.message,
                 message_table.c.global_position,
+                message_table.c.added_at,
             )
             .where(
                 _sa.and_(
@@ -681,8 +854,8 @@ class StreamProjector(Generic[E]):
                         *[
                             _sa.and_(
                                 message_table.c.stream == selected_stream.stream,
-                                message_table.c.version
-                                > selected_stream.max_aggregated_stream_version,
+                                message_table.c.global_position
+                                >= selected_stream.start_at_global_position,
                             )
                             for selected_stream in selected_streams
                         ]
@@ -711,13 +884,14 @@ class StreamProjector(Generic[E]):
         }
 
         rows = []
-        for message_id, stream, version, message, global_position in messages:
+        for message_id, stream, version, message, global_position, added_at in messages:
             message = StoredMessage(
                 message_id=message_id,
                 stream=stream,
                 version=version,
                 message=self.stream._store._serializer.deserialize(message),
                 global_position=global_position,
+                added_at=added_at,
             )
             partition = self.partitioner.get_partition(message)
             if partition < 0:
@@ -729,11 +903,19 @@ class StreamProjector(Generic[E]):
                     message_id,
                     stream,
                     version,
+                    global_position,
+                    added_at,
                     partition,
                     position,
                     message.message.get_message_time(),
                 )
             )
+            if self._stream_positions_cache is not None:
+                self._stream_positions_cache[stream] = StreamPositon(
+                    origin_stream=stream,
+                    max_aggregated_stream_global_position=message.global_position,
+                    max_aggregated_stream_added_at=message.added_at,
+                )
         self.stream._add(
             conn=conn,
             rows=rows,

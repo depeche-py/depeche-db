@@ -1,3 +1,4 @@
+import datetime as _dt
 import uuid as _uuid
 from typing import Any, List
 
@@ -34,6 +35,7 @@ SUB_MSG = SubscriptionMessage(
             balance=1,
         ),
         global_position=0,
+        added_at=_dt.datetime(2025, 1, 1, 13),
     ),
     ack=None,
 )

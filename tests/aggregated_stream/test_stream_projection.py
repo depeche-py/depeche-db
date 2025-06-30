@@ -4,7 +4,10 @@ import uuid as _uuid
 import pytest
 import sqlalchemy as _sa
 
-from depeche_db._aggregated_stream import AggregatedStream, SelectedOriginStream
+from depeche_db._aggregated_stream import (
+    AggregatedStream,
+    SelectedOriginStream2,
+)
 from tests._account_example import Account, AccountRepository
 
 
@@ -48,7 +51,7 @@ def test_stream_projector_origin_selection(
 
     def get_select_origin_streams():
         with db_engine.connect() as conn:
-            return subject.projector._select_origin_streams(conn=conn, cutoff_cond=[])
+            return subject.projector._select_origin_streams_naive(conn=conn)
 
     account = Account.register(id=ACCOUNT1_ID, owner_id=_uuid.uuid4(), number="123")
     account.credit(100)
@@ -56,7 +59,10 @@ def test_stream_projector_origin_selection(
     account_repo.save(account, expected_version=0)
 
     assert get_select_origin_streams() == [
-        SelectedOriginStream(f"account-{account.id}", 0, 1, 3)
+        SelectedOriginStream2(
+            stream=f"account-{account.id}", start_at_global_position=1
+        )
+        # SelectedOriginStream(f"account-{account.id}", 0, 1, 3)
     ]
 
     account2 = Account.register(id=ACCOUNT2_ID, owner_id=_uuid.uuid4(), number="234")
@@ -66,8 +72,12 @@ def test_stream_projector_origin_selection(
     account_repo.save(account2, expected_version=0)
 
     assert get_select_origin_streams() == [
-        SelectedOriginStream(f"account-{account.id}", 0, 1, 3),
-        SelectedOriginStream(f"account-{account2.id}", 0, 4, 4),
+        SelectedOriginStream2(
+            stream=f"account-{account.id}", start_at_global_position=1
+        ),
+        SelectedOriginStream2(
+            stream=f"account-{account2.id}", start_at_global_position=4
+        ),
     ]
     assert subject.projector.update_full() == 7
 
@@ -83,7 +93,7 @@ def test_stream_projector_origin_selection_late_commit(
 
     def get_select_origin_streams():
         with db_engine.connect() as conn:
-            return subject.projector._select_origin_streams(conn=conn, cutoff_cond=[])
+            return subject.projector._select_origin_streams_naive(conn=conn)
 
     with db_engine.connect() as long_running_conn:
         # Simulate a long-running transaction that commits later
@@ -107,7 +117,9 @@ def test_stream_projector_origin_selection_late_commit(
         assert get_select_origin_streams() == [
             # min_global_position == 3 here because the events above already
             # consumed sequence numbers 1 and 2 even though they are not visible yet
-            SelectedOriginStream(f"account-{account2.id}", 0, 3, 2),
+            SelectedOriginStream2(
+                stream=f"account-{account2.id}", start_at_global_position=3
+            ),
         ]
         assert subject.projector.update_full() == 2
         long_running_conn.commit()
@@ -115,7 +127,7 @@ def test_stream_projector_origin_selection_late_commit(
     assert get_select_origin_streams() == [
         # min_global_position == 1 because the events from the long-running
         # transaction are now visible
-        SelectedOriginStream(f"account-{account.id}", 0, 1, 2),
+        SelectedOriginStream2(f"account-{account.id}", start_at_global_position=1),
     ]
     assert subject.projector.update_full() == 2
     assert_stream_projection(subject, db_engine, account, account2)

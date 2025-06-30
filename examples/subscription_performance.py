@@ -21,7 +21,7 @@ from depeche_db import (
     SubscriptionRunner,
     MessageHandlerRegister,
 )
-from depeche_db._interfaces import FixedTimeBudget
+from depeche_db._interfaces import FixedTimeBudget, RunOnNotificationResult, TimeBudget
 from depeche_db._subscription import AckStrategy, StartAtPointInTime
 from depeche_db.tools import (
     DbLockProvider,
@@ -44,7 +44,7 @@ def measure_timing(name: str, fn: Callable) -> Callable:
 
 
 DB_DSN = "postgresql+psycopg://depeche:depeche@localhost:4888/depeche_demo"
-db_engine = create_engine(DB_DSN)
+db_engine = create_engine(DB_DSN, pool_size=10, max_overflow=20, echo=False)
 original_connect = db_engine.connect
 
 CONNECTIONS = 0
@@ -84,9 +84,10 @@ class NumMessagePartitioner:
 
 
 stream: AggregatedStream = message_store.aggregated_stream(
-    name="ex_perf2",
+    name="ex_perf26",
     partitioner=NumMessagePartitioner(),
     stream_wildcards=["aggregate-me-%"],
+    # update_batch_size=1000,
 )
 
 HANDLED = 0
@@ -134,9 +135,15 @@ def project():
     stream.projector._update_batch = measure_timing(
         "update_batch", stream.projector._update_batch
     )
-    stream.projector._add = measure_timing("add", stream.projector._add)
+    stream.projector._select_origin_streams_naive = measure_timing(
+        "_select_origin_streams_naive", stream.projector._select_origin_streams_naive
+    )
     start = time.time()
-    stream.projector.run()
+    while (
+        stream.projector.run(FixedTimeBudget(seconds=5))
+        == RunOnNotificationResult.WORK_REMAINING
+    ):
+        pass
     duration = time.time() - start
     print("Projector finished in {:.2f}s".format(duration))
 
