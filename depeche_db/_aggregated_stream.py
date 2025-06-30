@@ -480,6 +480,7 @@ SelectedOriginStream2 = namedtuple(
     [
         "stream",
         "start_at_global_position",
+        "estimated_message_count",
     ],
 )
 
@@ -697,6 +698,8 @@ class StreamProjector(Generic[E]):
                     SelectedOriginStream2(
                         stream=stream,
                         start_at_global_position=min_global_position,
+                        # TODO add estimate? or exact count?
+                        estimated_message_count=0,
                     )
                 )
             elif (
@@ -708,107 +711,13 @@ class StreamProjector(Generic[E]):
                         stream=stream,
                         start_at_global_position=stream_position.max_aggregated_stream_global_position
                         + 1,
+                        # TODO add estimate? or exact count?
+                        estimated_message_count=0,
                     )
                 )
+        # TODO limit the number to a reasonable number! (sum(estimated_message_count) close to batch_size)
         # TODO random sample? order by start_at_global_position?
         return candidate_streams
-
-    def _select_origin_streams(
-        self, conn: SAConnection, cutoff: Optional[int] = None
-    ) -> List[SelectedOriginStream]:
-        tbl = self.stream._table.alias()
-        message_table = self.stream._store._storage.message_table
-        cutoff_cond = []
-        if cutoff is not None:
-            cutoff_cond = [message_table.c.global_position <= cutoff]
-        max_origin_stream_version = (
-            # Versions of the origin streams, used to determine which streams
-            # have new messages.
-            _sa.select(
-                message_table.c.stream,
-                _sa.func.max(message_table.c.version).label(
-                    "max_origin_stream_version"
-                ),
-                _sa.func.min(message_table.c.global_position).label(
-                    "min_global_position"
-                ),
-            )
-            .where(
-                _sa.and_(
-                    _sa.or_(
-                        *[
-                            message_table.c.stream.like(wildcard)
-                            for wildcard in self.stream_wildcards
-                        ]
-                    ),
-                    *cutoff_cond,
-                )
-            )
-            .group_by(message_table.c.stream)
-            .cte("max_origin_stream_version")
-        )
-        max_aggregated_stream_version = (
-            # Current version of all the streams in the aggregated stream.
-            _sa.select(
-                tbl.c.origin_stream,
-                _sa.func.max(tbl.c.origin_stream_version).label(
-                    "max_aggregated_stream_version"
-                ),
-            )
-            .group_by(tbl.c.origin_stream)
-            .cte("max_aggregated_stream_version")
-        )
-        streams_to_be_updated = (
-            _sa.select(
-                max_origin_stream_version.c.stream,
-                _sa.func.coalesce(
-                    max_aggregated_stream_version.c.max_aggregated_stream_version, 0
-                ).label("max_aggregated_stream_version"),
-                max_origin_stream_version.c.min_global_position,
-                (
-                    max_origin_stream_version.c.max_origin_stream_version
-                    - _sa.func.coalesce(
-                        max_aggregated_stream_version.c.max_aggregated_stream_version, 0
-                    )
-                ).label("message_count"),
-            )
-            .select_from(
-                max_origin_stream_version.join(
-                    max_aggregated_stream_version,
-                    max_origin_stream_version.c.stream
-                    == max_aggregated_stream_version.c.origin_stream,
-                    isouter=True,
-                )
-            )
-            .where(
-                _sa.or_(
-                    max_aggregated_stream_version.c.max_aggregated_stream_version.is_(
-                        None
-                    ),
-                    max_origin_stream_version.c.max_origin_stream_version
-                    > max_aggregated_stream_version.c.max_aggregated_stream_version,
-                )
-            )
-            # Oldest (= first message the oldest) streams first
-            .order_by(max_origin_stream_version.c.min_global_position)
-        )
-
-        selected_streams: list[SelectedOriginStream] = []
-        for row in conn.execute(streams_to_be_updated):
-            if len(selected_streams) >= min(self.batch_size, 20):
-                # We select the 20 oldest streams to help with staying true
-                # to our best effort guarantee of a.global_position < b.global_position
-                # => a.position_in_partition < b.position_in_partition.
-                break
-            selected_streams.append(
-                SelectedOriginStream(
-                    row.stream,
-                    row.max_aggregated_stream_version,
-                    row.min_global_position,
-                    row.message_count,
-                )
-            )
-        return selected_streams
 
     def _update_batch(self, conn: SAConnection, cutoff: Optional[int] = None) -> int:
         message_table = self.stream._store._storage.message_table
