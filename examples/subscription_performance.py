@@ -84,10 +84,10 @@ class NumMessagePartitioner:
 
 
 stream: AggregatedStream = message_store.aggregated_stream(
-    name="ex_perf26",
+    name="ex_perf29",
     partitioner=NumMessagePartitioner(),
     stream_wildcards=["aggregate-me-%"],
-    # update_batch_size=1000,
+    update_batch_size=100,
 )
 
 HANDLED = 0

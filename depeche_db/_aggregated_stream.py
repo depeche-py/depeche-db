@@ -470,13 +470,7 @@ class _AlreadyUpdating(RuntimeError):
     pass
 
 
-# TODO remove this in favor of SelectedOriginStream2
 SelectedOriginStream = namedtuple(
-    "SelectedOriginStream",
-    ["stream", "max_aggregated_stream_version", "min_global_position", "message_count"],
-)
-
-SelectedOriginStream2 = namedtuple(
     "SelectedOriginStream2",
     [
         "stream",
@@ -491,6 +485,7 @@ AggregatedStreamPositon = namedtuple(
         "origin_stream",
         "max_aggregated_stream_global_position",
         "max_aggregated_stream_added_at",
+        "min_aggregated_stream_global_position",
     ],
 )
 
@@ -500,6 +495,15 @@ OriginStreamPositon = namedtuple(
         "origin_stream",
         "max_global_position",
         "min_global_position",
+    ],
+)
+
+OriginStreamPositonUpdate = namedtuple(
+    "OriginStreamPositonUpdate",
+    [
+        "origin_stream",
+        "version",
+        "global_position",
     ],
 )
 
@@ -524,18 +528,29 @@ class StreamProjector(Generic[E]):
         self.stream_wildcards = stream_wildcards
         self.partitioner = partitioner
         self.batch_size = batch_size or 100
-        self._stream_positions_cache = None
+        self._aggregate_stream_positions_cache = None
+        self._origin_stream_position_updates: List[OriginStreamPositonUpdate] = []
+        self._origin_stream_positions_cache = None
         self._messages_per_hour_cache: Optional[int] = None
 
     def interested_in_notification(self, notification: dict) -> bool:
+        # TODO check if notification.get("stream") % self.stream_wildcards
         return True
 
     def take_notification_hint(self, notification: dict):
-        stream, version = notification.get("stream"), notification.get("version")
-        if stream and version:
-            # TODO use the additional information to optimize the update
-            # TODO update cached_origin_streams
-            pass
+        stream, version, global_position = (
+            notification.get("stream"),
+            notification.get("version"),
+            notification.get("global_position"),
+        )
+        if stream is not None and version is not None and global_position is not None:
+            self._origin_stream_position_updates.append(
+                OriginStreamPositonUpdate(
+                    origin_stream=stream,
+                    version=version,
+                    global_position=global_position,
+                )
+            )
 
     @property
     def notification_channel(self) -> str:
@@ -577,7 +592,7 @@ class StreamProjector(Generic[E]):
                 )
             except _sa.exc.OperationalError as exc:
                 if isinstance(exc.orig, PsycoPgLockNotAvailable):
-                    self._stream_positions_cache = None
+                    self._aggregate_stream_positions_cache = None
                     raise _AlreadyUpdating(
                         "Cannot update stream projection, because another process is already updating it."
                     )
@@ -593,7 +608,7 @@ class StreamProjector(Generic[E]):
         return result
 
     def get_messages_per_hour(self, conn: SAConnection) -> int:
-        # TODO invalidate cache (time based?)
+        # TODO invalidate cache (time based -> in a different thread?)
         if self._messages_per_hour_cache is None:
             hours = 24 * 14
             origin_table = self.stream._store._storage.message_table
@@ -606,32 +621,32 @@ class StreamProjector(Generic[E]):
             self._messages_per_hour_cache = max(int(message_in_timeframe / hours), 50)
         return self._messages_per_hour_cache
 
-    def cached_stream_positions(
-        self, conn: SAConnection
+    def cached_aggregate_stream_positions(
+        self,
+        conn: SAConnection,
+        min_global_position: int,
+        max_aggregated_stream_global_position: Optional[int] = None,
     ) -> Dict[str, AggregatedStreamPositon]:
         stream_table = self.stream._table.alias()
-        if self._stream_positions_cache is not None:
+        if self._aggregate_stream_positions_cache is not None:
             max_cached_global_position = max(
                 (
                     row.max_aggregated_stream_global_position
-                    for row in self._stream_positions_cache.values()
+                    for row in self._aggregate_stream_positions_cache.values()
                 ),
                 default=-1,
             )
-            max_live_global_position = conn.execute(
-                _sa.select(_sa.func.max(stream_table.c.origin_stream_global_position))
-            ).scalar_one()
-            if max_cached_global_position != max_live_global_position:
-                # invalidate the cache
-                print("invalidating stream positions cache")
-                self._stream_positions_cache = None
+            if max_cached_global_position != max_aggregated_stream_global_position:
+                # Another process has updated the stream, so we need to refresh the cache
+                self._aggregate_stream_positions_cache = None
 
-        if not self._stream_positions_cache:
-            self._stream_positions_cache = {
+        if not self._aggregate_stream_positions_cache:
+            self._aggregate_stream_positions_cache = {
                 row.origin_stream: AggregatedStreamPositon(
                     origin_stream=row.origin_stream,
                     max_aggregated_stream_global_position=row.max_aggregated_stream_global_position,
                     max_aggregated_stream_added_at=row.max_aggregated_stream_added_at,
+                    min_aggregated_stream_global_position=row.min_aggregated_stream_global_position,
                 )
                 for row in conn.execute(
                     _sa.select(
@@ -642,87 +657,161 @@ class StreamProjector(Generic[E]):
                         _sa.func.max(stream_table.c.origin_stream_added_at).label(
                             "max_aggregated_stream_added_at"
                         ),
-                    ).group_by(stream_table.c.origin_stream)
+                        _sa.func.min(
+                            stream_table.c.origin_stream_global_position
+                        ).label("min_aggregated_stream_global_position"),
+                    )
+                    .where(
+                        stream_table.c.origin_stream_global_position
+                        >= min_global_position,
+                    )
+                    .group_by(stream_table.c.origin_stream)
                 )
             }
-        return self._stream_positions_cache
+        else:
+            pass
+            ## Prune old entries from the cache to save memory.
+            # for key, value in self._aggregate_stream_positions_cache.items():
+            #    if value.max_aggregated_stream_global_position < min_global_position:
+            #        print("Pruning old entry from cache:", key)
+            # self._aggregate_stream_positions_cache = {
+            #    key: value
+            #    for key, value in self._aggregate_stream_positions_cache.items()
+            #    if value.max_aggregated_stream_global_position >= min_global_position
+            # }
+        return self._aggregate_stream_positions_cache
 
-    def cached_origin_streams(
+    def cached_origin_stream_positions(
         self,
         conn: SAConnection,
         min_global_position: int,
         max_global_position: Optional[int] = None,
     ) -> Dict[str, OriginStreamPositon]:
-        # TODO cache!!
-        # TODO how to invalidate the cache?
-        origin_table = self.stream._store._storage.message_table
-        cutoff_cond = []
-        if max_global_position is not None:
-            cutoff_cond = [origin_table.c.global_position <= max_global_position]
-        origin_streams = list(
-            conn.execute(
-                _sa.select(
-                    origin_table.c.stream,
-                    _sa.func.max(origin_table.c.global_position).label(
-                        "max_origin_stream_global_position"
-                    ),
-                    _sa.func.min(origin_table.c.global_position).label(
-                        "min_origin_stream_global_position"
-                    ),
-                )
-                .where(
-                    _sa.and_(
-                        origin_table.c.global_position >= min_global_position,
-                        _sa.or_(
-                            *[
-                                origin_table.c.stream.like(wildcard)
-                                for wildcard in self.stream_wildcards
-                            ]
-                        ),
-                        *cutoff_cond,
-                    )
-                )
-                .group_by(origin_table.c.stream)
-            ).fetchall()
-        )
+        # TODO time-based invalidation of the cache?
 
-        result = {}
-        for (
-            stream,
-            max_global_position,
-            min_global_position,
-        ) in origin_streams:
-            result[stream] = OriginStreamPositon(
-                origin_stream=stream,
-                max_global_position=max_global_position,
-                min_global_position=min_global_position,
+        if self._origin_stream_positions_cache is not None:
+            for update in self._origin_stream_position_updates:
+                if update.version == 1:
+                    self._origin_stream_positions_cache[
+                        update.origin_stream
+                    ] = OriginStreamPositon(
+                        origin_stream=update.origin_stream,
+                        max_global_position=update.global_position,
+                        min_global_position=update.global_position,
+                    )
+                else:
+                    if update.origin_stream not in self._origin_stream_positions_cache:
+                        # We do not have enough information to update the cache,
+                        # so we clear the cache and will rebuild it below.
+                        self._origin_stream_positions_cache = None
+                        break
+
+                    current = self._origin_stream_positions_cache[update.origin_stream]
+                    self._origin_stream_positions_cache[
+                        update.origin_stream
+                    ] = OriginStreamPositon(
+                        origin_stream=update.origin_stream,
+                        max_global_position=max(
+                            current.max_global_position,
+                            update.global_position,
+                        ),
+                        min_global_position=max(
+                            current.min_global_position, min_global_position
+                        ),
+                    )
+            # TODO check if thread-safe
+            self._origin_stream_position_updates.clear()
+
+        if self._origin_stream_positions_cache is None:
+            origin_table = self.stream._store._storage.message_table
+            cutoff_cond = []
+            if max_global_position is not None:
+                cutoff_cond = [origin_table.c.global_position <= max_global_position]
+            origin_streams = list(
+                conn.execute(
+                    _sa.select(
+                        origin_table.c.stream,
+                        _sa.func.max(origin_table.c.global_position).label(
+                            "max_origin_stream_global_position"
+                        ),
+                        _sa.func.min(origin_table.c.global_position).label(
+                            "min_origin_stream_global_position"
+                        ),
+                    )
+                    .where(
+                        _sa.and_(
+                            origin_table.c.global_position >= min_global_position,
+                            _sa.or_(
+                                *[
+                                    origin_table.c.stream.like(wildcard)
+                                    for wildcard in self.stream_wildcards
+                                ]
+                            ),
+                            *cutoff_cond,
+                        )
+                    )
+                    .group_by(origin_table.c.stream)
+                ).fetchall()
             )
-        return result
+
+            result = {}
+            for (
+                stream,
+                max_global_position,
+                min_global_position,
+            ) in origin_streams:
+                result[stream] = OriginStreamPositon(
+                    origin_stream=stream,
+                    max_global_position=max_global_position,
+                    min_global_position=min_global_position,
+                )
+            self._origin_stream_positions_cache = result
+        return self._origin_stream_positions_cache
 
     def _select_origin_streams_naive(
         self, conn: SAConnection, cutoff: Optional[int] = None
-    ) -> List[SelectedOriginStream2]:
-        stream_positions = self.cached_stream_positions(conn)
-        largest_known_global_position = min(
-            (
-                row.max_aggregated_stream_global_position
-                for row in stream_positions.values()
-            ),
-            default=0,
-        )
-        # TODO configurable
-        lookback_for_gaps_hours = 6
-        estimated_lookback_global_position = (
-            self.get_messages_per_hour(conn) * lookback_for_gaps_hours
-        )
-        min_global_position = max(
-            0, largest_known_global_position - estimated_lookback_global_position
-        )
+    ) -> List[SelectedOriginStream]:
+        # TODO extract this and cache for some time
+        stream_table = self.stream._table.alias()
+        row = conn.execute(
+            _sa.select(
+                stream_table.c.origin_stream_global_position,
+                stream_table.c.origin_stream_added_at,
+            )
+            .order_by(stream_table.c.origin_stream_global_position.desc())
+            .limit(1)
+        ).fetchone()
+        if row:
+            max_global_position_in_aggregate_stream, x_added_at = row
+            lookback_for_gaps_hours = 6
 
-        origin_streams = self.cached_origin_streams(
+            origin_table = self.stream._store._storage.message_table
+            estimated_min_global_position = (
+                conn.execute(
+                    _sa.select(_sa.func.max(origin_table.c.global_position)).where(
+                        origin_table.c.added_at
+                        <= x_added_at - _dt.timedelta(hours=lookback_for_gaps_hours)
+                    )
+                ).scalar_one_or_none()
+            ) or 0
+        else:
+            max_global_position_in_aggregate_stream = -1
+            estimated_min_global_position = 0
+        print("estimated_min_global_position", estimated_min_global_position)
+        # /extract
+
+        stream_positions = self.cached_aggregate_stream_positions(
+            conn,
+            min_global_position=estimated_min_global_position,
+            max_aggregated_stream_global_position=max_global_position_in_aggregate_stream,
+        )
+        origin_streams = self.cached_origin_stream_positions(
             conn=conn,
-            min_global_position=min_global_position,
+            min_global_position=estimated_min_global_position,
             max_global_position=cutoff,
+        )
+        print(
+            f"origin_streams: {len(origin_streams)}, stream_positions: {len(stream_positions)}",
         )
 
         candidate_streams = []
@@ -733,8 +822,9 @@ class StreamProjector(Generic[E]):
         ) in origin_streams.values():
             stream_position = stream_positions.get(stream)
             if stream_position is None:
+                assert min_global_position >= estimated_min_global_position
                 candidate_streams.append(
-                    SelectedOriginStream2(
+                    SelectedOriginStream(
                         stream=stream,
                         start_at_global_position=min_global_position,
                         # TODO add estimate? or exact count?
@@ -746,7 +836,7 @@ class StreamProjector(Generic[E]):
                 < max_global_position
             ):
                 candidate_streams.append(
-                    SelectedOriginStream2(
+                    SelectedOriginStream(
                         stream=stream,
                         start_at_global_position=stream_position.max_aggregated_stream_global_position
                         + 1,
@@ -774,6 +864,7 @@ class StreamProjector(Generic[E]):
             for selected_stream in selected_streams
             # selected_stream.min_global_position for selected_stream in selected_streams
         )
+        print("min_global_position update", min_global_position)
         cutoff_cond = []
         if cutoff is not None:
             cutoff_cond = [message_table.c.global_position <= cutoff]
@@ -850,11 +941,17 @@ class StreamProjector(Generic[E]):
                     message.message.get_message_time(),
                 )
             )
-            if self._stream_positions_cache is not None:
-                self._stream_positions_cache[stream] = AggregatedStreamPositon(
+            if self._aggregate_stream_positions_cache is not None:
+                current = self._aggregate_stream_positions_cache.get(stream)
+                self._aggregate_stream_positions_cache[
+                    stream
+                ] = AggregatedStreamPositon(
                     origin_stream=stream,
                     max_aggregated_stream_global_position=message.global_position,
                     max_aggregated_stream_added_at=message.added_at,
+                    min_aggregated_stream_global_position=current.min_aggregated_stream_global_position
+                    if current
+                    else message.global_position,
                 )
         self.stream._add(
             conn=conn,

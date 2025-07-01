@@ -6,7 +6,7 @@ import sqlalchemy as _sa
 
 from depeche_db._aggregated_stream import (
     AggregatedStream,
-    SelectedOriginStream2,
+    SelectedOriginStream,
 )
 from tests._account_example import Account, AccountRepository
 
@@ -59,9 +59,7 @@ def test_stream_projector_origin_selection(
     account_repo.save(account, expected_version=0)
 
     assert get_select_origin_streams() == [
-        SelectedOriginStream2(
-            stream=f"account-{account.id}", start_at_global_position=1
-        )
+        SelectedOriginStream(stream=f"account-{account.id}", start_at_global_position=1)
         # SelectedOriginStream(f"account-{account.id}", 0, 1, 3)
     ]
 
@@ -72,10 +70,10 @@ def test_stream_projector_origin_selection(
     account_repo.save(account2, expected_version=0)
 
     assert get_select_origin_streams() == [
-        SelectedOriginStream2(
+        SelectedOriginStream(
             stream=f"account-{account.id}", start_at_global_position=1
         ),
-        SelectedOriginStream2(
+        SelectedOriginStream(
             stream=f"account-{account2.id}", start_at_global_position=4
         ),
     ]
@@ -114,10 +112,11 @@ def test_stream_projector_origin_selection_late_commit(
         )
         account2.credit(100)
         account_repo.save(account2, expected_version=0)
+        print("HERE")
         assert get_select_origin_streams() == [
             # min_global_position == 3 here because the events above already
             # consumed sequence numbers 1 and 2 even though they are not visible yet
-            SelectedOriginStream2(
+            SelectedOriginStream(
                 stream=f"account-{account2.id}", start_at_global_position=3
             ),
         ]
@@ -127,7 +126,7 @@ def test_stream_projector_origin_selection_late_commit(
     assert get_select_origin_streams() == [
         # min_global_position == 1 because the events from the long-running
         # transaction are now visible
-        SelectedOriginStream2(f"account-{account.id}", start_at_global_position=1),
+        SelectedOriginStream(f"account-{account.id}", start_at_global_position=1),
     ]
     assert subject.projector.update_full() == 2
     assert_stream_projection(subject, db_engine, account, account2)
