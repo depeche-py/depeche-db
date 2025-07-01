@@ -140,7 +140,7 @@ def project():
     )
     start = time.time()
     while (
-        stream.projector.run(FixedTimeBudget(seconds=5))
+        stream.projector.run(FixedTimeBudget(seconds=0.5))
         == RunOnNotificationResult.WORK_REMAINING
     ):
         pass
