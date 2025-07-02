@@ -16,7 +16,7 @@ from typing import (
 import sqlalchemy as _sa
 from sqlalchemy_utils import UUIDType as _UUIDType
 
-from ._compat import PsycoPgLockNotAvailable, SAConnection
+from ._compat import PsycoPgLockNotAvailable, SAConnection, SARow
 from ._factories import SubscriptionFactory
 from ._interfaces import (
     AggregatedStreamMessage,
@@ -813,7 +813,7 @@ class StreamProjector(Generic[E]):
         self._add(conn, messages)
         return len(messages)
 
-    def _add(self, conn: SAConnection, messages: List[_sa.Row]) -> None:
+    def _add(self, conn: SAConnection, messages: List[SARow]) -> None:
         positions = {
             row.partition: row.max_position
             for row in conn.execute(
