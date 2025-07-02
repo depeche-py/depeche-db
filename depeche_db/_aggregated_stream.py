@@ -578,7 +578,9 @@ class StreamProjector(Generic[E]):
         self.batch_size = batch_size or 100
         self.lookback_for_gaps_hours = lookback_for_gaps_hours or 6
         self._lookback_cache: Optional[LookbackCache] = None
-        self._get_origin_stream_positions_cache: Optional[OriginStreamPositionsCache] = None
+        self._get_origin_stream_positions_cache: Optional[
+            OriginStreamPositionsCache
+        ] = None
 
     def interested_in_notification(self, notification: dict) -> bool:
         # Check if the projector is interested in the notification.
@@ -763,13 +765,13 @@ class StreamProjector(Generic[E]):
                         <= head_added_at
                         - _dt.timedelta(hours=self.lookback_for_gaps_hours)
                     )
-                ).scalar_one_or_none()
+                ).scalar_one_or_none(),
             ) or 0
             self._lookback_cache = LookbackCache(
                 head_added_at=head_added_at, value=value
             )
 
-        return self._lookback_cache.value
+        return self._lookback_cache.value  # type: ignore
 
     def _select_origin_streams(
         self, conn: SAConnection, cutoff: Optional[int] = None
