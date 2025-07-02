@@ -81,12 +81,6 @@ class AggregatedStream(Generic[E]):
             _sa.Column("origin_stream", _sa.String(255), nullable=False),
             _sa.Column("origin_stream_version", _sa.Integer, nullable=False),
             _sa.Column(
-                "origin_stream_global_position", _sa.Integer, nullable=False, index=True
-            ),
-            _sa.Column(
-                "origin_stream_added_at", _sa.DateTime, nullable=False, index=True
-            ),
-            _sa.Column(
                 "partition",
                 _sa.Integer,
                 nullable=False,
@@ -102,6 +96,10 @@ class AggregatedStream(Generic[E]):
                 _sa.DateTime,
                 nullable=False,
             ),
+            _sa.Column(
+                "origin_stream_global_position", _sa.Integer, nullable=False, index=True
+            ),
+            _sa.Column("origin_stream_added_at", _sa.DateTime, nullable=False),
             _sa.UniqueConstraint(
                 "partition",
                 "position",
@@ -447,20 +445,24 @@ class AggregatedStream(Generic[E]):
         return f"""
             -- Add columns (nullable)
             ALTER TABLE {aggregated_stream_tablename}
-            ADD COLUMN origin_stream_global_position INTEGER NULL,
-            ADD COLUMN origin_stream_global_position TIMESTAMP NULL;
+                ADD COLUMN origin_stream_global_position INTEGER NULL,
+                ADD COLUMN origin_stream_added_at TIMESTAMP NULL;
 
             -- Copy data from the message store to the aggregated stream
             UPDATE {aggregated_stream_tablename} AS agg
-            SET origin_stream_global_position = msg.global_position,
-            origin_stream_added_at = msg.added_at
-            FROM {message_tablename} AS msg
-            WHERE agg.message_id = msg.message_id;
+                SET origin_stream_global_position = msg.global_position,
+                origin_stream_added_at = msg.added_at
+                FROM {message_tablename} AS msg
+                WHERE agg.message_id = msg.message_id;
 
             -- Make the new columns NOT NULL
             ALTER TABLE {aggregated_stream_tablename}
-            ALTER COLUMN origin_stream_global_position SET NOT NULL,
-            ALTER COLUMN origin_stream_added_at SET NOT NULL;
+                ALTER COLUMN origin_stream_global_position SET NOT NULL,
+                ALTER COLUMN origin_stream_added_at SET NOT NULL;
+
+            --- Add index
+            CREATE INDEX ix_{aggregated_stream_tablename}_origin_stream_global_position
+                ON {aggregated_stream_tablename} (origin_stream_global_position);
             """
 
 
@@ -507,7 +509,6 @@ AggregatedStreamPositon = namedtuple(
     [
         "origin_stream",
         "max_aggregated_stream_global_position",
-        "max_aggregated_stream_added_at",
         "min_aggregated_stream_global_position",
     ],
 )
@@ -628,7 +629,6 @@ class StreamProjector(Generic[E]):
             row.origin_stream: AggregatedStreamPositon(
                 origin_stream=row.origin_stream,
                 max_aggregated_stream_global_position=row.max_aggregated_stream_global_position,
-                max_aggregated_stream_added_at=row.max_aggregated_stream_added_at,
                 min_aggregated_stream_global_position=row.min_aggregated_stream_global_position,
             )
             for row in conn.execute(
@@ -636,9 +636,6 @@ class StreamProjector(Generic[E]):
                     stream_table.c.origin_stream,
                     _sa.func.max(stream_table.c.origin_stream_global_position).label(
                         "max_aggregated_stream_global_position"
-                    ),
-                    _sa.func.max(stream_table.c.origin_stream_added_at).label(
-                        "max_aggregated_stream_added_at"
                     ),
                     _sa.func.min(stream_table.c.origin_stream_global_position).label(
                         "min_aggregated_stream_global_position"
@@ -866,11 +863,11 @@ class StreamProjector(Generic[E]):
                     message_id,
                     stream,
                     version,
-                    global_position,
-                    added_at,
                     partition,
                     position,
                     message.message.get_message_time(),
+                    global_position,
+                    added_at,
                 )
             )
         self.stream._add(
