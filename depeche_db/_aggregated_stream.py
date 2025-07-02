@@ -577,8 +577,8 @@ class StreamProjector(Generic[E]):
         self.partitioner = partitioner
         self.batch_size = batch_size or 100
         self.lookback_for_gaps_hours = lookback_for_gaps_hours or 6
-        self._lookback_cache = None
-        self._get_origin_stream_positions_cache = None
+        self._lookback_cache: Optional[LookbackCache] = None
+        self._get_origin_stream_positions_cache: Optional[OriginStreamPositionsCache] = None
 
     def interested_in_notification(self, notification: dict) -> bool:
         # Check if the projector is interested in the notification.
@@ -787,7 +787,7 @@ class StreamProjector(Generic[E]):
             estimated_gap_look_back_start=estimated_gap_look_back_start,
         )
 
-        candidate_streams = []
+        candidate_streams: List[SelectedOriginStream] = []
         if self._get_origin_stream_positions_cache is not None:
             if (
                 self._get_origin_stream_positions_cache.estimated_gap_look_back_start
