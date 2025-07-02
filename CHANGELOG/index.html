@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#0103" class="md-skip">
+        <a href="#0110-only-release-candidate" class="md-skip">
           Skip to content
         </a>
       
@@ -845,6 +845,21 @@
   
 
 
+<h1 id="0110-only-release-candidate">0.11.0 (only release candidate)</h1>
+<ul>
+<li>Improved performance of aggregated stream projection.</li>
+<li><strong>BREAKING CHANGE</strong>: Extended the RunOnNotification protocol<ul>
+<li>Added <code>interested_in_notification(dict) -&gt; bool</code></li>
+<li>Added <code>take_notification_hint(dict) -&gt; bool</code></li>
+</ul>
+</li>
+<li><strong>BREAKING CHANGE</strong>: Changed DB schema of aggregated streams<ul>
+<li>Added columns; you will have to do a downtime deployment for these changes</li>
+<li>Use the following command to generate a migration script:
+  <code>python -m depeche_db generate-migration-script &lt;PREV-VERSION&gt; 0.11 --message-store=&lt;NAME&gt; --aggregated-stream=&lt;STREAM-NAME&gt; --aggregated-stream=&lt;ANOTHER...&gt;</code></li>
+</ul>
+</li>
+</ul>
 <h1 id="0103">0.10.3</h1>
 <ul>
 <li>Use one insert operation per batch in aggregated stream update instead of one per message</li>
