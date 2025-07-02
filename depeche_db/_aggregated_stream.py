@@ -742,7 +742,9 @@ class StreamProjector(Generic[E]):
         self, conn: SAConnection, head_added_at: _dt.datetime
     ) -> int:
         if self._lookback_cache is not None:
-            if (head_added_at - self._lookback_cache.head_added_at) > _dt.timedelta(hours=1):
+            if (head_added_at - self._lookback_cache.head_added_at) > _dt.timedelta(
+                hours=1
+            ):
                 self._lookback_cache = None
 
         if self._lookback_cache is None:
@@ -757,8 +759,7 @@ class StreamProjector(Generic[E]):
                 ).scalar_one_or_none()
             ) or 0
             self._lookback_cache = LookbackCache(
-                head_added_at=head_added_at,
-                value=value
+                head_added_at=head_added_at, value=value
             )
 
         return self._lookback_cache.value
@@ -780,6 +781,7 @@ class StreamProjector(Generic[E]):
         )
 
         candidate_streams = []
+        # TODO add a namedtuple for the cache. AI!
         if self._get_origin_stream_positions_cache is not None:
             if (
                 self._get_origin_stream_positions_cache[0]
