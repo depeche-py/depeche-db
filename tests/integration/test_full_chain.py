@@ -58,7 +58,6 @@ def test_it(pg_db, db_engine, stream_factory, store_factory, subscription_factor
         print(msg_sub_recv[0] - first_save_done)
         print(msg_sub_recv[1] - second_save_done)
         print(msg_sub_recv[2] - second_save_done)
-        raise
 
     finally:
         for executor in executors:

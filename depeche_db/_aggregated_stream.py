@@ -472,7 +472,7 @@ class _AlreadyUpdating(RuntimeError):
 
 
 SelectedOriginStream = namedtuple(
-    "SelectedOriginStream2",
+    "SelectedOriginStream",
     [
         "stream",
         "start_at_global_position",
@@ -491,20 +491,11 @@ AggregatedStreamPositon = namedtuple(
 )
 
 OriginStreamPositon = namedtuple(
-    "StreamPositon",
+    "OriginStreamPositon",
     [
         "origin_stream",
         "max_global_position",
         "min_global_position",
-    ],
-)
-
-OriginStreamPositonUpdate = namedtuple(
-    "OriginStreamPositonUpdate",
-    [
-        "origin_stream",
-        "version",
-        "global_position",
     ],
 )
 
@@ -804,14 +795,14 @@ class StreamProjector(Generic[E]):
             .order_by(message_table.c.global_position)
             .limit(self.batch_size)
         )
-        messages = list(conn.execute(qry))
+        messages = list(conn.execute(qry).fetchall())
         if not messages:
             return 0
 
         self._add(conn, messages)
         return len(messages)
 
-    def _add(self, conn, messages):
+    def _add(self, conn: SAConnection, messages: List[_sa.Row]) -> None:
         positions = {
             row.partition: row.max_position
             for row in conn.execute(
