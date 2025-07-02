@@ -715,7 +715,6 @@ class StreamProjector(Generic[E]):
                 conn, head_added_at
             )
         else:
-            head_global_position = -1
             estimated_gap_look_back_start = 0
 
         stream_positions = self.get_aggregate_stream_positions(
