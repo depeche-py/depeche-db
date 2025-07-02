@@ -7,7 +7,34 @@ def main():
     Commands:
         - aggregated_stream_migration: Shows the migration script for the aggregated stream.
     """
-    # Implement a subcommand "aggregated_stream_migration" that prints the migration script retruned from AggregatedStream.get_migration_ddl_0_11_0. The command needs to accept two args: message_store_name and aggregated_stream_name. AI!
+    parser = _argparse.ArgumentParser(description="DepecheDB CLI tools")
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+    
+    # Add aggregated_stream_migration subcommand
+    migration_parser = subparsers.add_parser(
+        "aggregated_stream_migration",
+        help="Shows the migration script for the aggregated stream"
+    )
+    migration_parser.add_argument(
+        "message_store_name",
+        help="Name of the message store"
+    )
+    migration_parser.add_argument(
+        "aggregated_stream_name", 
+        help="Name of the aggregated stream"
+    )
+    
+    args = parser.parse_args()
+    
+    if args.command == "aggregated_stream_migration":
+        migration_ddl = AggregatedStream.get_migration_ddl_0_11_0(
+            args.message_store_name,
+            args.aggregated_stream_name
+        )
+        print(migration_ddl)
+    else:
+        parser.print_help()
 
 
-main()
+if __name__ == "__main__":
+    main()
