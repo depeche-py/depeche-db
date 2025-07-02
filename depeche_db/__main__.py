@@ -8,6 +8,7 @@ def main():
     Commands:
         - aggregated_stream_migration: Shows the migration script for the aggregated stream.
     """
+    # TODO make this usable like this: `python -m depeche_db generate-migration-script <PREV-VERSION> 0.11 --message-store=<NAME> --aggregated-stream=<STREAM-NAME> --aggregated-stream=<ANOTHER...>`. AI!
     parser = _argparse.ArgumentParser(description="DepecheDB CLI tools")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
