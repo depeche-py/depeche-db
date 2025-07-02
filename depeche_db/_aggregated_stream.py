@@ -1,6 +1,7 @@
 import contextlib as _contextlib
 import datetime as _dt
 import re as _re
+import textwrap as _textwrap
 from collections import namedtuple
 from typing import (
     TYPE_CHECKING,
@@ -10,6 +11,7 @@ from typing import (
     Iterator,
     List,
     Optional,
+    Tuple,
     TypeVar,
 )
 
@@ -431,13 +433,15 @@ class AggregatedStream(Generic[E]):
             tablename=tablename,
             notification_channel=cls.notification_channel_name(aggregated_stream_name),
         )
-        return f"""
+        return _textwrap.dedent(
+            f"""
             ALTER TABLE "{aggregated_stream_name}_projected_stream"
                  RENAME TO {tablename};
             DROP TRIGGER IF EXISTS {aggregated_stream_name}_stream_notify_message_inserted;
             DROP FUNCTION IF EXISTS {aggregated_stream_name}_stream_notify_message_inserted;
             {new_objects}
             """
+        )
 
     @classmethod
     def get_migration_ddl_0_11_0(
@@ -448,7 +452,8 @@ class AggregatedStream(Generic[E]):
         """
         aggregated_stream_tablename = cls.stream_table_name(aggregated_stream_name)
         message_tablename = f"depeche_msgs_{message_store_name}"
-        return f"""
+        return _textwrap.dedent(
+            f"""
             -- Add columns (nullable)
             ALTER TABLE {aggregated_stream_tablename}
                 ADD COLUMN origin_stream_global_position INTEGER NULL,
@@ -470,14 +475,17 @@ class AggregatedStream(Generic[E]):
             CREATE INDEX ix_{aggregated_stream_tablename}_origin_stream_global_position
                 ON {aggregated_stream_tablename} (origin_stream_global_position);
             """
+        )
 
     @classmethod
-    def migration_script_generators(cls) -> Dict[str, List[Callable[[str, str], str]]]:
+    def migration_script_generators(
+        cls,
+    ) -> Dict[Tuple[int, int], List[Callable[[str, str], str]]]:
         return {
-            "0.8": [
+            (0, 8): [
                 cls.get_migration_ddl_0_8_0,
             ],
-            "0.11": [
+            (0, 11): [
                 cls.get_migration_ddl_0_11_0,
             ],
         }
