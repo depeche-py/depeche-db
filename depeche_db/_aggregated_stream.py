@@ -710,9 +710,7 @@ class StreamProjector(Generic[E]):
             ).fetchall()
         }
 
-    def _get_aggregated_stream_head(
-        self, conn: SAConnection
-    ) -> AggregatedStreamHead:
+    def _get_aggregated_stream_head(self, conn: SAConnection) -> AggregatedStreamHead:
         stream_table = self.stream._table.alias()
         row = conn.execute(
             _sa.select(
@@ -725,17 +723,17 @@ class StreamProjector(Generic[E]):
         if row:
             head_global_position, head_added_at = row
             return AggregatedStreamHead(
-                global_position=head_global_position,
-                added_at=head_added_at
+                global_position=head_global_position, added_at=head_added_at
             )
         return AggregatedStreamHead(
             global_position=-1,
-            added_at=_dt.datetime(1980, 1, 1, tzinfo=_dt.timezone.utc)
+            added_at=_dt.datetime(1980, 1, 1, tzinfo=_dt.timezone.utc),
         )
 
     def _estimate_gap_look_back_start(
         self, conn: SAConnection, head_added_at: _dt.datetime
     ) -> int:
+        # TODO add namedtuple for lookback cache. AI!
         if self._lookback_cache is not None:
             old_head_added_at, value = self._lookback_cache
             if (head_added_at - old_head_added_at) > _dt.timedelta(hours=1):
