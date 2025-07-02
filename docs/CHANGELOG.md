@@ -1,5 +1,6 @@
 # 0.11.0 (only release candidate)
 
+* Improved performance of aggregated stream projection.
 * **BREAKING CHANGE**: Extended the RunOnNotification protocol
     * Added `interested_in_notification(dict) -> bool`
     * Added `take_notification_hint(dict) -> bool`
