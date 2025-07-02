@@ -47,6 +47,7 @@ class AggregatedStream(Generic[E]):
         partitioner: MessagePartitioner[E],
         stream_wildcards: List[str],
         update_batch_size: Optional[int] = None,
+        lookback_for_gaps_hours: Optional[int] = None,
     ) -> None:
         """
         AggregatedStream aggregates multiple streams into one (partitioned) stream.
@@ -63,6 +64,7 @@ class AggregatedStream(Generic[E]):
             partitioner: Message partitioner
             stream_wildcards: List of stream wildcards
             update_batch_size: Batch size for updating the stream, defaults to 100
+            lookback_for_gaps_hours: How many hours we should look aback for gaps in global positions. (Default is 6 hours, set this to 2-4x the time your longest transaction takes)
 
         Attributes:
             name (str): Stream name
@@ -123,6 +125,7 @@ class AggregatedStream(Generic[E]):
             partitioner=partitioner,
             stream_wildcards=stream_wildcards,
             batch_size=update_batch_size,
+            lookback_for_gaps_hours=lookback_for_gaps_hours,
         )
 
     def truncate(self, conn: SAConnection):
@@ -551,6 +554,8 @@ class StreamProjector(Generic[E]):
         self.partitioner = partitioner
         self.batch_size = batch_size or 100
         self.lookback_for_gaps_hours = lookback_for_gaps_hours or 6
+        self._lookback_cache = None
+        self._get_origin_stream_positions_cache = None
 
     def interested_in_notification(self, notification: dict) -> bool:
         # Check if the projector is interested in the notification.
@@ -718,15 +723,25 @@ class StreamProjector(Generic[E]):
     def _estimate_gap_look_back_start(
         self, conn: SAConnection, head_added_at: _dt.datetime
     ) -> int:
-        origin_table = self.stream._store._storage.message_table
-        return (
-            conn.execute(
-                _sa.select(_sa.func.max(origin_table.c.global_position)).where(
-                    origin_table.c.added_at
-                    <= head_added_at - _dt.timedelta(hours=self.lookback_for_gaps_hours)
-                )
-            ).scalar_one_or_none()
-        ) or 0
+        if self._lookback_cache is not None:
+            old_head_added_at, value = self._lookback_cache
+            if (head_added_at - old_head_added_at) > _dt.timedelta(hours=1):
+                self._lookback_cache = None
+
+        if self._lookback_cache is None:
+            origin_table = self.stream._store._storage.message_table
+            value = (
+                conn.execute(
+                    _sa.select(_sa.func.max(origin_table.c.global_position)).where(
+                        origin_table.c.added_at
+                        <= head_added_at
+                        - _dt.timedelta(hours=self.lookback_for_gaps_hours)
+                    )
+                ).scalar_one_or_none()
+            ) or 0
+            self._lookback_cache = (head_added_at, value)
+
+        return self._lookback_cache[1]
 
     def _select_origin_streams(
         self, conn: SAConnection, cutoff: Optional[int] = None
@@ -743,13 +758,49 @@ class StreamProjector(Generic[E]):
             conn,
             estimated_gap_look_back_start=estimated_gap_look_back_start,
         )
-        origin_streams = self.get_origin_stream_positions(
-            conn=conn,
-            min_global_position=estimated_gap_look_back_start,
-            max_global_position=cutoff,
-        )
 
         candidate_streams = []
+        if self._get_origin_stream_positions_cache is not None:
+            if (
+                self._get_origin_stream_positions_cache[0]
+                == estimated_gap_look_back_start
+            ):
+                # We are using the cached origin streams
+                candidate_streams = self._calculate_selected_streams(
+                    origin_streams=self._get_origin_stream_positions_cache[1],
+                    stream_positions=stream_positions,
+                    estimated_gap_look_back_start=estimated_gap_look_back_start,
+                )
+        if not candidate_streams:
+            # Cached origin streams either did not give us any candidates or
+            # were not available.
+            origin_streams = self.get_origin_stream_positions(
+                conn=conn,
+                min_global_position=estimated_gap_look_back_start,
+                max_global_position=cutoff,
+            )
+            self._get_origin_stream_positions_cache = (
+                estimated_gap_look_back_start,
+                origin_streams,
+            )
+            candidate_streams = self._calculate_selected_streams(
+                origin_streams=origin_streams,
+                stream_positions=stream_positions,
+                estimated_gap_look_back_start=estimated_gap_look_back_start,
+            )
+
+        # TODO limit so that sum(estimated_message_count) close to batch_size
+        return sorted(candidate_streams, key=lambda x: x.start_at_global_position)[
+            : self.batch_size
+        ]
+
+    def _calculate_selected_streams(
+        self,
+        origin_streams: Dict[str, OriginStreamPositon],
+        stream_positions: Dict[str, AggregatedStreamPositon],
+        estimated_gap_look_back_start: int,
+    ) -> List[SelectedOriginStream]:
+        candidate_streams: List[SelectedOriginStream] = []
         for origin_stream in origin_streams.values():
             stream_position = stream_positions.get(origin_stream.origin_stream)
             if stream_position is None:
@@ -778,10 +829,7 @@ class StreamProjector(Generic[E]):
                         # estimated_message_count=origin_stream.max_version - stream_position.max_aggregated_stream_version,
                     )
                 )
-        # TODO limit so that sum(estimated_message_count) close to batch_size
-        return sorted(candidate_streams, key=lambda x: x.start_at_global_position)[
-            : self.batch_size
-        ]
+        return candidate_streams
 
     def _update_batch(self, conn: SAConnection, cutoff: Optional[int] = None) -> int:
         message_table = self.stream._store._storage.message_table
