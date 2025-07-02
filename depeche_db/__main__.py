@@ -63,7 +63,8 @@ def parse_version(version_str: str) -> Tuple[int, int]:
     """
     Parse a version string into a tuple of integers.
     """
-    return tuple(int(part) for part in version_str.split("."))[:2]
+    major, minor, *_ = [int(part) for part in version_str.split(".")]
+    return (major, minor)
 
 
 if __name__ == "__main__":
