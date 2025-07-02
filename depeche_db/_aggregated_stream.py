@@ -541,6 +541,14 @@ LookbackCache = namedtuple(
     ],
 )
 
+OriginStreamPositionsCache = namedtuple(
+    "OriginStreamPositionsCache",
+    [
+        "estimated_gap_look_back_start",
+        "origin_streams",
+    ],
+)
+
 
 class StreamProjector(Generic[E]):
     def __init__(
@@ -781,15 +789,14 @@ class StreamProjector(Generic[E]):
         )
 
         candidate_streams = []
-        # TODO add a namedtuple for the cache. AI!
         if self._get_origin_stream_positions_cache is not None:
             if (
-                self._get_origin_stream_positions_cache[0]
+                self._get_origin_stream_positions_cache.estimated_gap_look_back_start
                 == estimated_gap_look_back_start
             ):
                 # We are using the cached origin streams
                 candidate_streams = self._calculate_selected_streams(
-                    origin_streams=self._get_origin_stream_positions_cache[1],
+                    origin_streams=self._get_origin_stream_positions_cache.origin_streams,
                     stream_positions=stream_positions,
                     estimated_gap_look_back_start=estimated_gap_look_back_start,
                 )
@@ -801,9 +808,9 @@ class StreamProjector(Generic[E]):
                 min_global_position=estimated_gap_look_back_start,
                 max_global_position=cutoff,
             )
-            self._get_origin_stream_positions_cache = (
-                estimated_gap_look_back_start,
-                origin_streams,
+            self._get_origin_stream_positions_cache = OriginStreamPositionsCache(
+                estimated_gap_look_back_start=estimated_gap_look_back_start,
+                origin_streams=origin_streams,
             )
             candidate_streams = self._calculate_selected_streams(
                 origin_streams=origin_streams,
