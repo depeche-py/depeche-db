@@ -705,7 +705,7 @@ class StreamProjector(Generic[E]):
     def _get_aggregated_stream_head(
         self, conn: SAConnection
     ) -> Tuple[int, _dt.datetime]:
-        # TODO replace return type with namedtuple
+        # TODO replace return type with namedtuple. AI!
         stream_table = self.stream._table.alias()
         row = conn.execute(
             _sa.select(
