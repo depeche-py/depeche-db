@@ -50,8 +50,10 @@ SA_VERSION = "2.x"
 try:
     from sqlalchemy import Connection as SAConnection  # noqa
     from sqlalchemy import ColumnElement as SAColumnElement  # noqa
+    from sqlalchemy import Row as SARow  # noqa
 except ImportError:
     SA_VERSION = "1.4.x"
+    from sqlalchemy.engine import Row as SARow  # noqa
     from sqlalchemy.engine import Connection as SAConnection  # noqa
     from sqlalchemy.sql.expression import ColumnElement as SAColumnElement  # noqa
 

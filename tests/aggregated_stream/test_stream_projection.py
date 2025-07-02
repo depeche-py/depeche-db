@@ -4,7 +4,10 @@ import uuid as _uuid
 import pytest
 import sqlalchemy as _sa
 
-from depeche_db._aggregated_stream import AggregatedStream, SelectedOriginStream
+from depeche_db._aggregated_stream import (
+    AggregatedStream,
+    SelectedOriginStream,
+)
 from tests._account_example import Account, AccountRepository
 
 
@@ -48,7 +51,7 @@ def test_stream_projector_origin_selection(
 
     def get_select_origin_streams():
         with db_engine.connect() as conn:
-            return subject.projector._select_origin_streams(conn=conn, cutoff_cond=[])
+            return subject.projector._select_origin_streams(conn=conn)
 
     account = Account.register(id=ACCOUNT1_ID, owner_id=_uuid.uuid4(), number="123")
     account.credit(100)
@@ -56,7 +59,7 @@ def test_stream_projector_origin_selection(
     account_repo.save(account, expected_version=0)
 
     assert get_select_origin_streams() == [
-        SelectedOriginStream(f"account-{account.id}", 0, 1, 3)
+        SelectedOriginStream(stream=f"account-{account.id}", start_at_global_position=1)
     ]
 
     account2 = Account.register(id=ACCOUNT2_ID, owner_id=_uuid.uuid4(), number="234")
@@ -65,10 +68,25 @@ def test_stream_projector_origin_selection(
     account2.credit(100)
     account_repo.save(account2, expected_version=0)
 
+    # because of the cached origin streams, the projector will not update
+    # right away...
     assert get_select_origin_streams() == [
-        SelectedOriginStream(f"account-{account.id}", 0, 1, 3),
-        SelectedOriginStream(f"account-{account2.id}", 0, 4, 4),
+        SelectedOriginStream(
+            stream=f"account-{account.id}", start_at_global_position=1
+        ),
     ]
+
+    # ... but only when the cache is cleared
+    subject.projector._get_origin_stream_positions_cache = None
+    assert get_select_origin_streams() == [
+        SelectedOriginStream(
+            stream=f"account-{account.id}", start_at_global_position=1
+        ),
+        SelectedOriginStream(
+            stream=f"account-{account2.id}", start_at_global_position=4
+        ),
+    ]
+
     assert subject.projector.update_full() == 7
 
 
@@ -83,7 +101,7 @@ def test_stream_projector_origin_selection_late_commit(
 
     def get_select_origin_streams():
         with db_engine.connect() as conn:
-            return subject.projector._select_origin_streams(conn=conn, cutoff_cond=[])
+            return subject.projector._select_origin_streams(conn=conn)
 
     with db_engine.connect() as long_running_conn:
         # Simulate a long-running transaction that commits later
@@ -104,10 +122,13 @@ def test_stream_projector_origin_selection_late_commit(
         )
         account2.credit(100)
         account_repo.save(account2, expected_version=0)
+        print("HERE")
         assert get_select_origin_streams() == [
             # min_global_position == 3 here because the events above already
             # consumed sequence numbers 1 and 2 even though they are not visible yet
-            SelectedOriginStream(f"account-{account2.id}", 0, 3, 2),
+            SelectedOriginStream(
+                stream=f"account-{account2.id}", start_at_global_position=3
+            ),
         ]
         assert subject.projector.update_full() == 2
         long_running_conn.commit()
@@ -115,7 +136,7 @@ def test_stream_projector_origin_selection_late_commit(
     assert get_select_origin_streams() == [
         # min_global_position == 1 because the events from the long-running
         # transaction are now visible
-        SelectedOriginStream(f"account-{account.id}", 0, 1, 2),
+        SelectedOriginStream(f"account-{account.id}", start_at_global_position=1),
     ]
     assert subject.projector.update_full() == 2
     assert_stream_projection(subject, db_engine, account, account2)
@@ -158,6 +179,12 @@ def test_stream_projector_cutoff(db_engine, store_factory, stream_factory, accou
     assert account.events[-1].event_id not in [
         msg.message_id for msg in subject.read(partition=1)
     ]
+
+
+def test_stream_projector_interest(store_factory, stream_factory):
+    subject: AggregatedStream = stream_factory(store_factory())
+    assert subject.projector.interested_in_notification({"stream": "account-123"})
+    assert not subject.projector.interested_in_notification({"stream": "foo"})
 
 
 def test_stream_projector_locking(db_engine, store_factory, stream_factory):
