@@ -637,8 +637,6 @@ class StreamProjector(Generic[E]):
         min_global_position: int,
         max_global_position: Optional[int] = None,
     ) -> Dict[str, OriginStreamPositon]:
-        print("get_origin_stream_positions", min_global_position, max_global_position)
-
         origin_table = self.stream._store._storage.message_table
         cutoff_cond = []
         if max_global_position is not None:
@@ -682,6 +680,7 @@ class StreamProjector(Generic[E]):
     def _get_aggregated_stream_head(
         self, conn: SAConnection
     ) -> Tuple[int, _dt.datetime]:
+        # TODO replace return type with namedtuple
         stream_table = self.stream._table.alias()
         row = conn.execute(
             _sa.select(
@@ -709,7 +708,7 @@ class StreamProjector(Generic[E]):
             ).scalar_one_or_none()
         ) or 0
 
-    def _select_origin_streams_naive(
+    def _select_origin_streams(
         self, conn: SAConnection, cutoff: Optional[int] = None
     ) -> List[SelectedOriginStream]:
         head_global_position, head_added_at = self._get_aggregated_stream_head(conn)
@@ -742,7 +741,7 @@ class StreamProjector(Generic[E]):
                         stream=origin_stream.origin_stream,
                         start_at_global_position=origin_stream.min_global_position,
                         # TODO add estimate? or exact count?
-                        # estimated_message_count=0,
+                        # estimated_message_count=origin_stream.max_version,
                     )
                 )
             elif (
@@ -756,26 +755,25 @@ class StreamProjector(Generic[E]):
                             stream_position.max_aggregated_stream_global_position + 1
                         ),
                         # TODO add estimate? or exact count?
-                        # estimated_message_count=0,
+                        # estimated_message_count=origin_stream.max_version - stream_position.max_aggregated_stream_version,
                     )
                 )
-        # TODO limit the number to a reasonable number! (sum(estimated_message_count) close to batch_size)
-        # TODO random sample? order by start_at_global_position?
-        return candidate_streams
+        # TODO limit so that sum(estimated_message_count) close to batch_size
+        return sorted(candidate_streams, key=lambda x: x.start_at_global_position)[
+            : self.batch_size
+        ]
 
     def _update_batch(self, conn: SAConnection, cutoff: Optional[int] = None) -> int:
         message_table = self.stream._store._storage.message_table
 
-        selected_streams = self._select_origin_streams_naive(conn, cutoff=cutoff)
-        if not selected_streams:
+        selected_origin_streams = self._select_origin_streams(conn, cutoff=cutoff)
+        if not selected_origin_streams:
             return 0
 
         min_global_position = min(
             selected_stream.start_at_global_position
-            for selected_stream in selected_streams
+            for selected_stream in selected_origin_streams
         )
-        print("min_global_position update", min_global_position)
-        print("selected_streams", len(selected_streams))
         cutoff_cond = []
         if cutoff is not None:
             cutoff_cond = [message_table.c.global_position <= cutoff]
@@ -799,7 +797,7 @@ class StreamProjector(Generic[E]):
                                 message_table.c.global_position
                                 >= selected_stream.start_at_global_position,
                             )
-                            for selected_stream in selected_streams
+                            for selected_stream in selected_origin_streams
                         ]
                     ),
                 )
