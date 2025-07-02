@@ -51,7 +51,7 @@ def test_stream_projector_origin_selection(
 
     def get_select_origin_streams():
         with db_engine.connect() as conn:
-            return subject.projector._select_origin_streams_naive(conn=conn)
+            return subject.projector._select_origin_streams(conn=conn)
 
     account = Account.register(id=ACCOUNT1_ID, owner_id=_uuid.uuid4(), number="123")
     account.credit(100)
@@ -91,7 +91,7 @@ def test_stream_projector_origin_selection_late_commit(
 
     def get_select_origin_streams():
         with db_engine.connect() as conn:
-            return subject.projector._select_origin_streams_naive(conn=conn)
+            return subject.projector._select_origin_streams(conn=conn)
 
     with db_engine.connect() as long_running_conn:
         # Simulate a long-running transaction that commits later
