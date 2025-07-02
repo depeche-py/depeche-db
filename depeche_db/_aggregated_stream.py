@@ -521,10 +521,11 @@ class StreamProjector(Generic[E]):
         self.stream = stream
         self.stream_wildcards = stream_wildcards
         self.stream_regexes = [
-            _re.compile(wildcard.replace(".", "\\.").replace("%", ".*"))
+            _re.compile(
+                wildcard.replace("\\", "\\\\").replace(".", "\\.").replace("%", ".*")
+            )
             for wildcard in stream_wildcards
         ]
-        print("stream_wildcards", stream_wildcards, self.stream_regexes)
         self.partitioner = partitioner
         self.batch_size = batch_size or 100
         self.lookback_for_gaps_hours = lookback_for_gaps_hours or 6
