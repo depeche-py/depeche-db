@@ -417,7 +417,7 @@ class AggregatedStream(Generic[E]):
         return f"depeche_{name}_messages"
 
     @classmethod
-    def get_migration_ddl(cls, name: str):
+    def get_migration_ddl_0_8_0(cls, name: str) -> str:
         """
         DDL Script to migrate from <=0.8.0
         """
@@ -436,11 +436,32 @@ class AggregatedStream(Generic[E]):
             """
 
     @classmethod
-    def migrate_db_objects(cls, name: str, conn: SAConnection):
+    def get_migration_ddl_0_11_0(
+        cls, aggregated_stream_name: str, message_store_name: str
+    ) -> str:
         """
-        Migrate from <=0.8.0
+        DDL Script to migrate from < 0.11.0
         """
-        conn.execute(cls.get_migration_ddl(name=name))
+        aggregated_stream_tablename = cls.stream_table_name(aggregated_stream_name)
+        message_tablename = f"depeche_msgs_{message_store_name}"
+        return f"""
+            -- Add columns (nullable)
+            ALTER TABLE {aggregated_stream_tablename}
+            ADD COLUMN origin_stream_global_position INTEGER NULL,
+            ADD COLUMN origin_stream_global_position TIMESTAMP NULL;
+
+            -- Copy data from the message store to the aggregated stream
+            UPDATE {aggregated_stream_tablename} AS agg
+            SET origin_stream_global_position = msg.global_position,
+            origin_stream_added_at = msg.added_at
+            FROM {message_tablename} AS msg
+            WHERE agg.message_id = msg.message_id;
+
+            -- Make the new columns NOT NULL
+            ALTER TABLE {aggregated_stream_tablename}
+            ALTER COLUMN origin_stream_global_position SET NOT NULL,
+            ALTER COLUMN origin_stream_added_at SET NOT NULL;
+            """
 
 
 def _notify_trigger(name: str, tablename: str, notification_channel: str) -> str:
