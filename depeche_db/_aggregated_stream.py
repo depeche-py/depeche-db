@@ -765,7 +765,7 @@ class StreamProjector(Generic[E]):
                         <= head_added_at
                         - _dt.timedelta(hours=self.lookback_for_gaps_hours)
                     )
-                ).scalar_one_or_none(),
+                ).scalar_one_or_none()
             ) or 0
             self._lookback_cache = LookbackCache(
                 head_added_at=head_added_at, value=value
