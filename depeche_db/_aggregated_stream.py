@@ -4,6 +4,7 @@ import re as _re
 from collections import namedtuple
 from typing import (
     TYPE_CHECKING,
+    Callable,
     Dict,
     Generic,
     Iterator,
@@ -417,21 +418,24 @@ class AggregatedStream(Generic[E]):
         return f"depeche_{name}_messages"
 
     @classmethod
-    def get_migration_ddl_0_8_0(cls, name: str) -> str:
+    def get_migration_ddl_0_8_0(
+        cls, aggregated_stream_name: str, message_store_name: str
+    ) -> str:
         """
-        DDL Script to migrate from <=0.8.0
+        DDL Script to migrate from < 0.8.0
         """
-        tablename = cls.stream_table_name(name)
+        del message_store_name  # Unused in this migration
+        tablename = cls.stream_table_name(aggregated_stream_name)
         new_objects = _notify_trigger(
-            name=name,
+            name=aggregated_stream_name,
             tablename=tablename,
-            notification_channel=cls.notification_channel_name(name),
+            notification_channel=cls.notification_channel_name(aggregated_stream_name),
         )
         return f"""
-            ALTER TABLE "{name}_projected_stream"
+            ALTER TABLE "{aggregated_stream_name}_projected_stream"
                  RENAME TO {tablename};
-            DROP TRIGGER IF EXISTS {name}_stream_notify_message_inserted;
-            DROP FUNCTION IF EXISTS {name}_stream_notify_message_inserted;
+            DROP TRIGGER IF EXISTS {aggregated_stream_name}_stream_notify_message_inserted;
+            DROP FUNCTION IF EXISTS {aggregated_stream_name}_stream_notify_message_inserted;
             {new_objects}
             """
 
@@ -466,6 +470,17 @@ class AggregatedStream(Generic[E]):
             CREATE INDEX ix_{aggregated_stream_tablename}_origin_stream_global_position
                 ON {aggregated_stream_tablename} (origin_stream_global_position);
             """
+
+    @classmethod
+    def migration_script_generators(cls) -> Dict[str, List[Callable[[str, str], str]]]:
+        return {
+            "0.8": [
+                cls.get_migration_ddl_0_8_0,
+            ],
+            "0.11": [
+                cls.get_migration_ddl_0_11_0,
+            ],
+        }
 
 
 def _notify_trigger(name: str, tablename: str, notification_channel: str) -> str:

@@ -1,3 +1,12 @@
+# 0.11.0 (only release candidate)
+
+* **BREAKING CHANGE**: Extended the RunOnNotification protocol
+    * Added `interested_in_notification(dict) -> bool`
+    * Added `take_notification_hint(dict) -> bool`
+* **BREAKING CHANGE**: Changed DB schema of aggregated streams
+    * Added columns; you will have to do a downtime deployment for these changes
+    * Use `python -m depeche_db generate-migration-script <PREV-VERSION> 0.11 --message-store=<NAME> --aggregated-stream=<STREAM-NAME> --aggregated-stream=<ANOTHER...>`
+
 # 0.10.3
 
 * Use one insert operation per batch in aggregated stream update instead of one per message
