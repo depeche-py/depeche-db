@@ -533,6 +533,14 @@ AggregatedStreamHead = namedtuple(
     ],
 )
 
+LookbackCache = namedtuple(
+    "LookbackCache",
+    [
+        "head_added_at",
+        "value",
+    ],
+)
+
 
 class StreamProjector(Generic[E]):
     def __init__(
@@ -733,10 +741,8 @@ class StreamProjector(Generic[E]):
     def _estimate_gap_look_back_start(
         self, conn: SAConnection, head_added_at: _dt.datetime
     ) -> int:
-        # TODO add namedtuple for lookback cache. AI!
         if self._lookback_cache is not None:
-            old_head_added_at, value = self._lookback_cache
-            if (head_added_at - old_head_added_at) > _dt.timedelta(hours=1):
+            if (head_added_at - self._lookback_cache.head_added_at) > _dt.timedelta(hours=1):
                 self._lookback_cache = None
 
         if self._lookback_cache is None:
@@ -750,9 +756,12 @@ class StreamProjector(Generic[E]):
                     )
                 ).scalar_one_or_none()
             ) or 0
-            self._lookback_cache = (head_added_at, value)
+            self._lookback_cache = LookbackCache(
+                head_added_at=head_added_at,
+                value=value
+            )
 
-        return self._lookback_cache[1]
+        return self._lookback_cache.value
 
     def _select_origin_streams(
         self, conn: SAConnection, cutoff: Optional[int] = None
