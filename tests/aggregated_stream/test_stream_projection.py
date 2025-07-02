@@ -60,7 +60,6 @@ def test_stream_projector_origin_selection(
 
     assert get_select_origin_streams() == [
         SelectedOriginStream(stream=f"account-{account.id}", start_at_global_position=1)
-        # SelectedOriginStream(f"account-{account.id}", 0, 1, 3)
     ]
 
     account2 = Account.register(id=ACCOUNT2_ID, owner_id=_uuid.uuid4(), number="234")
