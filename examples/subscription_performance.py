@@ -50,6 +50,8 @@ db_engine = create_engine(
     pool_size=10,
     max_overflow=20,
     echo=False,
+    # Prevents degradation of performance due to prepare statements
+    connect_args={"prepare_threshold": None},
 )
 
 
@@ -150,10 +152,10 @@ def project():
     #    "get_aggregate_stream_positions",
     #    stream.projector.get_aggregate_stream_positions,
     # )
-    stream.projector.get_origin_stream_positions = measure_timing(
-        "get_origin_stream_positions",
-        stream.projector.get_origin_stream_positions,
-    )
+    # stream.projector.get_origin_stream_positions = measure_timing(
+    #    "get_origin_stream_positions",
+    #    stream.projector.get_origin_stream_positions,
+    # )
 
     start = time.time()
     while (
