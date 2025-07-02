@@ -1,5 +1,6 @@
 import contextlib as _contextlib
 import datetime as _dt
+import re as _re
 from collections import namedtuple
 from typing import (
     TYPE_CHECKING,
@@ -519,13 +520,23 @@ class StreamProjector(Generic[E]):
         """
         self.stream = stream
         self.stream_wildcards = stream_wildcards
+        self.stream_regexes = [
+            _re.compile(wildcard.replace(".", "\\.").replace("%", ".*"))
+            for wildcard in stream_wildcards
+        ]
+        print("stream_wildcards", stream_wildcards, self.stream_regexes)
         self.partitioner = partitioner
         self.batch_size = batch_size or 100
         self.lookback_for_gaps_hours = lookback_for_gaps_hours or 6
 
     def interested_in_notification(self, notification: dict) -> bool:
-        # TODO check if notification.get("stream") % self.stream_wildcards
-        return True
+        # Check if the projector is interested in the notification.
+        stream = notification.get("stream")
+        if isinstance(stream, str):
+            for regex in self.stream_regexes:
+                if regex.fullmatch(stream):
+                    return True
+        return False
 
     def take_notification_hint(self, notification: dict):
         pass

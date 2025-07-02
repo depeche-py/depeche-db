@@ -171,6 +171,12 @@ def test_stream_projector_cutoff(db_engine, store_factory, stream_factory, accou
     ]
 
 
+def test_stream_projector_interest(store_factory, stream_factory):
+    subject: AggregatedStream = stream_factory(store_factory())
+    assert subject.projector.interested_in_notification({"stream": "account-123"})
+    assert not subject.projector.interested_in_notification({"stream": "foo"})
+
+
 def test_stream_projector_locking(db_engine, store_factory, stream_factory):
     subject = stream_factory(store_factory())
     with db_engine.connect() as conn:
