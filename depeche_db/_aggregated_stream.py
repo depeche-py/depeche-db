@@ -493,6 +493,15 @@ class StreamProjector(Generic[E]):
         self.partitioner = partitioner
         self.batch_size = batch_size or 100
 
+    def interested_in_notification(self, notification: dict) -> bool:
+        return True
+
+    def take_notification_hint(self, notification: dict):
+        stream, version = notification.get("stream"), notification.get("version")
+        if stream and version:
+            # TODO use the additional information to optimize the update
+            pass
+
     @property
     def notification_channel(self) -> str:
         """
