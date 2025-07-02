@@ -680,6 +680,13 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#depeche_db.RunOnNotification.interested_in_notification" class="md-nav__link">
+    interested_in_notification()
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#depeche_db.RunOnNotification.run" class="md-nav__link">
     run()
   </a>
@@ -689,6 +696,13 @@
           <li class="md-nav__item">
   <a href="#depeche_db.RunOnNotification.stop" class="md-nav__link">
     stop()
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#depeche_db.RunOnNotification.take_notification_hint" class="md-nav__link">
+    take_notification_hint()
   </a>
   
 </li>
@@ -985,6 +999,13 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#depeche_db.RunOnNotification.interested_in_notification" class="md-nav__link">
+    interested_in_notification()
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#depeche_db.RunOnNotification.run" class="md-nav__link">
     run()
   </a>
@@ -994,6 +1015,13 @@
           <li class="md-nav__item">
   <a href="#depeche_db.RunOnNotification.stop" class="md-nav__link">
     stop()
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#depeche_db.RunOnNotification.take_notification_hint" class="md-nav__link">
+    take_notification_hint()
   </a>
   
 </li>
@@ -1089,6 +1117,34 @@ executor.run()   # this will stop on SIGTERM or SIGINT
           </td>
           <td>
               <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>stimulation_interval</code></td>
+          <td>
+                <code>float</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>Seconds; Every interval, all the handlers will run once. Zero &amp; negative values disable stimulation.</p>
+            </div>
+          </td>
+          <td>
+                <code>0.5</code>
+          </td>
+        </tr>
+        <tr>
+          <td><code>disable_signals</code></td>
+          <td>
+                <code>bool</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>Disable catching SIGINT/SIGTERM, useful if you want to run the Executor in a sub-thread</p>
+            </div>
+          </td>
+          <td>
+                <code>False</code>
           </td>
         </tr>
     </tbody>
@@ -1255,6 +1311,28 @@ can be registered with a <a class="autorefs autorefs-internal" href="#depeche_db
 
 
 
+<h3 id="depeche_db.RunOnNotification.interested_in_notification" class="doc doc-heading">
+          <code class="highlight language-python"><span class="n">interested_in_notification</span><span class="p">(</span><span class="n">notification</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span></code>
+
+</h3>
+
+
+  <div class="doc doc-contents ">
+  
+      <p>Signals whether the object is interested in a notification.
+If this method returns <code>False</code>, the object's <code>run</code> method will not be called
+because of this notification.</p>
+
+  </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+
 <h3 id="depeche_db.RunOnNotification.run" class="doc doc-heading">
           <code class="highlight language-python"><span class="n">run</span><span class="p">(</span><span class="n">budget</span><span class="p">:</span> <span class="n">TimeBudget</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">RunOnNotificationResult</span><span class="p">]</span></code>
 
@@ -1332,6 +1410,31 @@ It needs to return within reasonable time after the given time budget is over.</
       <p>If the object's <code>run</code> method has a loop, this method can be used to
 exit the loop earlier.
 Will be called in a separate thread.</p>
+
+  </div>
+
+</div>
+
+
+<div class="doc doc-object doc-function">
+
+
+
+
+<h3 id="depeche_db.RunOnNotification.take_notification_hint" class="doc doc-heading">
+          <code class="highlight language-python"><span class="n">take_notification_hint</span><span class="p">(</span><span class="n">notification</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span></code>
+
+</h3>
+
+
+  <div class="doc doc-contents ">
+  
+      <p>This will be called when a notification is received. Make sure that
+the implementation of this method is fast, as it will be called for every
+notification received on the channel.
+Also make sure that this method is thread-safe, as it can be called
+from different threads. Especially, it should be thread-safe against
+the <code>run</code> method.</p>
 
   </div>
 
