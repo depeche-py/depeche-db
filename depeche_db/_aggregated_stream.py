@@ -627,7 +627,7 @@ class StreamProjector(Generic[E]):
                     stream_table.c.origin_stream_global_position
                     >= estimated_gap_look_back_start,
                 )
-                .group_by(stream_table.c.origin_stream)
+                .group_by(stream_table.c.origin_stream),
             )
         }
 
@@ -652,6 +652,8 @@ class StreamProjector(Generic[E]):
                 max_global_position,
                 min_global_position,
             ) in conn.execute(
+                # TODO execute this with pyscopg's `prepare` option False
+                # https://www.psycopg.org/psycopg3/docs/api/connections.html#psycopg.Connection.execute
                 _sa.select(
                     origin_table.c.stream,
                     _sa.func.max(origin_table.c.global_position).label(
@@ -673,7 +675,7 @@ class StreamProjector(Generic[E]):
                         *cutoff_cond,
                     )
                 )
-                .group_by(origin_table.c.stream)
+                .group_by(origin_table.c.stream),
             ).fetchall()
         }
 

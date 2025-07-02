@@ -50,15 +50,7 @@ db_engine = create_engine(
     pool_size=10,
     max_overflow=20,
     echo=False,
-    pool_reset_on_return=None,
 )
-
-
-@_sa.event.listens_for(db_engine, "reset")
-def _reset_connection(dbapi_connection, connection_record, reset_state):
-    if not reset_state.terminate_only:
-        dbapi_connection.execute("DEALLOCATE ALL")
-    dbapi_connection.rollback()
 
 
 original_connect = db_engine.connect
@@ -103,7 +95,7 @@ stream: AggregatedStream = message_store.aggregated_stream(
     name="ex_perf07",
     partitioner=NumMessagePartitioner(),
     stream_wildcards=["aggregate-me-%"],
-    update_batch_size=1000,
+    update_batch_size=100,
 )
 
 HANDLED = 0
