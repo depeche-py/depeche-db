@@ -525,6 +525,14 @@ OriginStreamPositon = namedtuple(
     ],
 )
 
+AggregatedStreamHead = namedtuple(
+    "AggregatedStreamHead",
+    [
+        "global_position",
+        "added_at",
+    ],
+)
+
 
 class StreamProjector(Generic[E]):
     def __init__(
@@ -704,8 +712,7 @@ class StreamProjector(Generic[E]):
 
     def _get_aggregated_stream_head(
         self, conn: SAConnection
-    ) -> Tuple[int, _dt.datetime]:
-        # TODO replace return type with namedtuple. AI!
+    ) -> AggregatedStreamHead:
         stream_table = self.stream._table.alias()
         row = conn.execute(
             _sa.select(
@@ -717,8 +724,14 @@ class StreamProjector(Generic[E]):
         ).fetchone()
         if row:
             head_global_position, head_added_at = row
-            return head_global_position, head_added_at
-        return -1, _dt.datetime(1980, 1, 1, tzinfo=_dt.timezone.utc)
+            return AggregatedStreamHead(
+                global_position=head_global_position,
+                added_at=head_added_at
+            )
+        return AggregatedStreamHead(
+            global_position=-1,
+            added_at=_dt.datetime(1980, 1, 1, tzinfo=_dt.timezone.utc)
+        )
 
     def _estimate_gap_look_back_start(
         self, conn: SAConnection, head_added_at: _dt.datetime
@@ -746,10 +759,10 @@ class StreamProjector(Generic[E]):
     def _select_origin_streams(
         self, conn: SAConnection, cutoff: Optional[int] = None
     ) -> List[SelectedOriginStream]:
-        head_global_position, head_added_at = self._get_aggregated_stream_head(conn)
-        if head_global_position > 0:
+        head = self._get_aggregated_stream_head(conn)
+        if head.global_position > 0:
             estimated_gap_look_back_start = self._estimate_gap_look_back_start(
-                conn, head_added_at
+                conn, head.added_at
             )
         else:
             estimated_gap_look_back_start = 0
