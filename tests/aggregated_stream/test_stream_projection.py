@@ -6,8 +6,10 @@ import sqlalchemy as _sa
 
 from depeche_db._aggregated_stream import (
     AggregatedStream,
+    FullUpdateResult,
     SelectedOriginStream,
 )
+from depeche_db._interfaces import FixedTimeBudget, RunOnNotificationResult
 from tests._account_example import Account, AccountRepository
 
 
@@ -15,26 +17,26 @@ def test_stream_projector(db_engine, store_factory, stream_factory, account_ids)
     ACCOUNT1_ID, ACCOUNT2_ID = account_ids
     store = store_factory()
     subject = stream_factory(store)
-    assert subject.projector.update_full() == 0
+    assert subject.projector.update_full() == FullUpdateResult(0, False)
 
     account_repo = AccountRepository(store)
 
     account = Account.register(id=ACCOUNT1_ID, owner_id=_uuid.uuid4(), number="123")
     account.credit(100)
     account_repo.save(account, expected_version=0)
-    assert subject.projector.update_full() == 2
+    assert subject.projector.update_full() == FullUpdateResult(2, False)
 
     account2 = Account.register(id=ACCOUNT2_ID, owner_id=_uuid.uuid4(), number="234")
     account2.credit(100)
     account_repo.save(account2, expected_version=0)
-    assert subject.projector.update_full() == 2
+    assert subject.projector.update_full() == FullUpdateResult(2, False)
 
     account2.credit(100)
     account2.credit(100)
     account2.credit(100)
     account2.credit(100)
     account_repo.save(account2, expected_version=2)
-    assert subject.projector.update_full() == 4
+    assert subject.projector.update_full() == FullUpdateResult(4, False)
 
     assert_stream_projection(subject, db_engine, account, account2)
 
@@ -87,7 +89,7 @@ def test_stream_projector_origin_selection(
         ),
     ]
 
-    assert subject.projector.update_full() == 7
+    assert subject.projector.update_full() == FullUpdateResult(7, False)
 
 
 def test_stream_projector_origin_selection_late_commit(
@@ -130,7 +132,7 @@ def test_stream_projector_origin_selection_late_commit(
                 stream=f"account-{account2.id}", start_at_global_position=3
             ),
         ]
-        assert subject.projector.update_full() == 2
+        assert subject.projector.update_full() == FullUpdateResult(2, False)
         long_running_conn.commit()
 
     assert get_select_origin_streams() == [
@@ -138,7 +140,7 @@ def test_stream_projector_origin_selection_late_commit(
         # transaction are now visible
         SelectedOriginStream(f"account-{account.id}", start_at_global_position=1),
     ]
-    assert subject.projector.update_full() == 2
+    assert subject.projector.update_full() == FullUpdateResult(2, False)
     assert_stream_projection(subject, db_engine, account, account2)
 
 
@@ -220,3 +222,46 @@ def test_only_positive_partitions(
     subject = stream_factory(store, partitioner=IllegalPartitioner())
     with pytest.raises(ValueError):
         subject.projector.update_full()
+
+
+def test_stream_projector_run(db_engine, store_factory, stream_factory, account_ids):
+    ACCOUNT1_ID, _ = account_ids
+    store = store_factory()
+    subject = stream_factory(store)
+    assert (
+        subject.projector.run(FixedTimeBudget(-1))
+        == RunOnNotificationResult.DONE_FOR_NOW
+    )
+
+    account_repo = AccountRepository(store)
+
+    account = Account.register(id=ACCOUNT1_ID, owner_id=_uuid.uuid4(), number="123")
+    account.credit(100)
+    account_repo.save(account, expected_version=0)
+    assert (
+        subject.projector.run(FixedTimeBudget(-1))
+        == RunOnNotificationResult.WORK_REMAINING
+    )
+
+
+def test_stream_projector_work_left(
+    db_engine, store_factory, stream_factory, account_ids
+):
+    ACCOUNT1_ID, _ = account_ids
+    store = store_factory()
+    subject = stream_factory(store, batch_size=1)
+
+    account_repo = AccountRepository(store)
+
+    account = Account.register(id=ACCOUNT1_ID, owner_id=_uuid.uuid4(), number="123")
+    account.credit(100)
+    account.credit(100)
+    account_repo.save(account, expected_version=0)
+
+    # This will only do one batch because of the batch size and the already exhausted time budget
+    assert subject.projector.update_full(FixedTimeBudget(-1)) == FullUpdateResult(
+        1, True
+    )
+
+    # This will do the rest of the batches
+    assert subject.projector.update_full() == FullUpdateResult(2, False)
