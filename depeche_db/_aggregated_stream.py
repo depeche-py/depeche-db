@@ -1,5 +1,6 @@
 import contextlib as _contextlib
 import datetime as _dt
+import logging as _logging
 import re as _re
 import textwrap as _textwrap
 from collections import namedtuple
@@ -39,6 +40,8 @@ if TYPE_CHECKING:
     )
 
 E = TypeVar("E", bound=MessageProtocol)
+
+LOGGER = _logging.getLogger(__name__)
 
 
 class AggregatedStream(Generic[E]):
@@ -571,6 +574,14 @@ OriginStreamPositionsCache = namedtuple(
     ],
 )
 
+FullUpdateResult = namedtuple(
+    "FullUpdateResult",
+    [
+        "n_updated_messages",
+        "more_messages_available",
+    ],
+)
+
 
 class StreamProjector(Generic[E]):
     def __init__(
@@ -629,8 +640,8 @@ class StreamProjector(Generic[E]):
         Runs the projector once.
         """
         try:
-            self.update_full(budget=budget)
-            if budget and budget.over_budget():
+            result = self.update_full(budget=budget)
+            if budget and budget.over_budget() and result.more_messages_available:
                 return RunOnNotificationResult.WORK_REMAINING
         except _AlreadyUpdating:
             pass
@@ -642,11 +653,12 @@ class StreamProjector(Generic[E]):
         """
         pass
 
-    def update_full(self, budget: Optional[TimeBudget] = None) -> int:
+    def update_full(self, budget: Optional[TimeBudget] = None) -> FullUpdateResult:
         """
         Updates the projection from the last known position to the current position.
         """
         result = 0
+        batch_num = 0
         with self.stream._store.engine.connect() as conn:
             cutoff = self.stream._store._storage.get_global_position(conn)
             try:
@@ -664,13 +676,14 @@ class StreamProjector(Generic[E]):
                 raise
             while True:
                 batch_num = self._update_batch(conn, cutoff)
+                result += batch_num
+                LOGGER.debug(f"{self.stream.name}: Batch updated: {batch_num} messages")
                 if batch_num == 0:
                     break
                 if budget and budget.over_budget():
                     break
-                result += batch_num
             conn.commit()
-        return result
+        return FullUpdateResult(result, batch_num > 0)
 
     def get_aggregate_stream_positions(
         self,
@@ -780,6 +793,7 @@ class StreamProjector(Generic[E]):
                 self._lookback_cache = None
 
         if self._lookback_cache is None:
+            LOGGER.debug(f"{self.stream.name}: Updating lookback estimation")
             origin_table = self.stream._store._storage.message_table
             value = (
                 conn.execute(
@@ -806,6 +820,9 @@ class StreamProjector(Generic[E]):
             )
         else:
             estimated_gap_look_back_start = 0
+        LOGGER.debug(
+            f"{self.stream.name}: Estimated gap look back start: {estimated_gap_look_back_start}"
+        )
 
         stream_positions = self.get_aggregate_stream_positions(
             conn,
@@ -824,6 +841,10 @@ class StreamProjector(Generic[E]):
                     stream_positions=stream_positions,
                     estimated_gap_look_back_start=estimated_gap_look_back_start,
                 )
+                if candidate_streams:
+                    LOGGER.debug(
+                        f"{self.stream.name}: Found {len(candidate_streams)} candidate streams (using cached origin streams)"
+                    )
         if not candidate_streams:
             # Cached origin streams either did not give us any candidates or
             # were not available.
@@ -840,6 +861,9 @@ class StreamProjector(Generic[E]):
                 origin_streams=origin_streams,
                 stream_positions=stream_positions,
                 estimated_gap_look_back_start=estimated_gap_look_back_start,
+            )
+            LOGGER.debug(
+                f"{self.stream.name}: Found {len(candidate_streams)} candidate streams (using live origin streams)"
             )
 
         # TODO limit so that sum(estimated_message_count) close to batch_size
@@ -927,6 +951,8 @@ class StreamProjector(Generic[E]):
             .limit(self.batch_size)
         )
         messages = list(conn.execute(qry).fetchall())
+
+        LOGGER.debug(f"{self.stream.name}: Found {len(messages)} new messages")
         if not messages:
             return 0
 
