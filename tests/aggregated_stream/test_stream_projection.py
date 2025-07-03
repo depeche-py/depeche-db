@@ -1,5 +1,6 @@
 import threading as _threading
 import uuid as _uuid
+from unittest import mock as _mock
 
 import pytest
 import sqlalchemy as _sa
@@ -227,7 +228,7 @@ def test_only_positive_partitions(
 def test_stream_projector_run(db_engine, store_factory, stream_factory, account_ids):
     ACCOUNT1_ID, _ = account_ids
     store = store_factory()
-    subject = stream_factory(store)
+    subject = stream_factory(store, batch_size=2)
     assert (
         subject.projector.run(FixedTimeBudget(-1))
         == RunOnNotificationResult.DONE_FOR_NOW
@@ -249,19 +250,25 @@ def test_stream_projector_work_left(
 ):
     ACCOUNT1_ID, _ = account_ids
     store = store_factory()
-    subject = stream_factory(store, batch_size=1)
+    subject = stream_factory(store, batch_size=2)
+    with _mock.patch.object(
+        subject.projector, "_update_batch", wraps=subject.projector._update_batch
+    ) as mock_update_full:
+        account_repo = AccountRepository(store)
 
-    account_repo = AccountRepository(store)
+        account = Account.register(id=ACCOUNT1_ID, owner_id=_uuid.uuid4(), number="123")
+        account.credit(100)
+        account.credit(100)
+        account_repo.save(account, expected_version=0)
 
-    account = Account.register(id=ACCOUNT1_ID, owner_id=_uuid.uuid4(), number="123")
-    account.credit(100)
-    account.credit(100)
-    account_repo.save(account, expected_version=0)
+        # This will only do one batch because of the batch size and the already exhausted time budget
+        assert subject.projector.update_full(FixedTimeBudget(-1)) == FullUpdateResult(
+            2, True
+        )
 
-    # This will only do one batch because of the batch size and the already exhausted time budget
-    assert subject.projector.update_full(FixedTimeBudget(-1)) == FullUpdateResult(
-        1, True
-    )
+        # This will do the rest of the batches
+        assert subject.projector.update_full() == FullUpdateResult(1, False)
 
-    # This will do the rest of the batches
-    assert subject.projector.update_full() == FullUpdateResult(2, False)
+        # There are only 3 messages in total, so the total number of calls
+        # to _update_batch should be 2.
+        assert mock_update_full.call_count == 2

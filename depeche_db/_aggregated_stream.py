@@ -678,12 +678,14 @@ class StreamProjector(Generic[E]):
                 batch_num = self._update_batch(conn, cutoff)
                 result += batch_num
                 LOGGER.debug(f"{self.stream.name}: Batch updated: {batch_num} messages")
-                if batch_num == 0:
+                if batch_num < self.batch_size:
+                    # No more messages to process
                     break
                 if budget and budget.over_budget():
+                    # Budget exceeded, stop processing
                     break
             conn.commit()
-        return FullUpdateResult(result, batch_num > 0)
+        return FullUpdateResult(result, batch_num == self.batch_size)
 
     def get_aggregate_stream_positions(
         self,
