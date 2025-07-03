@@ -253,6 +253,7 @@ class AggregatedStream(Generic[E]):
     def get_partition_statistics(
         self,
         position_limits: Optional[Dict[int, int]] = None,
+        ignore_partitions: Optional[List[int]] = None,
         result_limit: Optional[int] = None,
         conn: Optional[SAConnection] = None,
     ) -> Iterator[StreamPartitionStatistic]:
@@ -279,27 +280,28 @@ class AggregatedStream(Generic[E]):
                             )
                             for partition, limit in position_limits.items()
                         ],
-                        _sa.not_(tbl.c.partition.in_(list(position_limits))),
+                        _sa.not_(
+                            tbl.c.partition.in_(
+                                list(position_limits) + (ignore_partitions or [])
+                            )
+                        ),
                     )
                 )
                 .group_by(tbl.c.partition)
                 .cte()
             )
 
-            qry = (
-                _sa.select(tbl, next_messages_tbl.c.max_position)
-                .select_from(
-                    next_messages_tbl.join(
-                        tbl,
-                        _sa.and_(
-                            tbl.c.partition == next_messages_tbl.c.partition,
-                            tbl.c.position == next_messages_tbl.c.min_position,
-                        ),
-                    )
+            qry = _sa.select(tbl, next_messages_tbl.c.max_position).select_from(
+                next_messages_tbl.join(
+                    tbl,
+                    _sa.and_(
+                        tbl.c.partition == next_messages_tbl.c.partition,
+                        tbl.c.position == next_messages_tbl.c.min_position,
+                    ),
                 )
-                .order_by(tbl.c.message_occurred_at)
-                .limit(result_limit)
             )
+            if result_limit is not None:
+                qry = qry.order_by(tbl.c.message_occurred_at).limit(result_limit)
             result = conn.execute(qry)
             for row in result.fetchall():
                 yield StreamPartitionStatistic(
