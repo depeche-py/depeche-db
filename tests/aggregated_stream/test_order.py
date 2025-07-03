@@ -1,3 +1,4 @@
+from depeche_db._aggregated_stream import FullUpdateResult
 from tests._account_example import AccountCreditedEvent
 
 
@@ -15,13 +16,13 @@ def test_out_of_order_commits(db_engine, store_factory, stream_factory, account_
         store.write(stream="account-b", message=msg2, conn=conn2)
 
         # not committed yet
-        assert subject.projector.update_full() == 0
+        assert subject.projector.update_full() == FullUpdateResult(0, False)
 
         conn2.commit()
-        assert subject.projector.update_full() == 1
+        assert subject.projector.update_full() == FullUpdateResult(1, False)
 
         conn1.commit()
-        assert subject.projector.update_full() == 1
+        assert subject.projector.update_full() == FullUpdateResult(1, False)
 
         # Because of the out-of-order commit, the messages in partition 1
         # are not in the order given by their global position.
@@ -55,7 +56,7 @@ def test_gaps_in_global_position(db_engine, store_factory, stream_factory, accou
         store.write(stream="account-a", message=msg2, conn=conn)
         conn.commit()
 
-    assert subject.projector.update_full() == 2
+    assert subject.projector.update_full() == FullUpdateResult(2, False)
     assert [msg.message_id for msg in subject.read(partition=1)] == [
         msg1.event_id,
         msg2.event_id,

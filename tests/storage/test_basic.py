@@ -1,5 +1,7 @@
+import datetime as _dt
 import time as _time
 import uuid as _uuid
+from unittest import mock as _mock
 
 import pytest
 
@@ -94,21 +96,23 @@ def test_read_streams(db_engine, storage):
         subject.add(conn, "stream1", 1, id3, {"foo": "bar3"})
 
         assert set(subject.get_message_ids(conn, "stream1")) == {id1, id3}
-        assert list(subject.read(conn, "stream1")) == [
-            (id1, 1, {"foo": "bar1"}, 1),
-            (id3, 2, {"foo": "bar3"}, 3),
+        result = list(subject.read(conn, "stream1"))
+        assert result == [
+            (id1, 1, {"foo": "bar1"}, 1, _mock.ANY),
+            (id3, 2, {"foo": "bar3"}, 3, _mock.ANY),
         ]
+        assert isinstance(result[0][4], _dt.datetime)
 
         assert list(subject.read_multiple(conn, ["stream1", "stream2"])) == [
-            (id1, "stream1", 1, {"foo": "bar1"}, 1),
-            (id2, "stream2", 1, {"foo": "bar2"}, 2),
-            (id3, "stream1", 2, {"foo": "bar3"}, 3),
+            (id1, "stream1", 1, {"foo": "bar1"}, 1, _mock.ANY),
+            (id2, "stream2", 1, {"foo": "bar2"}, 2, _mock.ANY),
+            (id3, "stream1", 2, {"foo": "bar3"}, 3, _mock.ANY),
         ]
 
         assert list(subject.read_wildcard(conn, "stream%")) == [
-            (id1, "stream1", 1, {"foo": "bar1"}, 1),
-            (id2, "stream2", 1, {"foo": "bar2"}, 2),
-            (id3, "stream1", 2, {"foo": "bar3"}, 3),
+            (id1, "stream1", 1, {"foo": "bar1"}, 1, _mock.ANY),
+            (id2, "stream2", 1, {"foo": "bar2"}, 2, _mock.ANY),
+            (id3, "stream1", 2, {"foo": "bar3"}, 3, _mock.ANY),
         ]
 
 
@@ -123,20 +127,25 @@ def test_read_messages(db_engine, storage):
         id3 = _uuid.uuid4()
         subject.add(conn, "stream1", 1, id3, {"foo": "bar3"})
 
-        assert subject.get_message_by_id(conn, id1) == (
+        result = subject.get_message_by_id(conn, id1)
+        assert result == (
             id1,
             "stream1",
             1,
             {"foo": "bar1"},
             1,
+            _mock.ANY,
         )
+        assert isinstance(result[5], _dt.datetime)
 
-        assert sorted(subject.get_messages_by_ids(conn, [id1, id2])) == sorted(
+        result = sorted(subject.get_messages_by_ids(conn, [id1, id2]))
+        assert result == sorted(
             [
-                (id1, "stream1", 1, {"foo": "bar1"}, 1),
-                (id2, "stream2", 1, {"foo": "bar2"}, 2),
+                (id1, "stream1", 1, {"foo": "bar1"}, 1, _mock.ANY),
+                (id2, "stream2", 1, {"foo": "bar2"}, 2, _mock.ANY),
             ]
         )
+        assert isinstance(result[0][5], _dt.datetime)
 
 
 def test_truncate(db_engine, storage):

@@ -2,7 +2,7 @@ version: '3'
 
 services:
   db_dev:
-    image: 'postgres:${POSTGRES_VERSION:-14.5}'
+    image: 'postgres:${POSTGRES_VERSION:-17}'
     environment:
       POSTGRES_USER: depeche
       POSTGRES_PASSWORD: depeche

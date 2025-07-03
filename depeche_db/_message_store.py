@@ -39,13 +39,14 @@ class MessageStoreReader(Generic[E]):
         """
         row = self._storage.get_message_by_id(conn=self._conn, message_id=message_id)
         if row:
-            message_id, stream, version, message, global_position = row
+            message_id, stream, version, message, global_position, addet_at = row
             return StoredMessage(
                 message_id=message_id,
                 stream=stream,
                 version=version,
                 message=self._serializer.deserialize(message),
                 global_position=global_position,
+                added_at=addet_at,
             )
         raise MessageNotFound(message_id)
 
@@ -61,13 +62,14 @@ class MessageStoreReader(Generic[E]):
         for row in self._storage.get_messages_by_ids(
             conn=self._conn, message_ids=message_ids
         ):
-            message_id, stream, version, message, global_position = row
+            message_id, stream, version, message, global_position, added_at = row
             yield StoredMessage(
                 message_id=message_id,
                 stream=stream,
                 version=version,
                 message=self._serializer.deserialize(message),
                 global_position=global_position,
+                added_at=added_at,
             )
 
     def read(self, stream: str) -> Iterator[StoredMessage[E]]:
@@ -77,15 +79,20 @@ class MessageStoreReader(Generic[E]):
         Args:
             stream (str): Stream name
         """
-        for message_id, version, message, global_position in self._storage.read(
-            self._conn, stream
-        ):
+        for (
+            message_id,
+            version,
+            message,
+            global_position,
+            added_at,
+        ) in self._storage.read(self._conn, stream):
             yield StoredMessage(
                 message_id=message_id,
                 stream=stream,
                 version=version,
                 message=self._serializer.deserialize(message),
                 global_position=global_position,
+                added_at=added_at,
             )
 
     def read_wildcard(self, stream_wildcard: str) -> Iterator[StoredMessage[E]]:
@@ -107,6 +114,7 @@ class MessageStoreReader(Generic[E]):
             version,
             message,
             global_position,
+            added_at,
         ) in self._storage.read_wildcard(self._conn, stream_wildcard):
             yield StoredMessage(
                 message_id=message_id,
@@ -114,6 +122,7 @@ class MessageStoreReader(Generic[E]):
                 version=version,
                 message=self._serializer.deserialize(message),
                 global_position=global_position,
+                added_at=added_at,
             )
 
 

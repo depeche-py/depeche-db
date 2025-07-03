@@ -7,7 +7,7 @@ jobs:
   tests-python-versions:
     strategy:
       matrix:
-        python: ["3.9", "3.10", "3.11"]
+        python: ["3.9", "3.10", "3.11", "3.12"]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -67,7 +67,7 @@ jobs:
   tests-postgresql-versions:
     strategy:
       matrix:
-        postgres: ["12", "13", "14", "15", "16"]
+        postgres: ["12", "13", "14", "15", "16", "17"]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3

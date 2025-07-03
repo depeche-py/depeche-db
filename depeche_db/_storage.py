@@ -3,6 +3,7 @@ The storage implementation in PL/SQL is heavily inspired by
 https://github.com/message-db/message-db
 """
 
+import datetime as _dt
 import uuid as _uuid
 from typing import Any, Iterator, Optional, Sequence, Tuple
 
@@ -67,12 +68,14 @@ class Storage:
             self.message_table.c.version,
             self.message_table.c.message,
             self.message_table.c.global_position,
+            self.message_table.c.added_at,
         )
         self._select_without_stream = _sa.select(
             self.message_table.c.message_id,
             self.message_table.c.version,
             self.message_table.c.message,
             self.message_table.c.global_position,
+            self.message_table.c.added_at,
         )
 
     def add(
@@ -162,7 +165,7 @@ class Storage:
 
     def read(
         self, conn: SAConnection, stream: str
-    ) -> Iterator[Tuple[_uuid.UUID, int, dict, int]]:
+    ) -> Iterator[Tuple[_uuid.UUID, int, dict, int, _dt.datetime]]:
         return conn.execute(  # type: ignore
             self._select_without_stream.where(
                 self.message_table.c.stream == stream
@@ -171,7 +174,7 @@ class Storage:
 
     def read_multiple(
         self, conn: SAConnection, streams: Sequence[str]
-    ) -> Iterator[Tuple[_uuid.UUID, str, int, dict, int]]:
+    ) -> Iterator[Tuple[_uuid.UUID, str, int, dict, int, _dt.datetime]]:
         return conn.execute(  # type: ignore
             self._select.where(self.message_table.c.stream.in_(streams)).order_by(
                 self.message_table.c.global_position
@@ -180,7 +183,7 @@ class Storage:
 
     def read_wildcard(
         self, conn: SAConnection, stream_wildcard: str
-    ) -> Iterator[Tuple[_uuid.UUID, str, int, dict, int]]:
+    ) -> Iterator[Tuple[_uuid.UUID, str, int, dict, int, _dt.datetime]]:
         return conn.execute(  # type: ignore
             self._select.where(
                 self.message_table.c.stream.like(stream_wildcard)
@@ -189,14 +192,14 @@ class Storage:
 
     def get_message_by_id(
         self, conn: SAConnection, message_id: _uuid.UUID
-    ) -> Tuple[_uuid.UUID, str, int, dict, int]:
+    ) -> Tuple[_uuid.UUID, str, int, dict, int, _dt.datetime]:
         return conn.execute(  # type: ignore
             self._select.where(self.message_table.c.message_id == message_id)
         ).first()
 
     def get_messages_by_ids(
         self, conn: SAConnection, message_ids: Sequence[_uuid.UUID]
-    ) -> Iterator[Tuple[_uuid.UUID, str, int, dict, int]]:
+    ) -> Iterator[Tuple[_uuid.UUID, str, int, dict, int, _dt.datetime]]:
         return conn.execute(  # type: ignore
             self._select.where(self.message_table.c.message_id.in_(message_ids))
         )

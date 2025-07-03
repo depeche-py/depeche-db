@@ -45,6 +45,7 @@ class AggregatedStreamFactory(Generic[E]):
         partitioner: "MessagePartitioner[E]",
         stream_wildcards: List[str],
         update_batch_size: Optional[int] = None,
+        lookback_for_gaps_hours: Optional[int] = None,
     ) -> "AggregatedStream[E]":
         """
         Create an aggregated stream.
@@ -54,6 +55,7 @@ class AggregatedStreamFactory(Generic[E]):
             partitioner: A partitioner for the stream
             stream_wildcards: A list of stream wildcards
             update_batch_size: The batch size for updating the stream
+            lookback_for_gaps_hours: How many hours we should look aback for gaps in global positions. (Default is 6 hours, set this to 2-4x the time your longest transaction takes)
         """
         from ._aggregated_stream import AggregatedStream
 
@@ -63,6 +65,7 @@ class AggregatedStreamFactory(Generic[E]):
             partitioner=partitioner,
             stream_wildcards=stream_wildcards,
             update_batch_size=update_batch_size,
+            lookback_for_gaps_hours=lookback_for_gaps_hours,
         )
 
 

@@ -57,6 +57,7 @@ class StoredMessage(Generic[E]):
         version: Message version
         message: Message (`E` subtype of `MessageProtocol`)
         global_position: Global position
+        added_at: DB timestamp when the message was added to the stream
     """
 
     message_id: _uuid.UUID
@@ -64,6 +65,7 @@ class StoredMessage(Generic[E]):
     version: int
     message: E
     global_position: int
+    added_at: _dt.datetime
 
 
 class AckOpProtocol(Protocol):
