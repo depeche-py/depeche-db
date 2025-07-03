@@ -12,8 +12,11 @@ from typing import (
     Union,
 )
 
+import sqlalchemy as _sa
+
 from . import tools as _tools
 from ._aggregated_stream import AggregatedStream
+from ._compat import SAConnection
 from ._interfaces import (
     CallMiddleware,
     ErrorAction,
@@ -204,7 +207,9 @@ class Subscription(Generic[E]):
             finally:
                 self._lock_provider.unlock(lock_key)
 
-    def _get_cached_partition_statistics(self, conn):
+    def _get_cached_partition_statistics(
+        self, conn: SAConnection
+    ) -> list[StreamPartitionStatistic]:
         # The AggregatedStream.get_partition_statistics call is expensive and
         # becomes more expensive the more `position_limits` we pass.
         # Therefore, we cache the statistics for all partitions whose state did not
@@ -221,15 +226,34 @@ class Subscription(Generic[E]):
             if state_position == state.positions.get(partition, -1)
         }
 
-        # Update cache for partitions that were handled since the last run of this method.
+        # Update cache for partitions that saw new messages since the last run of this method.
+        if self._partition_statistics_cache:
+            stream_table = self._stream._table
+            partition_heads = {
+                row.partition: row.max_1
+                for row in conn.execute(
+                    _sa.select(
+                        stream_table.c.partition,
+                        _sa.func.max(stream_table.c.position),
+                    )
+                    .where(
+                        stream_table.c.partition.in_(
+                            self._partition_statistics_cache.keys()
+                        )
+                    )
+                    .group_by(stream_table.c.partition)
+                )
+            }
+
+            for statistic, _ in self._partition_statistics_cache.values():
+                if statistic.partition_number in partition_heads:
+                    statistic.max_position = partition_heads[statistic.partition_number]
+
         interesting_positions = {
             partition: position
             for partition, position in state.positions.items()
             if partition not in self._partition_statistics_cache
         }
-
-        # Update cache for partitions that saw new messages since the last run of this method.
-        # TODO is this necessary??
 
         for statistic in self._stream.get_partition_statistics(
             position_limits=interesting_positions,
@@ -450,7 +474,6 @@ class SubscriptionRunner(Generic[E]):
             for message in self._subscription.get_next_messages(count=self._batch_size):
                 n += 1
                 self.handle(message)
-                # TODO check budget here?
             if n == 0:
                 break
             if budget and budget.over_budget():

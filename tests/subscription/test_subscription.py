@@ -76,14 +76,16 @@ def test_subscription_cached_stats_update_via_stream_update(
 
     # Initial load with empty cache
     stats = get_stats()
-    assert 1 in stats
+    assert stats[1].next_message_position == 0
+    assert stats[1].max_position == 2
 
-    # We "consume" the events in partition 1
+    # We "consume" one of events in partition 1
     subject._state_provider.store(
-        subscription_name=subject.name, partition=1, position=2
+        subscription_name=subject.name, partition=1, position=1
     )
     stats = get_stats()
-    assert 1 not in stats
+    assert stats[1].next_message_position == 2
+    assert stats[1].max_position == 2
 
     # Another event is added to partition 1
     store, account, _ = store_with_events
@@ -94,8 +96,8 @@ def test_subscription_cached_stats_update_via_stream_update(
 
     # The stats should now reflect the new event
     stats_after_state_update = get_stats()
-    assert 1 in stats_after_state_update
-    assert stats_after_state_update[1].next_message_position == 3
+    assert stats_after_state_update[1].next_message_position == 2
+    assert stats_after_state_update[1].max_position == 3
 
 
 def test_db_subscription_state(
