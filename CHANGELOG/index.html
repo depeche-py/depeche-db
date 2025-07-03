@@ -848,6 +848,7 @@
 <h1 id="0110-only-release-candidate">0.11.0 (only release candidate)</h1>
 <ul>
 <li>Improved performance of aggregated stream projection.</li>
+<li>Fixed bug in return of AggregatedStream.projector.run which would always re-run it in the executor right away.</li>
 <li><strong>BREAKING CHANGE</strong>: Extended the RunOnNotification protocol<ul>
 <li>Added <code>interested_in_notification(dict) -&gt; bool</code></li>
 <li>Added <code>take_notification_hint(dict) -&gt; bool</code></li>
