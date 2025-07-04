@@ -264,3 +264,45 @@ def assert_subscription_event_order(events: List[SubscriptionMessage[AccountEven
         assert partition_events == sorted(
             partition_events, key=lambda evt: evt.position
         )
+
+
+def test_subscription_get_next_message_batch_from_partition(
+    db_engine, stream_with_events, subscription_factory, store_with_events
+):
+    subject: Subscription = subscription_factory(stream_with_events)
+    messages = []
+
+    # We "consume" one of events in partition 1
+    subject._state_provider.store(
+        subscription_name=subject.name, partition=1, position=1
+    )
+    batch = subject.get_next_message_batch_from_partition(partition_number=1, count=2)
+    assert batch is not None
+    assert len(batch.messages) == 1
+    for message in batch.messages:
+        messages.append(message)
+        assert message.partition == 1
+        assert message.position >= 1
+        batch.ack(message)
+    subject.ack_message_batch(message_batch=batch, success=True)
+
+    batch = subject.get_next_message_batch_from_partition(partition_number=1, count=2)
+    assert batch is None
+
+    # Another event is added to partition 1
+    store, account, _ = store_with_events
+    account_repo = AccountRepository(store)
+    account.credit(100)
+    account.credit(100)
+    account_repo.save(account, expected_version=3)
+    stream_with_events.projector.update_full()
+
+    batch = subject.get_next_message_batch_from_partition(partition_number=1, count=2)
+    assert batch is not None
+    assert len(batch.messages) == 2
+    for message in batch.messages:
+        messages.append(message)
+        assert message.partition == 1
+        assert message.position >= 1
+
+    assert_subscription_event_order(messages)

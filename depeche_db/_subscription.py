@@ -1,6 +1,7 @@
 import datetime as _dt
 import enum as _enum
 import logging as _logging
+import queue as _queue
 from typing import (
     Callable,
     Dict,
@@ -271,6 +272,56 @@ class Subscription(Generic[E]):
             key=lambda statisitic: statisitic.next_message_occurred_at,
         )
 
+    def get_next_message_batch_from_partition(
+        self, partition_number: int, count: int
+    ) -> Optional[SubscriptionMessageBatch[E]]:
+        if not self._state_provider.initialized(self.name):
+            self._init_state()
+        assert self._state_provider.initialized(self.name)
+
+        lock_key = f"subscription-{self.name}-{partition_number}"
+        if not self._lock_provider.lock(lock_key):
+            return None
+
+        with self._stream._store.engine.connect() as conn:
+            state = self._state_provider.read(self.name)
+            print(state)
+            message_pointers = list(
+                self._stream.read_slice(
+                    partition=partition_number,
+                    start=state.positions.get(partition_number, -1) + 1,
+                    count=count,
+                    conn=conn,
+                )
+            )
+            if not message_pointers:
+                self._lock_provider.unlock(lock_key)
+                return None
+
+            with self._stream._store.reader(conn=conn) as reader:
+                stored_messages = {
+                    message.message_id: message
+                    for message in reader.get_messages_by_ids(
+                        [pointer.message_id for pointer in message_pointers]
+                    )
+                }
+            messages = [
+                SubscriptionMessage(
+                    partition=pointer.partition,
+                    position=pointer.position,
+                    stored_message=stored_messages[pointer.message_id],
+                    ack=NoAckOp(),
+                )
+                for pointer in message_pointers
+            ]
+            return SubscriptionMessageBatch(
+                partition=partition_number,
+                first_position=min(msg.position for msg in messages),
+                last_position=max(msg.position for msg in messages),
+                lock_key=lock_key,
+                messages=messages,
+            )
+
     def get_next_message_batch(
         self, count: int
     ) -> Optional[SubscriptionMessageBatch[E]]:
@@ -329,6 +380,7 @@ class Subscription(Generic[E]):
         self, message_batch: SubscriptionMessageBatch[E], success: bool
     ) -> None:
         if success:
+            assert message_batch.ackd_position > -1
             self._state_provider.store(
                 subscription_name=self.name,
                 partition=message_batch.partition,
@@ -338,6 +390,41 @@ class Subscription(Generic[E]):
 
     def unlock_message_batch(self, message_batch: SubscriptionMessageBatch[E]) -> None:
         self._lock_provider.unlock(message_batch.lock_key)
+
+    def get_next_messages_from_partition(
+        self, partition_number: int, count: int
+    ) -> Iterator[SubscriptionMessage[E]]:
+        batch = None
+        try:
+            batch = self.get_next_message_batch_from_partition(
+                partition_number=partition_number, count=count
+            )
+            if batch:
+                for message in batch.messages:
+                    ack = AckOp(
+                        name=self.name,
+                        partition=message.partition,
+                        position=message.position,
+                        state_provider=self._state_provider,
+                    )
+
+                    yield SubscriptionMessage(
+                        partition=message.partition,
+                        position=message.position,
+                        stored_message=message.stored_message,
+                        ack=ack,
+                    )
+                    if ack.rolled_back:
+                        # the message was not ack'd or the acknolwedgement was rolled back
+                        break
+                    try:
+                        ack.execute()
+                    except AckRolledback:
+                        # the message was not ack'd or the acknolwedgement was rolled back
+                        break
+        finally:
+            if batch:
+                self.unlock_message_batch(batch)
 
     def get_next_messages(self, count: int) -> Iterator[SubscriptionMessage[E]]:
         batch = None
@@ -451,12 +538,16 @@ class SubscriptionRunner(Generic[E]):
         self._batch_size = batch_size or 10
         self._keep_running = True
         self._handler = message_handler
+        self._changed_partitions: _queue.Queue[int] = _queue.Queue()
 
     def interested_in_notification(self, notification: dict) -> bool:
         return True
 
     def take_notification_hint(self, notification: dict):
-        pass
+        partition = notification.get("partition")
+        position = notification.get("position")
+        if partition is not None and position is not None:
+            self._changed_partitions.put(partition)
 
     @property
     def notification_channel(self) -> str:
@@ -468,10 +559,19 @@ class SubscriptionRunner(Generic[E]):
     def stop(self):
         self._keep_running = False
 
+    def _get_next_messages(self) -> Iterator[SubscriptionMessage[E]]:
+        if self._changed_partitions.empty():
+            partition = self._changed_partitions.get()
+            return self._subscription.get_next_messages_from_partition(
+                partition_number=partition, count=self._batch_size
+            )
+
+        return self._subscription.get_next_messages(count=self._batch_size)
+
     def run_once(self, budget: Optional[TimeBudget] = None) -> RunOnNotificationResult:
         while self._keep_running:
             n = 0
-            for message in self._subscription.get_next_messages(count=self._batch_size):
+            for message in self._get_next_messages():
                 n += 1
                 self.handle(message)
             if n == 0:
@@ -485,11 +585,19 @@ class SubscriptionRunner(Generic[E]):
 
 
 class BatchedAckSubscriptionRunner(SubscriptionRunner[E]):
+    def _get_next_message_batch(self) -> Optional[SubscriptionMessageBatch]:
+        while not self._changed_partitions.empty():
+            partition = self._changed_partitions.get()
+            batch = self._subscription.get_next_message_batch_from_partition(
+                partition_number=partition, count=self._batch_size
+            )
+            if batch:
+                return batch
+        return self._subscription.get_next_message_batch(count=self._batch_size)
+
     def run_once(self, budget: Optional[TimeBudget] = None) -> RunOnNotificationResult:
         while self._keep_running:
-            message_batch = self._subscription.get_next_message_batch(
-                count=self._batch_size
-            )
+            message_batch = self._get_next_message_batch()
             if message_batch is None:
                 break
             try:
