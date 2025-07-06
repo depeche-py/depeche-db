@@ -1,4 +1,4 @@
-# 0.11.0 (only release candidate)
+# 0.11.0
 
 * Improved performance of aggregated stream projection.
 * Fixed bug in return of AggregatedStream.projector.run which would always re-run it in the executor right away.
