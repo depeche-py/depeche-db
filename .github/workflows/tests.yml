@@ -20,17 +20,22 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Install
         run: |
-          pipx install poetry
-          poetry env use ${{ matrix.python }}
-          poetry install --with dev
-          poetry add psycopg2-binary
-          poetry show
+          pipx install uv
+          uv sync --with dev
+          uv add psycopg2-binary
+          uv show
       - name: Run tests
-        run: poetry run pytest -vv
+        run: uv run pytest -vv
   tests-psycopg-version:
     strategy:
       matrix:
-        psycopg: ["psycopg2-binary", "psycopg2-binary==2.9.3", "psycopg[binary]", "psycopg[binary]==3.2.1"]
+        psycopg:
+          [
+            "psycopg2-binary",
+            "psycopg2-binary==2.9.3",
+            "psycopg[binary]",
+            "psycopg[binary]==3.2.1",
+          ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -39,12 +44,12 @@ jobs:
           docker compose -f docker-compose.yml up -d
       - name: Install
         run: |
-          pipx install poetry
-          poetry install --with dev
-          poetry add '${{ matrix.psycopg }}'
-          poetry show
+          pipx install uv
+          uv sync --with dev
+          uv add '${{ matrix.psycopg }}'
+          uv show
       - name: Run tests
-        run: poetry run pytest -vv
+        run: uv run pytest -vv
   tests-sqlalchemy-versions:
     strategy:
       matrix:
@@ -57,13 +62,13 @@ jobs:
           docker compose -f docker-compose.yml up -d
       - name: Install
         run: |
-          pipx install poetry
-          poetry install --with dev
-          poetry add psycopg2-binary
-          poetry add sqlalchemy${{ matrix.sqlalchemy }}
-          poetry show
+          pipx install uv
+          uv sync --with dev
+          uv add psycopg2-binary
+          uv add sqlalchemy${{ matrix.sqlalchemy }}
+          uv show
       - name: Run tests
-        run: poetry run pytest -vv
+        run: uv run pytest -vv
   tests-postgresql-versions:
     strategy:
       matrix:
@@ -76,12 +81,12 @@ jobs:
           POSTGRES_VERSION=${{ matrix.postgres }} docker compose -f docker-compose.yml up -d
       - name: Install
         run: |
-          pipx install poetry
-          poetry install --with dev
-          poetry add psycopg2-binary
-          poetry show
+          pipx install uv
+          uv sync --with dev
+          uv add psycopg2-binary
+          uv show
       - name: Run tests
-        run: poetry run pytest -vv
+        run: uv run pytest -vv
   tests-pydantic:
     strategy:
       matrix:
@@ -94,10 +99,10 @@ jobs:
           docker compose -f docker-compose.yml up -d
       - name: Install
         run: |
-          pipx install poetry
-          poetry install --with dev
-          poetry add psycopg2-binary
-          poetry add --group dev pydantic${{ matrix.pydantic }}
-          poetry show
+          pipx install uv
+          uv sync --with dev
+          uv add psycopg2-binary
+          uv add --group dev pydantic${{ matrix.pydantic }}
+          uv show
       - name: Run tests
-        run: poetry run pytest -vv tests/tools/test_pydantic_serializer.py
+        run: uv run pytest -vv tests/tools/test_pydantic_serializer.py
