@@ -21,6 +21,7 @@ jobs:
       - name: Install
         run: |
           pipx install uv
+          uv venv --python ${{ matrix.python }}
           uv sync --with dev
           uv add psycopg2-binary
           uv show
