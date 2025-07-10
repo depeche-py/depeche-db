@@ -10,7 +10,7 @@ def test_typing():
     repo_path = _pathlib.Path(__file__).parent.parent
     res = _subprocess.run(
         [
-            "poetry",
+            "uv",
             "run",
             "--",
             "mypy",

@@ -45,6 +45,8 @@ Psycopg (Version 2 >= 2.9.3 or Version 3 >= 3.1)
 pip install depeche-db
 # OR
 poetry add depeche-db
+# OR
+uv add depeche-db
 ```
 
 ## Example
