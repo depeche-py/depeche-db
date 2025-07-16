@@ -74,7 +74,7 @@ stream = message_store.aggregated_stream(
 )
 
 HANDLED = 0
-HANDLER_DELAY = 0.002
+HANDLER_DELAY = 0.001
 handlers = MessageHandlerRegister[MyMessage]()
 
 
@@ -124,6 +124,7 @@ def projector():
 
 
 def sub():
+    time.sleep(random.random())
     executor = Executor(db_dsn=DB_DSN, stimulation_interval=STIMULATION_INTERVAL)
     executor.register(subscription.runner)
     start = time.time()
@@ -146,11 +147,15 @@ def run_test():
     print(
         f"{STIMULATION_INTERVAL=} {subscription.runner._batch_size=}, {subscription.runner.__class__.__name__}"
     )
-    pub = subprocess.Popen(
-        ["python", "-u", "-m", "examples.pub_sub_performance", "pub"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-    )
+    pubs = [
+        subprocess.Popen(
+            ["python", "-u", "-m", "examples.pub_sub_performance", "pub"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        for _ in range(4)
+    ]
+    pub = pubs[0]
     projector = subprocess.Popen(
         ["python", "-u", "-m", "examples.pub_sub_performance", "projector"],
         stdout=subprocess.PIPE,
@@ -169,22 +174,32 @@ def run_test():
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
         )
-        for i in range(3)
+        for i in range(1)
     ]
     pub_done = False
+
     try:
         while True:
             if not pub_done and pub.poll() is not None:
                 pub_done = True
                 for sub in subs:
                     sub.terminate()
-            if pub_done and all(sub.poll() is not None for sub in subs):
+                for pub1 in pubs:
+                    pub1.terminate()
+            if (
+                pub_done
+                and all(sub.poll() is not None for sub in subs)
+                and all(pub1.poll() is not None for pub1 in pubs)
+            ):
                 break
             r, _, _ = select.select(
-                [pub.stdout, *[sub.stdout for sub in subs]], [], [], 1
+                [*[pub1.stdout for pub1 in pubs], *[sub.stdout for sub in subs]],
+                [],
+                [],
+                1,
             )
             for fd in r:
-                prefix = "pub" if fd == pub.stdout else "sub"
+                prefix = "pub" if any(fd == pub1.stdout for pub1 in pubs) else "sub"
                 line = fd.readline()
                 if line:
                     print(prefix, line.decode("utf-8"), end="")
@@ -192,7 +207,8 @@ def run_test():
             for line in sub.stdout.readlines():
                 print("sub", line.decode("utf-8"), end="")
     finally:
-        pub.kill()
+        for pub1 in pubs:
+            pub1.kill()
         projector.kill()
         for sub in subs:
             sub.kill()
