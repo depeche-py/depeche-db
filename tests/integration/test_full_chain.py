@@ -25,7 +25,7 @@ def test_it(pg_db, db_engine, stream_factory, store_factory, subscription_factor
         msg_sub_recv.append(time.time())
 
     subscription: Subscription = subscription_factory(stream, handlers=handlers)
-    subscription._get_cached_partition_statistics = mock.Mock(
+    subscription._get_cached_partition_statistics = mock.Mock(  # type: ignore[method-assign]
         wraps=subscription._get_cached_partition_statistics
     )
     executors = []

@@ -7,6 +7,7 @@ from typing import (
     Dict,
     Generic,
     Iterator,
+    List,
     Optional,
     Tuple,
     TypeVar,
@@ -277,7 +278,7 @@ class Subscription(Generic[E]):
         conn: SAConnection,
         partition: int,
         count: int,
-    ):
+    ) -> Optional[SubscriptionMessageBatch[E]]:
         lock_key = f"subscription-{self.name}-{partition}"
         if not self._lock_provider.lock(lock_key):
             return None
@@ -479,7 +480,7 @@ class SubscriptionRunner(Generic[E]):
         self._batch_size = batch_size or 10
         self._keep_running = True
         self._handler = message_handler
-        self._hints = []
+        self._hints: List[Tuple[int, int]] = []
         self._hint_lock = _threading.Lock()
 
     def interested_in_notification(self, notification: dict) -> bool:
