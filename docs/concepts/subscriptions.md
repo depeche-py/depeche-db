@@ -5,8 +5,7 @@ are discriminated by a name. A subscription works roughly like this:
 
 1. Wait for a trigger
 1. Get the current state (pairs of partition number & last processed position)
-1. For each partition that has messages after the known position (ordered by the
-   message time of the oldest unprocessed message)
+1. For each partition that has messages after the known position
     1. Try to acquire a lock (subscription group name, partition)
     1. Re-validate the state (a parallel process might have advanced it already)
     1. Process the message(s) (depending on the batch size)
@@ -18,13 +17,16 @@ the ordering guarantees within a partition because only one instance can
 process messages from any given partition at any time. It can be described as
 an instance of the competing consumers pattern.
 
-The ordering done in step 3 is not necessary to keep any of the guarantees but
-helps to keep up with the expectation that messages in the system are processed
-roughly in the order given by their message time. It also helps with fairness,
-because it will favor processing older messages first.
-
 The order of steps 3c and 3d makes this a "at least once" delivery system,
 because the message is processed before the new position is recorded.
+
+
+### Change in 0.12.0
+
+Partition selection in step 3 is NOT anymore preferring the partition with the
+oldest message. It now prefers the partition with the most unprocessed messages.
+In order to help with fairness this selection is randomized a bit.
+
 
 ## Start point
 

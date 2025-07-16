@@ -255,11 +255,6 @@ class AggregatedStream(Generic[E]):
         result_limit: Optional[int] = None,
         conn: Optional[SAConnection] = None,
     ) -> Iterator[StreamPartitionStatistic]:
-        """
-        Get partition statistics for deciding which partitions to read from. This
-        is used by subscriptions.
-        """
-
         def _inner(conn):
             tbl = self._table.alias()
             next_messages_tbl = (
