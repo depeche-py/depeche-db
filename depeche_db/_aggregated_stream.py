@@ -252,8 +252,6 @@ class AggregatedStream(Generic[E]):
 
     def get_partition_statistics(
         self,
-        position_limits: Optional[Dict[int, int]] = None,
-        ignore_partitions: Optional[List[int]] = None,
         result_limit: Optional[int] = None,
         conn: Optional[SAConnection] = None,
     ) -> Iterator[StreamPartitionStatistic]:
@@ -262,8 +260,6 @@ class AggregatedStream(Generic[E]):
         is used by subscriptions.
         """
 
-        position_limits = position_limits or {-1: -1}
-
         def _inner(conn):
             tbl = self._table.alias()
             next_messages_tbl = (
@@ -271,21 +267,6 @@ class AggregatedStream(Generic[E]):
                     tbl.c.partition,
                     _sa.func.min(tbl.c.position).label("min_position"),
                     _sa.func.max(tbl.c.position).label("max_position"),
-                )
-                .where(
-                    _sa.or_(
-                        *[
-                            _sa.and_(
-                                tbl.c.partition == partition, tbl.c.position > limit
-                            )
-                            for partition, limit in position_limits.items()
-                        ],
-                        _sa.not_(
-                            tbl.c.partition.in_(
-                                list(position_limits) + (ignore_partitions or [])
-                            )
-                        ),
-                    )
                 )
                 .group_by(tbl.c.partition)
                 .cte()
