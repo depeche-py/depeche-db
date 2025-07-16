@@ -1,6 +1,7 @@
 import datetime as _dt
 import enum as _enum
 import logging as _logging
+import random as _random
 from typing import (
     Callable,
     Dict,
@@ -206,7 +207,9 @@ class Subscription(Generic[E]):
                 self._lock_provider.unlock(lock_key)
 
     def get_max_aggregated_stream_positions(
-        self, conn: SAConnection, min_position: int
+        self,
+        conn: SAConnection,
+        # min_position: int,
     ) -> Dict[int, int]:
         # Relatively expensive operation, so we try hard to do it only when required
         tbl = self._stream._table
@@ -215,10 +218,12 @@ class Subscription(Generic[E]):
                 tbl.c.partition,
                 _sa.func.max(tbl.c.position).label("max_position"),
             )
-            .where(tbl.c.position >= min_position)
+            # .where(tbl.c.position >= min_position)
             .group_by(tbl.c.partition)
         )
-        result = dict(conn.execute(qry).fetchall())
+        result = {
+            row.partition: row.max_position for row in conn.execute(qry).fetchall()
+        }
         self._max_aggregated_stream_positions_cache = result
         return result
 
@@ -247,10 +252,10 @@ class Subscription(Generic[E]):
             else:
                 max_aggregated_stream_positions = self.get_max_aggregated_stream_positions(
                     conn=conn,
-                    # TODO make sure we have "all" partitions?!
-                    min_position=min(
-                        (position - 1000 for position in state.positions), default=0
-                    ),
+                    # TODO how to make sure we have all partitions in the state?
+                    # min_position=min(
+                    #    (position - 1000 for position in state.positions), default=0
+                    # ),
                 )
             distances = []
             for (
@@ -269,10 +274,17 @@ class Subscription(Generic[E]):
         if not distances:
             distances = _get(cached=False)
 
-        import random
-
-        result = [partition_number for _, partition_number in sorted(distances)][:10]
-        random.shuffle(result)
+        # Take the top 20 partitions with the most messages to read
+        result = [
+            partition_number
+            for _, partition_number in sorted(
+                distances,
+                reverse=True,
+            )
+        ]
+        result = result[:20]
+        # Shuffle the partitions to avoid reading them in the same order on multiple instances
+        _random.shuffle(result)
         return result
 
     def get_next_message_batch(
@@ -305,7 +317,6 @@ class Subscription(Generic[E]):
                 if not message_pointers:
                     # No messages -> try the next partition
                     self._lock_provider.unlock(lock_key)
-                    print("Unlock, no msgs")
                     continue
 
                 with self._stream._store.reader(conn=conn) as reader:
