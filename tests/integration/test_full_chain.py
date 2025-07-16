@@ -66,7 +66,10 @@ def test_it(pg_db, db_engine, stream_factory, store_factory, subscription_factor
         print(msg_sub_recv[0] - first_save_done)
         print(msg_sub_recv[1] - second_save_done)
         print(msg_sub_recv[2] - second_save_done)
-        assert len(subscription._get_cached_partition_statistics.mock_calls) < 4
+
+        # The notification hints should have the effect that we do not load the partition statistics
+        # from the database for every update.
+        assert 0 < len(subscription._get_cached_partition_statistics.mock_calls) < 4
 
     finally:
         for executor in executors:
