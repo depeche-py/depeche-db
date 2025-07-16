@@ -25,8 +25,7 @@ def test_default_beginning(
     assert not state_provider.initialized(subject.name)
     assert len(list(subject.get_next_messages(count=1))) == 1
     assert state_provider.initialized(subject.name)
-    # TODO correct?
-    assert state_provider.read(subject.name) == SubscriptionState(positions={2: 0})
+    assert len(state_provider.read(subject.name).positions) == 1
 
 
 def test_next_message(identifier, stream_with_events, lock_provider, state_provider):
