@@ -74,7 +74,7 @@ stream = message_store.aggregated_stream(
 )
 
 HANDLED = 0
-HANDLER_DELAY = 0.02
+HANDLER_DELAY = 0.002
 handlers = MessageHandlerRegister[MyMessage]()
 
 
@@ -92,8 +92,8 @@ def handle_event_a(message: SubscriptionMessage[MyMessage]):
 subscription = stream.subscription(
     name="example_pub_sub",
     handlers=handlers,
-    # batch_size=100,
-    # ack_strategy=AckStrategy.BATCHED,
+    batch_size=100,
+    ack_strategy=AckStrategy.BATCHED,
     start_point=StartAtPointInTime(
         datetime.utcnow().replace(tzinfo=pytz.UTC) - timedelta(days=1)
     ),
@@ -163,7 +163,8 @@ def run_test():
                 "-u",
                 "-m",
                 "examples.pub_sub_performance",
-                "sub_profile" if i == 0 else "sub",
+                "sub",
+                # "sub_profile" if i == 0 else "sub",
             ],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
