@@ -6,8 +6,8 @@ from typing import (
     Dict,
     Generic,
     Iterator,
+    List,
     Optional,
-    Tuple,
     TypeVar,
     Union,
 )
@@ -25,7 +25,6 @@ from ._interfaces import (
     MessageProtocol,
     RunOnNotificationResult,
     StoredMessage,
-    StreamPartitionStatistic,
     SubscriptionErrorHandler,
     SubscriptionMessage,
     SubscriptionMessageBatch,
@@ -186,9 +185,8 @@ class Subscription(Generic[E]):
             )
         else:
             raise NotImplementedError(f"Ack strategy {ack_strategy} is not implemented")
-        self._partition_statistics_cache: Dict[
-            int, Tuple[StreamPartitionStatistic, int]
-        ] = {}
+
+        self._max_aggregated_stream_positions_cache: Dict[int, int] = {}
 
     def _init_state(self):
         if not self._state_provider.initialized(self.name):
@@ -207,69 +205,75 @@ class Subscription(Generic[E]):
             finally:
                 self._lock_provider.unlock(lock_key)
 
-    def _get_cached_partition_statistics(
-        self, conn: SAConnection
-    ) -> list[StreamPartitionStatistic]:
-        # The AggregatedStream.get_partition_statistics call is expensive and
-        # becomes more expensive the more `position_limits` we pass.
-        # Therefore, we cache the statistics for all partitions whose state did not
-        # change since the last run of this method.
+    def get_max_aggregated_stream_positions(
+        self, conn: SAConnection, min_position: int
+    ) -> Dict[int, int]:
+        # Relatively expensive operation, so we try hard to do it only when required
+        tbl = self._stream._table
+        qry = (
+            _sa.select(
+                tbl.c.partition,
+                _sa.func.max(tbl.c.position).label("max_position"),
+            )
+            .where(tbl.c.position >= min_position)
+            .group_by(tbl.c.partition)
+        )
+        result = dict(conn.execute(qry).fetchall())
+        self._max_aggregated_stream_positions_cache = result
+        return result
+
+    def update_max_aggregated_stream_positions_cache(
+        self, partition_number: int, max_position: int
+    ) -> None:
+        """
+        Updates the cache of max aggregated stream positions for a specific partition.
+        This is used to keep the cache up-to-date when new messages are added to the stream.
+        """
+        current_value = self._max_aggregated_stream_positions_cache.get(
+            partition_number, -1
+        )
+        self._max_aggregated_stream_positions_cache[partition_number] = max(
+            max_position, current_value
+        )
+
+    def get_next_partitions(self, conn: SAConnection) -> List[int]:
         state = self._state_provider.read(self.name)
 
-        # Remove statistics if state changed on the partition
-        self._partition_statistics_cache = {
-            partition: (statistic, state_position)
-            for partition, (
-                statistic,
-                state_position,
-            ) in self._partition_statistics_cache.items()
-            if state_position == state.positions.get(partition, -1)
-        }
-
-        # Update cache for partitions that saw new messages since the last run of this method.
-        if self._partition_statistics_cache:
-            stream_table = self._stream._table
-            partition_heads = {
-                row.partition: row.max_1
-                for row in conn.execute(
-                    _sa.select(
-                        stream_table.c.partition,
-                        _sa.func.max(stream_table.c.position),
-                    )
-                    .where(
-                        stream_table.c.partition.in_(
-                            self._partition_statistics_cache.keys()
-                        )
-                    )
-                    .group_by(stream_table.c.partition)
+        def _get(cached: bool):
+            if cached and self._max_aggregated_stream_positions_cache:
+                max_aggregated_stream_positions = (
+                    self._max_aggregated_stream_positions_cache
                 )
-            }
+            else:
+                max_aggregated_stream_positions = self.get_max_aggregated_stream_positions(
+                    conn=conn,
+                    # TODO make sure we have "all" partitions?!
+                    min_position=min(
+                        (position - 1000 for position in state.positions), default=0
+                    ),
+                )
+            distances = []
+            for (
+                partition_number,
+                max_position,
+            ) in max_aggregated_stream_positions.items():
+                current_position = state.positions.get(partition_number, -1)
+                if current_position < max_position:
+                    # there are still messages to read in this partition
+                    distances.append(
+                        (max_position - current_position, partition_number)
+                    )
+            return distances
 
-            for statistic, _ in self._partition_statistics_cache.values():
-                if statistic.partition_number in partition_heads:
-                    statistic.max_position = partition_heads[statistic.partition_number]
+        distances = _get(cached=True)
+        if not distances:
+            distances = _get(cached=False)
 
-        interesting_positions = {
-            partition: position
-            for partition, position in state.positions.items()
-            if partition not in self._partition_statistics_cache
-        }
+        import random
 
-        for statistic in self._stream.get_partition_statistics(
-            position_limits=interesting_positions,
-            ignore_partitions=list(self._partition_statistics_cache.keys()),
-            conn=conn,
-        ):
-            self._partition_statistics_cache[statistic.partition_number] = (
-                statistic,
-                state.positions.get(statistic.partition_number, -1),
-            )
-
-        # get_next_message_batch expects this to be sorted by next_message_occurred_at
-        return sorted(
-            [statistic for (statistic, _) in self._partition_statistics_cache.values()],
-            key=lambda statisitic: statisitic.next_message_occurred_at,
-        )
+        result = [partition_number for _, partition_number in sorted(distances)][:10]
+        random.shuffle(result)
+        return result
 
     def get_next_message_batch(
         self, count: int
@@ -279,27 +283,31 @@ class Subscription(Generic[E]):
         assert self._state_provider.initialized(self.name)
 
         with self._stream._store.engine.connect() as conn:
-            for statistic in self._get_cached_partition_statistics(conn=conn):
-                lock_key = f"subscription-{self.name}-{statistic.partition_number}"
+            for partition_number in self.get_next_partitions(conn=conn):
+                lock_key = f"subscription-{self.name}-{partition_number}"
                 if not self._lock_provider.lock(lock_key):
                     continue
-                # now we have the lock, we need to check if the position is still valid
-                # if not, we need to release the lock and try the next partition
+
+                # now we have the lock, we need to get the current state of
+                # the partition to determine where to start reading
                 state = self._state_provider.read(self.name)
-                if state.positions.get(statistic.partition_number, -1) != (
-                    statistic.next_message_position - 1
-                ):
-                    self._lock_provider.unlock(lock_key)
-                    continue
+                current_position = state.positions.get(partition_number, -1)
+                next_message_position = current_position + 1
 
                 message_pointers = list(
                     self._stream.read_slice(
-                        partition=statistic.partition_number,
-                        start=statistic.next_message_position,
+                        partition=partition_number,
+                        start=next_message_position,
                         count=count,
                         conn=conn,
                     )
                 )
+                if not message_pointers:
+                    # No messages -> try the next partition
+                    self._lock_provider.unlock(lock_key)
+                    print("Unlock, no msgs")
+                    continue
+
                 with self._stream._store.reader(conn=conn) as reader:
                     stored_messages = {
                         message.message_id: message
@@ -317,7 +325,7 @@ class Subscription(Generic[E]):
                     for pointer in message_pointers
                 ]
                 return SubscriptionMessageBatch(
-                    partition=statistic.partition_number,
+                    partition=partition_number,
                     first_position=min(msg.position for msg in messages),
                     last_position=max(msg.position for msg in messages),
                     lock_key=lock_key,
@@ -456,7 +464,12 @@ class SubscriptionRunner(Generic[E]):
         return True
 
     def take_notification_hint(self, notification: dict):
-        pass
+        partition_number = notification.get("partition")
+        position = notification.get("position")
+        if partition_number is not None and position is not None:
+            self._subscription.update_max_aggregated_stream_positions_cache(
+                partition_number, position
+            )
 
     @property
     def notification_channel(self) -> str:
