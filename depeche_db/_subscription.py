@@ -1,6 +1,7 @@
 import datetime as _dt
 import enum as _enum
 import logging as _logging
+import threading as _threading
 from typing import (
     Callable,
     Dict,
@@ -271,58 +272,79 @@ class Subscription(Generic[E]):
             key=lambda statisitic: statisitic.next_message_occurred_at,
         )
 
+    def get_next_message_batch_for_partition(
+        self,
+        conn: SAConnection,
+        partition: int,
+        count: int,
+    ):
+        lock_key = f"subscription-{self.name}-{partition}"
+        if not self._lock_provider.lock(lock_key):
+            return None
+
+        state = self._state_provider.read(self.name)
+        next_message_position = state.positions.get(partition, -1) + 1
+
+        message_pointers = list(
+            self._stream.read_slice(
+                partition=partition,
+                start=next_message_position,
+                count=count,
+                conn=conn,
+            )
+        )
+        if not message_pointers:
+            self._lock_provider.unlock(lock_key)
+            return None
+
+        with self._stream._store.reader(conn=conn) as reader:
+            stored_messages = {
+                message.message_id: message
+                for message in reader.get_messages_by_ids(
+                    [pointer.message_id for pointer in message_pointers]
+                )
+            }
+
+        messages = [
+            SubscriptionMessage(
+                partition=pointer.partition,
+                position=pointer.position,
+                stored_message=stored_messages[pointer.message_id],
+                ack=NoAckOp(),
+            )
+            for pointer in message_pointers
+        ]
+        return SubscriptionMessageBatch(
+            partition=partition,
+            first_position=min(msg.position for msg in messages),
+            last_position=max(msg.position for msg in messages),
+            lock_key=lock_key,
+            messages=messages,
+        )
+
     def get_next_message_batch(
-        self, count: int
+        self, count: int, preferred_partition: Optional[int] = None
     ) -> Optional[SubscriptionMessageBatch[E]]:
         if not self._state_provider.initialized(self.name):
             self._init_state()
         assert self._state_provider.initialized(self.name)
 
         with self._stream._store.engine.connect() as conn:
-            for statistic in self._get_cached_partition_statistics(conn=conn):
-                lock_key = f"subscription-{self.name}-{statistic.partition_number}"
-                if not self._lock_provider.lock(lock_key):
-                    continue
-                # now we have the lock, we need to check if the position is still valid
-                # if not, we need to release the lock and try the next partition
-                state = self._state_provider.read(self.name)
-                if state.positions.get(statistic.partition_number, -1) != (
-                    statistic.next_message_position - 1
-                ):
-                    self._lock_provider.unlock(lock_key)
-                    continue
+            if preferred_partition is not None:
+                return self.get_next_message_batch_for_partition(
+                    conn=conn,
+                    partition=preferred_partition,
+                    count=count,
+                )
 
-                message_pointers = list(
-                    self._stream.read_slice(
-                        partition=statistic.partition_number,
-                        start=statistic.next_message_position,
-                        count=count,
-                        conn=conn,
-                    )
-                )
-                with self._stream._store.reader(conn=conn) as reader:
-                    stored_messages = {
-                        message.message_id: message
-                        for message in reader.get_messages_by_ids(
-                            [pointer.message_id for pointer in message_pointers]
-                        )
-                    }
-                messages = [
-                    SubscriptionMessage(
-                        partition=pointer.partition,
-                        position=pointer.position,
-                        stored_message=stored_messages[pointer.message_id],
-                        ack=NoAckOp(),
-                    )
-                    for pointer in message_pointers
-                ]
-                return SubscriptionMessageBatch(
+            for statistic in self._get_cached_partition_statistics(conn=conn):
+                batch = self.get_next_message_batch_for_partition(
+                    conn=conn,
                     partition=statistic.partition_number,
-                    first_position=min(msg.position for msg in messages),
-                    last_position=max(msg.position for msg in messages),
-                    lock_key=lock_key,
-                    messages=messages,
+                    count=count,
                 )
+                if batch:
+                    return batch
             return None
 
     def ack_message_batch(
@@ -339,10 +361,14 @@ class Subscription(Generic[E]):
     def unlock_message_batch(self, message_batch: SubscriptionMessageBatch[E]) -> None:
         self._lock_provider.unlock(message_batch.lock_key)
 
-    def get_next_messages(self, count: int) -> Iterator[SubscriptionMessage[E]]:
+    def get_next_messages(
+        self, count: int, preferred_partition: Optional[int] = None
+    ) -> Iterator[SubscriptionMessage[E]]:
         batch = None
         try:
-            batch = self.get_next_message_batch(count=count)
+            batch = self.get_next_message_batch(
+                count=count, preferred_partition=preferred_partition
+            )
             if batch:
                 for message in batch.messages:
                     ack = AckOp(
@@ -421,6 +447,8 @@ class SubscriptionMessageHandler(Generic[E]):
 
 
 class SubscriptionRunner(Generic[E]):
+    MAX_HINTS = 10000
+
     def __init__(
         self,
         subscription: Subscription[E],
@@ -451,12 +479,18 @@ class SubscriptionRunner(Generic[E]):
         self._batch_size = batch_size or 10
         self._keep_running = True
         self._handler = message_handler
+        self._hints = []
+        self._hint_lock = _threading.Lock()
 
     def interested_in_notification(self, notification: dict) -> bool:
         return True
 
     def take_notification_hint(self, notification: dict):
-        pass
+        partition = notification.get("partition")
+        position = notification.get("position")
+        if partition is not None and position is not None:
+            with self._hint_lock:
+                self._hints.append((partition, position))
 
     @property
     def notification_channel(self) -> str:
@@ -468,14 +502,44 @@ class SubscriptionRunner(Generic[E]):
     def stop(self):
         self._keep_running = False
 
+    def _get_next_partition_from_hints(self) -> Tuple[Optional[int], int]:
+        if not self._hints:
+            return None, -1
+        with self._hint_lock:
+            hinted_partition = self._hints[0][0]
+            hinted_position = max(
+                position
+                for partition, position in self._hints
+                if partition == hinted_partition
+            )
+        return hinted_partition, hinted_position
+
+    def _update_hints(self, partition: int, position: int):
+        with self._hint_lock:
+            self._hints = [
+                (p, pos) for p, pos in self._hints if p != partition or pos > position
+            ][: self.MAX_HINTS]
+
     def run_once(self, budget: Optional[TimeBudget] = None) -> RunOnNotificationResult:
         while self._keep_running:
-            n = 0
-            for message in self._subscription.get_next_messages(count=self._batch_size):
-                n += 1
+            hinted_partition, hinted_position = self._get_next_partition_from_hints()
+            message = None
+            for message in self._subscription.get_next_messages(
+                count=self._batch_size, preferred_partition=hinted_partition
+            ):
                 self.handle(message)
-            if n == 0:
+
+            if message is not None:
+                # Removes all hints lower than the last message
+                self._update_hints(message.partition, message.position)
+
+            if message is None and hinted_partition is not None:
+                # If we had a hint but no message, we still want to update the hints
+                self._update_hints(hinted_partition, hinted_position)
+
+            if message is None and hinted_partition is None:
                 break
+
             if budget and budget.over_budget():
                 return RunOnNotificationResult.WORK_REMAINING
         return RunOnNotificationResult.DONE_FOR_NOW
@@ -487,15 +551,25 @@ class SubscriptionRunner(Generic[E]):
 class BatchedAckSubscriptionRunner(SubscriptionRunner[E]):
     def run_once(self, budget: Optional[TimeBudget] = None) -> RunOnNotificationResult:
         while self._keep_running:
+            hinted_partition, hinted_position = self._get_next_partition_from_hints()
             message_batch = self._subscription.get_next_message_batch(
-                count=self._batch_size
+                count=self._batch_size, preferred_partition=hinted_partition
             )
+            if message_batch is None and hinted_partition is not None:
+                # If we had a hint but no message, we still want to update the hints
+                self._update_hints(hinted_partition, hinted_position)
+                continue
+
             if message_batch is None:
                 break
             try:
+                message = None
                 for message in message_batch.messages:
                     self.handle(message)
                     message_batch.ack(message)
+                if message is not None:
+                    # Removes all hints lower than the last message
+                    self._update_hints(message.partition, message.position)
             finally:
                 self._subscription.ack_message_batch(
                     message_batch=message_batch, success=True

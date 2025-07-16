@@ -148,7 +148,8 @@ def test_db_subscription_state_batched(
     )
 
     events = []
-    while True:
+    n = 0
+    while n < 10:
         batch = subject.get_next_message_batch(count=100)
         if not batch or not batch.messages:
             break
@@ -156,6 +157,7 @@ def test_db_subscription_state_batched(
             events.append(event)
             batch.ack(event)
         subject.ack_message_batch(batch, success=True)
+        n += 1
 
     assert_subscription_event_order(events)
 

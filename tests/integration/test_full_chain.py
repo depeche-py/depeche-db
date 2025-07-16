@@ -1,6 +1,7 @@
 import threading
 import time
 import uuid
+from unittest import mock
 
 from depeche_db._aggregated_stream import AggregatedStream
 from depeche_db._executor import Executor
@@ -24,6 +25,9 @@ def test_it(pg_db, db_engine, stream_factory, store_factory, subscription_factor
         msg_sub_recv.append(time.time())
 
     subscription: Subscription = subscription_factory(stream, handlers=handlers)
+    subscription._get_cached_partition_statistics = mock.Mock(
+        wraps=subscription._get_cached_partition_statistics
+    )
     executors = []
 
     def projector():
@@ -51,13 +55,18 @@ def test_it(pg_db, db_engine, stream_factory, store_factory, subscription_factor
         account.credit(100)
         account_repo.save(account, expected_version=2)
         second_save_done = time.time()
+        account.credit(100)
+        account_repo.save(account, expected_version=3)
+        account.credit(100)
+        account_repo.save(account, expected_version=4)
         time.sleep(0.5)
 
-        assert len(msg_sub_recv) == 3
+        assert len(msg_sub_recv) == 5
         # Timing
         print(msg_sub_recv[0] - first_save_done)
         print(msg_sub_recv[1] - second_save_done)
         print(msg_sub_recv[2] - second_save_done)
+        assert len(subscription._get_cached_partition_statistics.mock_calls) < 4
 
     finally:
         for executor in executors:
