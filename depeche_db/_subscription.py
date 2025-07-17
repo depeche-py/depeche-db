@@ -218,6 +218,7 @@ class Subscription(Generic[E]):
                 tbl.c.partition,
                 _sa.func.max(tbl.c.position).label("max_position"),
             )
+            # TODO this filter would be very helpful.
             # .where(tbl.c.position >= min_position)
             .group_by(tbl.c.partition)
         )
