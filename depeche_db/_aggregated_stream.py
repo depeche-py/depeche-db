@@ -296,6 +296,27 @@ class AggregatedStream(Generic[E]):
         else:
             yield from _inner(conn)
 
+    def _get_max_aggregated_stream_positions(
+        self,
+        conn: SAConnection,
+        # min_position: int,
+    ) -> Dict[int, int]:
+        # Relatively expensive operation, so we should try hard to do it only when required
+        tbl = self._table
+        qry = (
+            _sa.select(
+                tbl.c.partition,
+                _sa.func.max(tbl.c.position).label("max_position"),
+            )
+            # TODO this filter would be very helpful performance-wise!
+            # .where(tbl.c.position >= min_position)
+            .group_by(tbl.c.partition)
+        )
+        result = {
+            row.partition: row.max_position for row in conn.execute(qry).fetchall()
+        }
+        return result
+
     def time_to_positions(self, time: _dt.datetime) -> Dict[int, int]:
         """
         Get the positions for each partition at a given time.

@@ -13,8 +13,6 @@ from typing import (
     Union,
 )
 
-import sqlalchemy as _sa
-
 from . import tools as _tools
 from ._aggregated_stream import AggregatedStream
 from ._compat import SAConnection
@@ -206,29 +204,7 @@ class Subscription(Generic[E]):
             finally:
                 self._lock_provider.unlock(lock_key)
 
-    def get_max_aggregated_stream_positions(
-        self,
-        conn: SAConnection,
-        # min_position: int,
-    ) -> Dict[int, int]:
-        # Relatively expensive operation, so we try hard to do it only when required
-        tbl = self._stream._table
-        qry = (
-            _sa.select(
-                tbl.c.partition,
-                _sa.func.max(tbl.c.position).label("max_position"),
-            )
-            # TODO this filter would be very helpful.
-            # .where(tbl.c.position >= min_position)
-            .group_by(tbl.c.partition)
-        )
-        result = {
-            row.partition: row.max_position for row in conn.execute(qry).fetchall()
-        }
-        self._max_aggregated_stream_positions_cache = result
-        return result
-
-    def update_max_aggregated_stream_positions_cache(
+    def _update_max_aggregated_stream_positions_cache(
         self, partition_number: int, max_position: int
     ) -> None:
         """
@@ -242,23 +218,26 @@ class Subscription(Generic[E]):
             max_position, current_value
         )
 
-    def get_next_partitions(self, conn: SAConnection) -> List[int]:
+    def _get_next_partitions(self, conn: SAConnection) -> List[int]:
         state = self._state_provider.read(self.name)
 
-        def _get(cached: bool):
-            if cached and self._max_aggregated_stream_positions_cache:
-                max_aggregated_stream_positions = (
-                    self._max_aggregated_stream_positions_cache
-                )
-            else:
-                max_aggregated_stream_positions = self.get_max_aggregated_stream_positions(
-                    conn=conn,
-                    # TODO how to make sure we have all partitions in the state?
-                    # min_position=min(
-                    #    (position - 1000 for position in state.positions), default=0
-                    # ),
-                )
-            distances = []
+        def _refresh_max_aggregated_stream_positions_cache():
+            self._max_aggregated_stream_positions_cache = self._stream._get_max_aggregated_stream_positions(
+                conn=conn,
+                # TODO how to make sure we have all partitions in the state?
+                # min_position=min(
+                #    (position - 1000 for position in state.positions), default=0
+                # ),
+            )
+
+        def _calculate_unprocessed_message_counts():
+            if not self._max_aggregated_stream_positions_cache:
+                return {}
+
+            max_aggregated_stream_positions = (
+                self._max_aggregated_stream_positions_cache
+            )
+            unprocessed_message_counts = []
             for (
                 partition_number,
                 max_position,
@@ -266,20 +245,21 @@ class Subscription(Generic[E]):
                 current_position = state.positions.get(partition_number, -1)
                 if current_position < max_position:
                     # there are still messages to read in this partition
-                    distances.append(
+                    unprocessed_message_counts.append(
                         (max_position - current_position, partition_number)
                     )
-            return distances
+            return unprocessed_message_counts
 
-        distances = _get(cached=True)
-        if not distances:
-            distances = _get(cached=False)
+        unprocessed_message_counts = _calculate_unprocessed_message_counts()
+        if not unprocessed_message_counts:
+            _refresh_max_aggregated_stream_positions_cache()
+            unprocessed_message_counts = _calculate_unprocessed_message_counts()
 
         # Take the top 20 partitions with the most messages to read
         result = [
             partition_number
             for _, partition_number in sorted(
-                distances,
+                unprocessed_message_counts,
                 reverse=True,
             )
         ]
@@ -296,7 +276,7 @@ class Subscription(Generic[E]):
         assert self._state_provider.initialized(self.name)
 
         with self._stream._store.engine.connect() as conn:
-            for partition_number in self.get_next_partitions(conn=conn):
+            for partition_number in self._get_next_partitions(conn=conn):
                 lock_key = f"subscription-{self.name}-{partition_number}"
                 if not self._lock_provider.lock(lock_key):
                     continue
@@ -479,7 +459,7 @@ class SubscriptionRunner(Generic[E]):
         partition_number = notification.get("partition")
         position = notification.get("position")
         if partition_number is not None and position is not None:
-            self._subscription.update_max_aggregated_stream_positions_cache(
+            self._subscription._update_max_aggregated_stream_positions_cache(
                 partition_number, position
             )
 
