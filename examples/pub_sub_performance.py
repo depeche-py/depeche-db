@@ -174,7 +174,7 @@ def run_test():
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
         )
-        for i in range(1)
+        for i in range(4)
     ]
     pub_done = False
 
