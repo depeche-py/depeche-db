@@ -6,6 +6,8 @@ Install from PyPI using your favorite package manager
 pip install depeche-db psycopg2-binary
 # OR
 poetry add depeche-db psycopg2-binary
+# OR
+uv add depeche-db psycopg2-binary 
 ```
 
 
@@ -15,6 +17,8 @@ Or using psycopg3:
 pip install depeche-db psycopg
 # OR
 poetry add depeche-db psycopg
+# OR
+uv add depeche-db psycopg
 ```
 
 
