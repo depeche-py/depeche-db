@@ -16,7 +16,9 @@ class DbLockProvider:
         self._locks: Dict[str, _pals.Lock] = {}  # type: ignore
 
     def lock(self, name: str) -> bool:
-        assert name not in self._locks, "Lock already acquired"
+        # assert name not in self._locks, "Lock already acquired"
+        if name in self._locks:
+            return False
         lock = self._locks[name] = self.locker.lock(name, blocking=False)
         result = lock.acquire()
         if not result:

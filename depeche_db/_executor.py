@@ -9,7 +9,6 @@ from ._interfaces import FixedTimeBudget, RunOnNotification, RunOnNotificationRe
 from .tools import PgNotificationListener
 
 
-# TODO add tests
 class Executor:
     """
     Executor is a class that runs handlers on notifications.
