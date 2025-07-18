@@ -627,6 +627,10 @@ class StreamProjector(Generic[E]):
     def take_notification_hint(self, notification: dict):
         pass
 
+    def is_thread_safe(self) -> bool:
+        # At least not until we thoroughly test this.
+        return False
+
     @property
     def notification_channel(self) -> str:
         """

@@ -56,9 +56,9 @@ class ThreadedExecutor:
         ] = _collections.defaultdict(list)
         self.stimulation_interval = stimulation_interval
         self.keep_running = True
-        self.handler_queues = {}
+        self.handler_queues: Dict[_uuid.UUID, UniqueQueue] = {}
+        self.handler_threads: List[_threading.Thread] = []
         self.stimulator_thread = _threading.Thread(target=self._stimulate, daemon=True)
-        self.handler_threads = []
         self.listener = None
         if not disable_signals:
             _signal.signal(_signal.SIGINT, lambda *_: self._stop())
@@ -71,6 +71,7 @@ class ThreadedExecutor:
         Args:
             handler: Handler to register
         """
+        assert concurrency > 0, "Concurrency must be greater than 0"
         self.channel_register[handler.notification_channel].append(
             HandlerRegistration(handler=handler, concurrency=concurrency)
         )

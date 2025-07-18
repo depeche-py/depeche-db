@@ -489,6 +489,9 @@ class SubscriptionRunner(Generic[E]):
     def handle(self, message: SubscriptionMessage):
         self._handler.handle(message)
 
+    def is_thread_safe(self) -> bool:
+        return True
+
 
 class BatchedAckSubscriptionRunner(SubscriptionRunner[E]):
     def run_once(self, budget: Optional[TimeBudget] = None) -> RunOnNotificationResult:
