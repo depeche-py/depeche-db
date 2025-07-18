@@ -2,12 +2,17 @@ import contextlib
 import threading
 import time
 
+import pytest
+
 from depeche_db._executor import Executor
 from depeche_db._interfaces import (
     RunOnNotification,
     RunOnNotificationResult,
     TimeBudget,
 )
+from depeche_db.experimental.threaded_executor import ThreadedExecutor
+
+EXECUTOR_CLASSES = [Executor, ThreadedExecutor]
 
 
 class FakeHandler(RunOnNotification):
@@ -39,8 +44,8 @@ class FakeHandler(RunOnNotification):
 
 
 @contextlib.contextmanager
-def setup(pg_db, stimulation_interval=20.0):
-    obj = Executor(
+def setup(pg_db, subject_class, stimulation_interval=20.0):
+    obj = subject_class(
         pg_db, stimulation_interval=stimulation_interval, disable_signals=True
     )
 
@@ -56,8 +61,9 @@ def setup(pg_db, stimulation_interval=20.0):
         executor_thread.join()
 
 
-def test_basic(pg_db):
-    with setup(pg_db) as (thread, subject):
+@pytest.mark.parametrize("subject_class", EXECUTOR_CLASSES)
+def test_basic(pg_db, subject_class):
+    with setup(pg_db, subject_class) as (thread, subject):
         handler = FakeHandler()
         subject.register(handler)
         thread.start()
@@ -71,8 +77,9 @@ def test_basic(pg_db):
         assert len(handler.calls) == 3
 
 
-def test_stimulation(pg_db):
-    with setup(pg_db, stimulation_interval=0.1) as (thread, subject):
+@pytest.mark.parametrize("subject_class", EXECUTOR_CLASSES)
+def test_stimulation(pg_db, subject_class):
+    with setup(pg_db, subject_class, stimulation_interval=0.1) as (thread, subject):
         handler = FakeHandler()
         subject.register(handler)
         thread.start()
@@ -80,8 +87,9 @@ def test_stimulation(pg_db):
         assert 3 < len(handler.calls) < 6
 
 
-def test_no_stimulation(pg_db):
-    with setup(pg_db, stimulation_interval=0) as (thread, subject):
+@pytest.mark.parametrize("subject_class", EXECUTOR_CLASSES)
+def test_no_stimulation(pg_db, subject_class):
+    with setup(pg_db, subject_class, stimulation_interval=0) as (thread, subject):
         handler = FakeHandler()
         subject.register(handler)
         thread.start()
@@ -89,8 +97,9 @@ def test_no_stimulation(pg_db):
         assert len(handler.calls) == 0
 
 
-def test_requeue_when_work_remains(pg_db):
-    with setup(pg_db) as (thread, subject):
+@pytest.mark.parametrize("subject_class", EXECUTOR_CLASSES)
+def test_requeue_when_work_remains(pg_db, subject_class):
+    with setup(pg_db, subject_class) as (thread, subject):
         handler = FakeHandler(slow=True)
         subject.register(handler)
         thread.start()
@@ -98,8 +107,9 @@ def test_requeue_when_work_remains(pg_db):
         assert len(handler.calls) > 1
 
 
-def test_no_call_if_not_interested(pg_db):
-    with setup(pg_db, stimulation_interval=0) as (thread, subject):
+@pytest.mark.parametrize("subject_class", EXECUTOR_CLASSES)
+def test_no_call_if_not_interested(pg_db, subject_class):
+    with setup(pg_db, subject_class, stimulation_interval=0) as (thread, subject):
         handler = FakeHandler()
         handler.interested_in_notification = lambda x: x.get("message") == "Hello 1"  # type: ignore
         subject.register(handler)
@@ -118,8 +128,9 @@ def test_no_call_if_not_interested(pg_db):
         assert len(handler.calls) == 1
 
 
-def test_take_notification_hint(pg_db):
-    with setup(pg_db, stimulation_interval=0) as (thread, subject):
+@pytest.mark.parametrize("subject_class", EXECUTOR_CLASSES)
+def test_take_notification_hint(pg_db, subject_class):
+    with setup(pg_db, subject_class, stimulation_interval=0) as (thread, subject):
         handler = FakeHandler()
         subject.register(handler)
         thread.start()
