@@ -2,6 +2,7 @@ import datetime as _dt
 import enum as _enum
 import logging as _logging
 import random as _random
+import time as _time
 from typing import (
     Callable,
     Dict,
@@ -192,6 +193,9 @@ class Subscription(Generic[E]):
             lock_key = f"subscription-{self.name}-init"
             if not self._lock_provider.lock(lock_key):
                 # another instance is already initializing the state
+                # wait until it is initialized
+                while not self._state_provider.initialized(self.name):
+                    _time.sleep(0.05)
                 return
             try:
                 if self._start_point is not None:
@@ -234,14 +238,11 @@ class Subscription(Generic[E]):
             if not self._max_aggregated_stream_positions_cache:
                 return {}
 
-            max_aggregated_stream_positions = (
-                self._max_aggregated_stream_positions_cache
-            )
             unprocessed_message_counts = []
             for (
                 partition_number,
                 max_position,
-            ) in max_aggregated_stream_positions.items():
+            ) in self._max_aggregated_stream_positions_cache.copy().items():
                 current_position = state.positions.get(partition_number, -1)
                 if current_position < max_position:
                     # there are still messages to read in this partition
