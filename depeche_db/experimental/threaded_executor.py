@@ -72,6 +72,10 @@ class ThreadedExecutor:
             handler: Handler to register
         """
         assert concurrency > 0, "Concurrency must be greater than 0"
+        if concurrency > 1:
+            assert (
+                handler.is_thread_safe()
+            ), "Handler must be thread-safe for concurrency > 1"
         self.channel_register[handler.notification_channel].append(
             HandlerRegistration(handler=handler, concurrency=concurrency)
         )
