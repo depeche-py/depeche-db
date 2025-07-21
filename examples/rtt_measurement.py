@@ -102,7 +102,7 @@ def sub():
         db_dsn=DB_DSN, disable_signals=True, stimulation_interval=0
     )
     executor.register(stream.projector)
-    executor.register(subscription.runner, concurrency=30)
+    executor.register(subscription.runner)
     executor.run()
 
 

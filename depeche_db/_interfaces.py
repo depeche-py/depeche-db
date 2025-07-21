@@ -394,15 +394,6 @@ class RunOnNotification(Protocol):
         """
         raise NotImplementedError
 
-    def is_thread_safe(self) -> bool:
-        """
-        Returns `True` if the implementation is thread-safe.
-        This means that the `run` method can be called from multiple threads
-        at the same time, and the `take_notification_hint` method can be called
-        from different threads than the `run` method.
-        """
-        return True
-
 
 class ErrorAction(_enum.Enum):
     """
