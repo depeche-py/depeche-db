@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#0120" class="md-skip">
+        <a href="#0121" class="md-skip">
           Skip to content
         </a>
       
@@ -845,13 +845,21 @@
   
 
 
+<h1 id="0121">0.12.1</h1>
+<ul>
+<li>Add experimental <code>ThreadedExecutor</code>.</li>
+</ul>
 <h1 id="0120">0.12.0</h1>
 <ul>
-<li>Simplify partition selection in subscriptions</li>
+<li>Simplify partition selection in subscriptions<ul>
 <li>We do NOT guarantee anymore that the partition with the oldest message is read next.</li>
 <li>This improves performance a lot.</li>
-<li><strong>BREAKING CHANGE</strong>: Simplify interface of <code>AggregatedStream.get_partition_statistics</code></li>
+</ul>
+</li>
+<li><strong>BREAKING CHANGE</strong>: Simplify interface of <code>AggregatedStream.get_partition_statistics</code><ul>
 <li>Removed arguments <code>position_limits</code> and <code>ignore_partitions</code>.</li>
+</ul>
+</li>
 </ul>
 <h1 id="0110">0.11.0</h1>
 <ul>
