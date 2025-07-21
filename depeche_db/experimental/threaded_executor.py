@@ -64,14 +64,18 @@ class ThreadedExecutor:
             _signal.signal(_signal.SIGINT, lambda *_: self._stop())
             _signal.signal(_signal.SIGTERM, lambda *_: self._stop())
 
-    def register(self, handler: RunOnNotification):
+    def register(self, handler: RunOnNotification, concurrency: int = 1):
         """
         Registers a handler to be run on notifications.
 
         Args:
             handler: Handler to register
         """
-        concurrency = 1  # TODO v2: allow setting concurrency
+        assert concurrency > 0, "Concurrency must be greater than 0"
+        if concurrency > 1:
+            assert (
+                handler.is_thread_safe()
+            ), "Handler must be thread-safe for concurrency > 1"
         self.channel_register[handler.notification_channel].append(
             HandlerRegistration(handler=handler, concurrency=concurrency)
         )
