@@ -48,6 +48,7 @@ Modifications:
 import hashlib
 import logging
 import struct
+from typing import Set
 
 import sqlalchemy as sa
 
@@ -90,7 +91,7 @@ class Locker:
 
         # pg_advisory_unlock_all is expensive, so we track which DB API connections
         # we used for lock and only run it on these.
-        self.tainted_connection_ids = set()
+        self.tainted_connection_ids: Set[int] = set()
 
         if create_engine_callable:
             self.engine = create_engine_callable()
