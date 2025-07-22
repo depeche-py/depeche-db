@@ -1,0 +1,245 @@
+"""
+Vendored with a modification to the connection cleanup.
+
+Source:
+    PyPI: https://pypi.org/project/PALs/
+    Github: https://github.com/level12/pals
+    version: 0.3.5
+    SHA: 905bb40eeeb6db936df692a026460bd4e41c725a
+
+Original License:
+    Copyright (c) 2018 by Randy Syring and contributors.
+
+    Some rights reserved.
+
+    Redistribution and use in source and binary forms of the software as well
+    as documentation, with or without modification, are permitted provided
+    that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+    * Redistributions in binary form must reproduce the above
+      copyright notice, this list of conditions and the following
+      disclaimer in the documentation and/or other materials provided
+      with the distribution.
+
+    * The names of the contributors may not be used to endorse or
+      promote products derived from this software without specific
+      prior written permission.
+
+    THIS SOFTWARE AND DOCUMENTATION IS PROVIDED BY THE COPYRIGHT HOLDERS AND
+    CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT
+    NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+    A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+    OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+    EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+    PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+    PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+    LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+    NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+    SOFTWARE AND DOCUMENTATION, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH
+    DAMAGE.
+
+Modifications:
+    * Run pg_advisory_unlock_all only when necessary.
+"""
+
+import hashlib
+import logging
+import struct
+from typing import Set
+
+import sqlalchemy as sa
+
+log = logging.getLogger(__name__)
+
+__all__ = [
+    "Locker",
+    "AcquireFailure",
+]
+
+
+class AcquireFailure(Exception):
+    def __init__(self, name, message):
+        self.name = name
+        self.message = message
+
+    def __str__(self):
+        return f'Lock acquire failed for "{self.name}". {self.message}.'
+
+
+class Locker:
+    """
+    A Locker instance is intended to be an app-level lock factory.
+
+    It holds the name of the application (so lock names are namespaced and less likely to
+    collide) and the SQLAlchemy engine instance (and therefore the connection pool).
+    """
+
+    def __init__(
+        self,
+        app_name,
+        db_url=None,
+        blocking_default=True,
+        acquire_timeout_default=30000,
+        create_engine_callable=None,
+    ):
+        self.app_name = app_name
+        self.blocking_default = blocking_default
+        self.acquire_timeout_default = acquire_timeout_default
+
+        # pg_advisory_unlock_all is expensive, so we track which DB API connections
+        # we used for lock and only run it on these.
+        self.tainted_connection_ids: Set[int] = set()
+
+        if create_engine_callable:
+            self.engine = create_engine_callable()
+        else:
+            self.engine = sa.create_engine(db_url)
+
+        @sa.event.listens_for(self.engine, "checkin")
+        def on_conn_checkin(dbapi_connection, connection_record):
+            """
+            This function will be called when a connection is checked back into the connection
+            pool.  That should happen when .close() is called on it or when the connection
+            proxy goes out of scope and is garbage collected.
+            """
+            if dbapi_connection is None:
+                # This may occur in rare circumstances where the connection is already closed or an
+                # error occurred while connecting to the database. In these cases any held locks
+                # should already be released when the connection terminated.
+                return
+
+            if id(dbapi_connection) in self.tainted_connection_ids:
+                self.tainted_connection_ids.remove(id(dbapi_connection))
+                with dbapi_connection.cursor() as cur:
+                    # If the connection is "closed" we want all locks to be cleaned up since this
+                    # connection is going to be recycled.  This step is to take extra care that we don't
+                    # accidentally leave a lock acquired.
+                    cur.execute("select pg_advisory_unlock_all()")
+
+    def _lock_name(self, name):
+        if self.app_name is None:
+            return name
+
+        return "{}.{}".format(self.app_name, name)
+
+    def _lock_num(self, name):
+        """
+        PostgreSQL requires lock ids to be integers.  It accepts bigints which gives us
+        64 bits to work with.  Hash the lock name to an integer.
+        """
+        name = self._lock_name(name)
+
+        name_hash = hashlib.sha1(name.encode("utf-8"))
+
+        # Convert the hash to an integer value in the range of a PostgreSQL bigint
+        (num,) = struct.unpack("q", name_hash.digest()[:8])
+
+        return num
+
+    def lock(self, name, **kwargs):
+        lock_num = self._lock_num(name)
+        name = self._lock_name(name)
+        kwargs.setdefault("blocking", self.blocking_default)
+        kwargs.setdefault("acquire_timeout", self.acquire_timeout_default)
+        return Lock(self, lock_num, name, **kwargs)
+
+
+class Lock:
+    def __init__(
+        self, parent, lock_num, name, blocking=None, acquire_timeout=None, shared=False
+    ):
+        self.parent = parent
+        self.engine = parent.engine
+        self.conn = None
+        self.lock_num = lock_num
+        self.name = name
+        self.blocking = blocking
+        self.acquire_timeout = acquire_timeout
+        self.shared_suffix = "_shared" if shared else ""
+
+    def _acquire(self, blocking=None, acquire_timeout=None) -> bool:
+        blocking = blocking if blocking is not None else self.blocking
+        acquire_timeout = acquire_timeout or self.acquire_timeout
+
+        if self.conn is None:
+            self.conn = self.engine.connect()
+            self.parent.tainted_connection_ids.add(
+                id(self.conn._dbapi_connection.dbapi_connection)
+            )
+
+        if blocking:
+            timeout_sql = sa.text("set lock_timeout = :timeout")
+            with self.conn.begin():
+                self.conn.execute(timeout_sql, {"timeout": acquire_timeout})
+
+            lock_sql = sa.text(
+                f"select pg_advisory_lock{self.shared_suffix}(:lock_num)"
+            )
+        else:
+            lock_sql = sa.text(
+                f"select pg_try_advisory_lock{self.shared_suffix}(:lock_num)"
+            )
+
+        try:
+            with self.conn.begin():
+                result = self.conn.execute(lock_sql, {"lock_num": self.lock_num})
+            retval = result.scalar()
+            log.debug("Lock result was: %r", retval)
+            # At least on PG 10.6, pg_advisory_lock() returns an empty string
+            # when it acquires the lock.  pg_try_advisory_lock() returns True.
+            # If pg_try_advisory_lock() fails, it returns False.
+            if retval in (True, ""):
+                return True
+            else:
+                raise AcquireFailure(self.name, "result was: {retval}")
+        except sa.exc.OperationalError as e:
+            if "lock timeout" not in str(e):
+                raise
+            log.debug("Lock acquire failed due to timeout")
+            raise AcquireFailure(self.name, "Failed due to timeout")
+
+    def acquire(self, blocking=None, acquire_timeout=None) -> bool:
+        try:
+            return self._acquire(blocking=blocking, acquire_timeout=acquire_timeout)
+        except AcquireFailure:
+            return False
+
+    def release(self):
+        if self.conn is None:
+            return False
+
+        sql = sa.text(f"select pg_advisory_unlock{self.shared_suffix}(:lock_num)")
+        with self.conn.begin():
+            result = self.conn.execute(sql, {"lock_num": self.lock_num})
+        try:
+            return result.scalar()
+        finally:
+            self.conn.close()
+            self.conn = None
+
+    def __enter__(self):
+        self._acquire()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.release()
+
+    def __del__(self):
+        # Do everything we can to release resources and the connection to avoid accidentally holding
+        # a lock indefinitely if .release() is forgotten.
+        try:
+            self.release()
+        except Exception:
+            # Sometimes this will fail if the connection has gone away before the gc runs.  Since
+            # Python is just going to print the exception and we can't do anything about it,
+            # suppress the exception to keep erroneous noise out of stderr.
+            pass
+        try:
+            self.conn.close()
+        except Exception:
+            # ditto
+            pass
+        del self.conn
