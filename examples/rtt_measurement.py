@@ -17,12 +17,14 @@ from depeche_db import (
     SubscriptionMessage,
     StartAtNextMessage,
 )
-from depeche_db._executor import ThreadedExecutor
+from depeche_db.experimental.threaded_executor import ThreadedExecutor
 from depeche_db._subscription import AckStrategy
 from depeche_db.tools import PydanticMessageSerializer
+from depeche_db.tools.db_lock_provider import DbLockProvider
 
 DB_DSN = "postgresql+psycopg://depeche:depeche@localhost:4888/depeche_demo"
 db_engine = create_engine(DB_DSN, pool_size=50)
+locking_db_engine = db_engine  # create_engine(DB_DSN, pool_size=5)
 
 
 class MyMessage(pydantic.BaseModel):
@@ -64,7 +66,7 @@ msg_sub_recv = {}
 @handlers.register
 def handle_event_a(message: SubscriptionMessage[MyMessage]):
     msg_sub_recv[message.stored_message.message_id] = time.time()
-    time.sleep(0.5 * random.random())  # Simulate some processing delay
+    # time.sleep(0.5 * random.random())  # Simulate some processing delay
 
 
 msg_write_start = {}
@@ -94,6 +96,7 @@ subscription = stream.subscription(
     start_point=StartAtNextMessage(),
     # batch_size=30,
     ack_strategy=AckStrategy.BATCHED,
+    lock_provider=DbLockProvider("subscription_example_rtt", locking_db_engine),
 )
 
 
