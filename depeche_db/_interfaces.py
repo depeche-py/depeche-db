@@ -201,6 +201,7 @@ class MessageSerializer(Protocol, Generic[M]):
         raise NotImplementedError()
 
 
+@runtime_checkable
 class MessagePartitioner(Protocol, Generic[E]):
     """
     Message partitioner is a protocol that is used to determine partition number for a message.
@@ -210,6 +211,29 @@ class MessagePartitioner(Protocol, Generic[E]):
         """
         Returns partition number for a message. The partition number must be a
         positive integer. The partition number must be deterministic for a given message.
+        """
+        raise NotImplementedError
+
+
+@runtime_checkable
+class MessagePartitionerWithMax(Protocol, Generic[E]):
+    """
+    Message partitioner is a protocol that is used to determine partition number for a message.
+
+    This partitioner also provides a maximum number of partitions that can be used.
+    """
+
+    def get_partition(self, message: StoredMessage[E]) -> int:
+        """
+        Returns partition number for a message. The partition number must be a
+        positive integer. The partition number must be deterministic for a given message.
+        """
+        raise NotImplementedError
+
+    def get_max(self) -> int:
+        """
+        Returns maximum number of partitions that can be used.
+        This is used to determine the number of partitions in the stream.
         """
         raise NotImplementedError
 

@@ -21,6 +21,7 @@ from ._interfaces import (  # noqa: F401
     LockProvider,
     MessageHandlerRegisterProtocol,
     MessagePartitioner,
+    MessagePartitionerWithMax,
     MessagePosition,
     MessageProtocol,
     MessageSerializer,

@@ -79,13 +79,16 @@ def identifier():
     return _inner
 
 
-ACCOUNT1_ID = _uuid.UUID("3cf31a23-5b95-42f3-b7d8-000000000001")
-ACCOUNT2_ID = _uuid.UUID("3cf31a23-5b95-42f3-b7d8-000000000002")
+ACCOUNT1_ID = _uuid.UUID("3cf31a23-5b95-42f3-b7d8-000000000000")
+ACCOUNT2_ID = _uuid.UUID("3cf31a23-5b95-42f3-b7d8-000000000001")
 
 
 class MyPartitioner(MessagePartitioner[AccountEvent]):
     def get_partition(self, event: StoredMessage[AccountEvent]) -> int:
         return int(str(event.message.account_id)[-1])
+
+    def get_max(self) -> int:
+        return 1
 
 
 @pytest.fixture

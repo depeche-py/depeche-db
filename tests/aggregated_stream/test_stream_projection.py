@@ -225,6 +225,20 @@ def test_only_positive_partitions(
         subject.projector.update_full()
 
 
+def test_max_partition(db_engine, store_with_events, stream_factory, account_ids):
+    class IllegalPartitioner:
+        def get_partition(self, event):
+            return 11
+
+        def get_max(self):
+            return 10
+
+    store = store_with_events[0]
+    subject = stream_factory(store, partitioner=IllegalPartitioner())
+    with pytest.raises(ValueError):
+        subject.projector.update_full()
+
+
 def test_stream_projector_run(db_engine, store_factory, stream_factory, account_ids):
     ACCOUNT1_ID, _ = account_ids
     store = store_factory()

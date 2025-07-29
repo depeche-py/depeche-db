@@ -39,7 +39,7 @@ def test_next_message(identifier, stream_with_events, lock_provider, state_provi
     assert list(subject.get_next_messages(count=1)) == []
     assert state_provider.initialized(subject.name)
     assert state_provider.read(subject.name) == SubscriptionState(
-        positions={1: 2, 2: 1}
+        positions={0: 2, 1: 1}
     )
 
 

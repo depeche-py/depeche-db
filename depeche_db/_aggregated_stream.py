@@ -1,5 +1,6 @@
 import contextlib as _contextlib
 import datetime as _dt
+import functools as _ft
 import logging as _logging
 import re as _re
 import textwrap as _textwrap
@@ -24,6 +25,7 @@ from ._factories import SubscriptionFactory
 from ._interfaces import (
     AggregatedStreamMessage,
     MessagePartitioner,
+    MessagePartitionerWithMax,
     MessageProtocol,
     RunOnNotificationResult,
     StoredMessage,
@@ -49,7 +51,7 @@ class AggregatedStream(Generic[E]):
         self,
         name: str,
         store: MessageStore[E],
-        partitioner: MessagePartitioner[E],
+        partitioner: MessagePartitioner[E] | MessagePartitionerWithMax[E],
         stream_wildcards: List[str],
         update_batch_size: Optional[int] = None,
         lookback_for_gaps_hours: Optional[int] = None,
@@ -125,6 +127,7 @@ class AggregatedStream(Generic[E]):
             self._table, "after_create", trigger.execute_if(dialect="postgresql")
         )
         self._metadata.create_all(store.engine, checkfirst=True)
+        self.partitioner = partitioner
         self.projector = StreamProjector(
             stream=self,
             partitioner=partitioner,
@@ -132,6 +135,12 @@ class AggregatedStream(Generic[E]):
             batch_size=update_batch_size,
             lookback_for_gaps_hours=lookback_for_gaps_hours,
         )
+
+    @_ft.cached_property
+    def max_partition(self) -> int | None:
+        if isinstance(self.partitioner, MessagePartitionerWithMax):
+            return self.partitioner.get_max()
+        return None
 
     def truncate(self, conn: SAConnection):
         """
@@ -299,19 +308,16 @@ class AggregatedStream(Generic[E]):
     def _get_max_aggregated_stream_positions(
         self,
         conn: SAConnection,
-        # min_position: int,
+        min_global_position: int | None,
     ) -> Dict[int, int]:
         # Relatively expensive operation, so we should try hard to do it only when required
         tbl = self._table
-        qry = (
-            _sa.select(
-                tbl.c.partition,
-                _sa.func.max(tbl.c.position).label("max_position"),
-            )
-            # TODO this filter would be very helpful performance-wise!
-            # .where(tbl.c.position >= min_position)
-            .group_by(tbl.c.partition)
-        )
+        qry = _sa.select(
+            tbl.c.partition,
+            _sa.func.max(tbl.c.position).label("max_position"),
+        ).group_by(tbl.c.partition)
+        if min_global_position is not None:
+            qry = qry.where(tbl.c.origin_stream_global_position >= min_global_position)
         result = {
             row.partition: row.max_position for row in conn.execute(qry).fetchall()
         }
@@ -586,7 +592,7 @@ class StreamProjector(Generic[E]):
     def __init__(
         self,
         stream: AggregatedStream[E],
-        partitioner: MessagePartitioner[E],
+        partitioner: MessagePartitioner[E] | MessagePartitionerWithMax[E],
         stream_wildcards: List[str],
         batch_size: Optional[int] = None,
         lookback_for_gaps_hours: Optional[int] = None,
@@ -972,6 +978,7 @@ class StreamProjector(Generic[E]):
         }
 
         rows = []
+        max_partition = self.stream.max_partition
         for message_id, stream, version, message, global_position, added_at in messages:
             message = StoredMessage(
                 message_id=message_id,
@@ -984,6 +991,10 @@ class StreamProjector(Generic[E]):
             partition = self.partitioner.get_partition(message)
             if partition < 0:
                 raise ValueError("partition must be >= 0")
+            if max_partition is not None and partition > max_partition:
+                raise ValueError(
+                    f"Partition {partition} is greater than max partition {max_partition}"
+                )
             position = positions.get(partition, -1) + 1
             positions[partition] = position
             rows.append(

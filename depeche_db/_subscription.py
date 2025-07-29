@@ -14,6 +14,8 @@ from typing import (
     Union,
 )
 
+import sqlalchemy as _sa
+
 from . import tools as _tools
 from ._aggregated_stream import AggregatedStream
 from ._compat import SAConnection
@@ -226,12 +228,41 @@ class Subscription(Generic[E]):
         state = self._state_provider.read(self.name)
 
         def _refresh_max_aggregated_stream_positions_cache():
-            self._max_aggregated_stream_positions_cache = self._stream._get_max_aggregated_stream_positions(
-                conn=conn,
-                # TODO how to make sure we have all partitions in the state?
-                # min_position=min(
-                #    (position - 1000 for position in state.positions), default=0
-                # ),
+            min_global_position = None
+            if self._stream.max_partition is not None:
+                all_partitions_in_state = all(
+                    n in state.positions for n in range(self._stream.max_partition + 1)
+                )
+                if all_partitions_in_state:
+                    vals = _sa.sql.Values(
+                        _sa.column("partition", _sa.Integer),
+                        _sa.column("position", _sa.Integer),
+                        name="vals",
+                    ).data(
+                        [
+                            (partition, position)
+                            for partition, position in state.positions.items()
+                        ]
+                    )
+                    vals_cte = _sa.select(vals.c.partition, vals.c.position).cte()
+                    qry = _sa.select(
+                        _sa.func.min(
+                            self._stream._table.c.origin_stream_global_position
+                        )
+                    ).select_from(
+                        vals_cte.join(
+                            self._stream._table,
+                            _sa.and_(
+                                vals_cte.c.partition == self._stream._table.c.partition,
+                                vals_cte.c.position == self._stream._table.c.position,
+                            ),
+                        )
+                    )
+                    min_global_position = conn.execute(qry).scalar_one_or_none()
+            self._max_aggregated_stream_positions_cache = (
+                self._stream._get_max_aggregated_stream_positions(
+                    conn=conn, min_global_position=min_global_position
+                )
             )
 
         def _calculate_unprocessed_message_counts():

@@ -11,6 +11,7 @@ from ._interfaces import (
     LockProvider,
     MessageHandlerRegisterProtocol,
     MessagePartitioner,
+    MessagePartitionerWithMax,
     MessageProtocol,
     SubscriptionErrorHandler,
     SubscriptionStartPoint,
@@ -42,7 +43,7 @@ class AggregatedStreamFactory(Generic[E]):
     def __call__(
         self,
         name: str,
-        partitioner: "MessagePartitioner[E]",
+        partitioner: MessagePartitioner[E] | MessagePartitionerWithMax[E],
         stream_wildcards: List[str],
         update_batch_size: Optional[int] = None,
         lookback_for_gaps_hours: Optional[int] = None,
