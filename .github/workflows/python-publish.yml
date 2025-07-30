@@ -28,7 +28,7 @@ jobs:
       - name: Install uv & dependencies
         run: |
           pipx install uv
-          uv sync --with dev
+          uv sync --group dev
       - name: Build
         run: uv build
       - name: Publish package

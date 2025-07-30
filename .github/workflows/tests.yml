@@ -24,7 +24,7 @@ jobs:
         run: |
           pipx install uv
           uv venv --python ${{ matrix.python }}
-          uv sync --with dev
+          uv sync --group dev
           uv add psycopg2-binary
           uv show
       - name: Run tests
@@ -48,7 +48,7 @@ jobs:
       - name: Install
         run: |
           pipx install uv
-          uv sync --with dev
+          uv sync --group dev
           uv add '${{ matrix.psycopg }}'
           uv show
       - name: Run tests
@@ -66,7 +66,7 @@ jobs:
       - name: Install
         run: |
           pipx install uv
-          uv sync --with dev
+          uv sync --group dev
           uv add psycopg2-binary
           uv add sqlalchemy${{ matrix.sqlalchemy }}
           uv show
@@ -85,7 +85,7 @@ jobs:
       - name: Install
         run: |
           pipx install uv
-          uv sync --with dev
+          uv sync --group dev
           uv add psycopg2-binary
           uv show
       - name: Run tests
@@ -103,7 +103,7 @@ jobs:
       - name: Install
         run: |
           pipx install uv
-          uv sync --with dev
+          uv sync --group dev
           uv add psycopg2-binary
           uv add --group dev pydantic${{ matrix.pydantic }}
           uv show
