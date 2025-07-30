@@ -26,7 +26,7 @@ jobs:
           uv venv --python ${{ matrix.python }}
           uv sync --group dev
           uv add psycopg2-binary
-          uv show
+          uv pip list
       - name: Run tests
         run: uv run pytest -vv
   tests-psycopg-version:
@@ -50,13 +50,13 @@ jobs:
           pipx install uv
           uv sync --group dev
           uv add '${{ matrix.psycopg }}'
-          uv show
+          uv pip list
       - name: Run tests
         run: uv run pytest -vv
   tests-sqlalchemy-versions:
     strategy:
       matrix:
-        sqlalchemy: ["^1.4", "^2.0"]
+        sqlalchemy: [">=1.4,<2.0", ">=2.0,<3.0"]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -69,7 +69,7 @@ jobs:
           uv sync --group dev
           uv add psycopg2-binary
           uv add sqlalchemy${{ matrix.sqlalchemy }}
-          uv show
+          uv pip list
       - name: Run tests
         run: uv run pytest -vv
   tests-postgresql-versions:
@@ -87,13 +87,13 @@ jobs:
           pipx install uv
           uv sync --group dev
           uv add psycopg2-binary
-          uv show
+          uv pip list
       - name: Run tests
         run: uv run pytest -vv
   tests-pydantic:
     strategy:
       matrix:
-        pydantic: ["^1.10", "^2.4"]
+        pydantic: [">=1.10,<2.0", ">=2.4,<3.0"]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -106,6 +106,6 @@ jobs:
           uv sync --group dev
           uv add psycopg2-binary
           uv add --group dev pydantic${{ matrix.pydantic }}
-          uv show
+          uv pip show
       - name: Run tests
         run: uv run pytest -vv tests/tools/test_pydantic_serializer.py
