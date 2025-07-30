@@ -1,3 +1,7 @@
+# 0.12.2
+
+* Fix silent failure in PgNotificationListener
+
 # 0.12.1
 
 * Add experimental `ThreadedExecutor`.
