@@ -128,12 +128,13 @@ class AggregatedStream(Generic[E]):
         )
         self._metadata.create_all(store.engine, checkfirst=True)
         self.partitioner = partitioner
+        self.lookback_for_gaps_hours = lookback_for_gaps_hours or 6
         self.projector = StreamProjector(
             stream=self,
             partitioner=partitioner,
             stream_wildcards=stream_wildcards,
             batch_size=update_batch_size,
-            lookback_for_gaps_hours=lookback_for_gaps_hours,
+            lookback_for_gaps_hours=self.lookback_for_gaps_hours,
         )
 
     @_ft.cached_property
@@ -258,6 +259,25 @@ class AggregatedStream(Generic[E]):
             yield conn
         finally:
             conn.close()
+
+    def get_hourly_message_rate(self, conn: SAConnection) -> float:
+        tbl = self._table.alias()
+        qry = _sa.select(
+            _sa.func.count(tbl.c.message_id).label("message_count"),
+            _sa.func.max(tbl.c.origin_stream_added_at).label("max_added_at"),
+            _sa.func.min(tbl.c.origin_stream_added_at).label("min_added_at"),
+        ).where(
+            tbl.c.origin_stream_added_at
+            >= _dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=14)
+        )
+        result = conn.execute(qry).fetchone()
+        if not result or result.min_added_at == result.max_added_at:
+            return 100
+        return (
+            result.message_count
+            / (result.max_added_at - result.min_added_at).total_seconds()
+            * 3600
+        )
 
     def get_partition_statistics(
         self,
@@ -594,8 +614,8 @@ class StreamProjector(Generic[E]):
         stream: AggregatedStream[E],
         partitioner: MessagePartitioner[E] | MessagePartitionerWithMax[E],
         stream_wildcards: List[str],
+        lookback_for_gaps_hours: int,
         batch_size: Optional[int] = None,
-        lookback_for_gaps_hours: Optional[int] = None,
     ):
         """
         Stream projector is responsible for updating an aggregated stream.

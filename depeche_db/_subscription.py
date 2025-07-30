@@ -1,3 +1,4 @@
+import dataclasses as _dc
 import datetime as _dt
 import enum as _enum
 import logging as _logging
@@ -133,6 +134,16 @@ class AckOp:
         return self._rolled_back
 
 
+@_dc.dataclass
+class _CutoffCache:
+    global_position: int
+    calculated_at: _dt.datetime
+
+
+def _now() -> _dt.datetime:
+    return _dt.datetime.now(_dt.timezone.utc)
+
+
 class Subscription(Generic[E]):
     _state_provider: SubscriptionStateProvider
     runner: "Union[SubscriptionRunner[E], BatchedAckSubscriptionRunner[E]]"
@@ -189,6 +200,9 @@ class Subscription(Generic[E]):
             raise NotImplementedError(f"Ack strategy {ack_strategy} is not implemented")
 
         self._max_aggregated_stream_positions_cache: Dict[int, int] = {}
+        self._cutoff_cache: _CutoffCache = _CutoffCache(
+            global_position=-1, calculated_at=_now() - _dt.timedelta(days=100)
+        )
 
     def _init_state(self):
         if not self._state_provider.initialized(self.name):
@@ -224,10 +238,9 @@ class Subscription(Generic[E]):
             max_position, current_value
         )
 
-    def _get_next_partitions(self, conn: SAConnection) -> List[int]:
+    def _get_cutoff(self, conn: SAConnection) -> int:
         state = self._state_provider.read(self.name)
-
-        def _refresh_max_aggregated_stream_positions_cache():
+        if self._cutoff_cache.calculated_at < _now() - _dt.timedelta(hours=2):
             min_global_position = None
             if self._stream.max_partition is not None:
                 all_partitions_in_state = all(
@@ -259,9 +272,29 @@ class Subscription(Generic[E]):
                         )
                     )
                     min_global_position = conn.execute(qry).scalar_one_or_none()
+                    if min_global_position:
+                        cutoff = max(
+                            min_global_position
+                            - int(
+                                self._stream.get_hourly_message_rate(conn)
+                                * self._stream.lookback_for_gaps_hours
+                            ),
+                            -1,
+                        )
+                        self._cutoff_cache = _CutoffCache(
+                            global_position=cutoff,
+                            calculated_at=_now(),
+                        )
+
+        return self._cutoff_cache.global_position
+
+    def _get_next_partitions(self, conn: SAConnection) -> List[int]:
+        state = self._state_provider.read(self.name)
+
+        def _refresh_max_aggregated_stream_positions_cache():
             self._max_aggregated_stream_positions_cache = (
                 self._stream._get_max_aggregated_stream_positions(
-                    conn=conn, min_global_position=min_global_position
+                    conn=conn, min_global_position=self._get_cutoff(conn=conn)
                 )
             )
 
