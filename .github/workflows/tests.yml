@@ -68,7 +68,7 @@ jobs:
           pipx install uv
           uv sync --group dev
           uv add psycopg2-binary
-          uv add sqlalchemy${{ matrix.sqlalchemy }}
+          uv add 'sqlalchemy${{ matrix.sqlalchemy }}'
           uv pip list
       - name: Run tests
         run: uv run pytest -vv
@@ -105,7 +105,7 @@ jobs:
           pipx install uv
           uv sync --group dev
           uv add psycopg2-binary
-          uv add --group dev pydantic${{ matrix.pydantic }}
-          uv pip show
+          uv add --group dev 'pydantic${{ matrix.pydantic }}'
+          uv pip list
       - name: Run tests
         run: uv run pytest -vv tests/tools/test_pydantic_serializer.py
