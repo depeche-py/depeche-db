@@ -7,7 +7,7 @@ pip install depeche-db psycopg2-binary
 # OR
 poetry add depeche-db psycopg2-binary
 # OR
-uv add depeche-db psycopg2-binary 
+uv add depeche-db psycopg2-binary
 ```
 
 
