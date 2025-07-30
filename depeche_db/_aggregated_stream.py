@@ -252,18 +252,9 @@ class AggregatedStream(Generic[E]):
 
     def get_partition_statistics(
         self,
-        position_limits: Optional[Dict[int, int]] = None,
-        ignore_partitions: Optional[List[int]] = None,
         result_limit: Optional[int] = None,
         conn: Optional[SAConnection] = None,
     ) -> Iterator[StreamPartitionStatistic]:
-        """
-        Get partition statistics for deciding which partitions to read from. This
-        is used by subscriptions.
-        """
-
-        position_limits = position_limits or {-1: -1}
-
         def _inner(conn):
             tbl = self._table.alias()
             next_messages_tbl = (
@@ -271,21 +262,6 @@ class AggregatedStream(Generic[E]):
                     tbl.c.partition,
                     _sa.func.min(tbl.c.position).label("min_position"),
                     _sa.func.max(tbl.c.position).label("max_position"),
-                )
-                .where(
-                    _sa.or_(
-                        *[
-                            _sa.and_(
-                                tbl.c.partition == partition, tbl.c.position > limit
-                            )
-                            for partition, limit in position_limits.items()
-                        ],
-                        _sa.not_(
-                            tbl.c.partition.in_(
-                                list(position_limits) + (ignore_partitions or [])
-                            )
-                        ),
-                    )
                 )
                 .group_by(tbl.c.partition)
                 .cte()
@@ -319,6 +295,27 @@ class AggregatedStream(Generic[E]):
                 yield from _inner(conn)
         else:
             yield from _inner(conn)
+
+    def _get_max_aggregated_stream_positions(
+        self,
+        conn: SAConnection,
+        # min_position: int,
+    ) -> Dict[int, int]:
+        # Relatively expensive operation, so we should try hard to do it only when required
+        tbl = self._table
+        qry = (
+            _sa.select(
+                tbl.c.partition,
+                _sa.func.max(tbl.c.position).label("max_position"),
+            )
+            # TODO this filter would be very helpful performance-wise!
+            # .where(tbl.c.position >= min_position)
+            .group_by(tbl.c.partition)
+        )
+        result = {
+            row.partition: row.max_position for row in conn.execute(qry).fetchall()
+        }
+        return result
 
     def time_to_positions(self, time: _dt.datetime) -> Dict[int, int]:
         """

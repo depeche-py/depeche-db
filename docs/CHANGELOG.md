@@ -1,3 +1,19 @@
+# 0.12.2
+
+* Fix silent failure in PgNotificationListener
+
+# 0.12.1
+
+* Add experimental `ThreadedExecutor`.
+
+# 0.12.0
+
+* Simplify partition selection in subscriptions
+    * We do NOT guarantee anymore that the partition with the oldest message is read next.
+    * This improves performance a lot.
+* **BREAKING CHANGE**: Simplify interface of `AggregatedStream.get_partition_statistics`
+    * Removed arguments `position_limits` and `ignore_partitions`.
+
 # 0.11.0
 
 * Improved performance of aggregated stream projection.

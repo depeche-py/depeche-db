@@ -16,40 +16,13 @@ def test_stream_statisitics(db_engine, store_with_events, stream_factory):
         evt.event_id for evt in account2.events
     ]
 
-    assert list(
-        subject.get_partition_statistics(position_limits={1: 1}, result_limit=1)
-    )[0] == StreamPartitionStatistic(
-        partition_number=2,
-        next_message_id=account2.events[0].event_id,
-        next_message_position=0,
-        next_message_occurred_at=account2.events[0].occurred_at,
-        max_position=1,
-    )
-
-
-def test_stream_statistics_ignore_partition(
-    db_engine, store_with_events, stream_factory
-):
-    event_store, account, account2 = store_with_events
-    subject: AggregatedStream = stream_factory(event_store)
-    subject.projector.update_full()
-
-    assert [msg.message_id for msg in subject.read(partition=1)] == [
-        evt.event_id for evt in account.events
-    ]
-    assert [msg.message_id for msg in subject.read(partition=2)] == [
-        evt.event_id for evt in account2.events
-    ]
-
-    assert list(
-        subject.get_partition_statistics(
-            position_limits={1: 1}, ignore_partitions=[2], result_limit=1
-        )
-    )[0] == StreamPartitionStatistic(
+    assert list(subject.get_partition_statistics(result_limit=1))[
+        0
+    ] == StreamPartitionStatistic(
         partition_number=1,
-        next_message_id=account.events[2].event_id,
-        next_message_position=2,
-        next_message_occurred_at=account.events[2].occurred_at,
+        next_message_id=account.events[0].event_id,
+        next_message_position=0,
+        next_message_occurred_at=account.events[0].occurred_at,
         max_position=2,
     )
 
@@ -94,6 +67,6 @@ def test_passing_connection(db_engine, store_with_events, stream_factory):
         assert list(subject.read_slice(partition=1, start=0, count=2)) == list(
             subject.read_slice(partition=1, start=0, count=2, conn=conn)
         )
-        assert list(subject.get_partition_statistics(position_limits={1: 1})) == list(
-            subject.get_partition_statistics(position_limits={1: 1}, conn=conn)
+        assert list(subject.get_partition_statistics()) == list(
+            subject.get_partition_statistics(conn=conn)
         )
