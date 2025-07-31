@@ -32,6 +32,6 @@ jobs:
       - name: Install
         run: |
           pipx install uv
-          uv sync --group dev,docs
+          uv sync --group dev --group docs
       - name: Deploy docs
         run: uv run mkdocs gh-deploy
