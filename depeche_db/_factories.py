@@ -4,6 +4,7 @@ from typing import (
     List,
     Optional,
     TypeVar,
+    Union,
 )
 
 from ._interfaces import (
@@ -43,7 +44,7 @@ class AggregatedStreamFactory(Generic[E]):
     def __call__(
         self,
         name: str,
-        partitioner: MessagePartitioner[E] | MessagePartitionerWithMax[E],
+        partitioner: Union[MessagePartitioner[E], MessagePartitionerWithMax[E]],
         stream_wildcards: List[str],
         update_batch_size: Optional[int] = None,
         lookback_for_gaps_hours: Optional[int] = None,

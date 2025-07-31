@@ -15,6 +15,7 @@ from typing import (
     Optional,
     Tuple,
     TypeVar,
+    Union,
 )
 
 import sqlalchemy as _sa
@@ -51,7 +52,7 @@ class AggregatedStream(Generic[E]):
         self,
         name: str,
         store: MessageStore[E],
-        partitioner: MessagePartitioner[E] | MessagePartitionerWithMax[E],
+        partitioner: Union[MessagePartitioner[E], MessagePartitionerWithMax[E]],
         stream_wildcards: List[str],
         update_batch_size: Optional[int] = None,
         lookback_for_gaps_hours: Optional[int] = None,
@@ -612,7 +613,7 @@ class StreamProjector(Generic[E]):
     def __init__(
         self,
         stream: AggregatedStream[E],
-        partitioner: MessagePartitioner[E] | MessagePartitionerWithMax[E],
+        partitioner: Union[MessagePartitioner[E], MessagePartitionerWithMax[E]],
         stream_wildcards: List[str],
         lookback_for_gaps_hours: int,
         batch_size: Optional[int] = None,
