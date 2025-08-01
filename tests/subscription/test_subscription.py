@@ -1,6 +1,7 @@
 import threading
 import time
 from typing import List
+from unittest import mock
 
 import pytest
 
@@ -194,6 +195,47 @@ def test_subscription_runner_time_budget(
 
     assert len(events) > 0, "Should have processed some events"
     assert_subscription_event_order(events)
+
+
+def test_subscription_refresh_max_aggregated_stream_positions_cache(
+    db_engine, stream_with_events, subscription_factory
+):
+    subject: Subscription = subscription_factory(stream_with_events)
+    subject._stream._get_max_aggregated_stream_positions = mock.Mock(
+        wraps=subject._stream._get_max_aggregated_stream_positions
+    )
+
+    with db_engine.connect() as conn:
+        subject._state_provider.store(
+            subscription_name=subject.name, partition=0, position=1
+        )
+        subject._get_next_partitions(conn)
+        subject._stream._get_max_aggregated_stream_positions.assert_called_with(
+            conn=conn, min_global_position=None
+        )
+    raise
+
+
+def test_subscription_refresh_max_aggregated_stream_positions_cache_min_positions(
+    db_engine, stream_with_events, subscription_factory
+):
+    subject: Subscription = subscription_factory(stream_with_events)
+    subject._stream._get_max_aggregated_stream_positions = mock.Mock(
+        wraps=subject._stream._get_max_aggregated_stream_positions
+    )
+    with db_engine.connect() as conn:
+        subject._state_provider.store(
+            subscription_name=subject.name, partition=0, position=2
+        )
+        subject._state_provider.store(
+            subscription_name=subject.name, partition=1, position=1
+        )
+        subject._get_next_partitions(conn)
+        subject._stream._get_max_aggregated_stream_positions.assert_called_with(
+            conn=conn, min_global_position=4
+        )
+
+    raise
 
 
 def assert_subscription_event_order(events: List[SubscriptionMessage[AccountEvent]]):

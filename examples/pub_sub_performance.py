@@ -66,11 +66,15 @@ class NumMessagePartitioner:
     def get_partition(self, message: StoredMessage[MyMessage]) -> int:
         return message.message.content % 10
 
+    def get_max(self) -> int:
+        return 9
+
 
 stream = message_store.aggregated_stream(
     name="example_pub_sub1",
     partitioner=NumMessagePartitioner(),
     stream_wildcards=["aggregate-me-%"],
+    lookback_for_gaps_hours=1,
 )
 
 HANDLED = 0
