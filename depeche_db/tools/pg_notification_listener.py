@@ -5,7 +5,7 @@ import queue
 import select
 import threading
 import time
-from typing import Iterator, Sequence
+from typing import Iterator, Sequence, Union
 
 from depeche_db._compat import PSYCOPG_VERSION
 from depeche_db._compat import psycopg as _psycopg
@@ -17,6 +17,11 @@ logger = logging.getLogger(__name__)
 class PgNotification:
     channel: str
     payload: dict
+
+
+@_dc.dataclass
+class PgNotificationFailure:
+    exception: Exception
 
 
 class PgNotificationListener:
@@ -31,7 +36,7 @@ class PgNotificationListener:
         self.channels = channels
         self._keep_running = True
         self._thread = threading.Thread(target=self._loop)
-        self._queue = queue.Queue[PgNotification]()
+        self._queue = queue.Queue[Union[PgNotification, PgNotificationFailure]]()
         self._ignore_payload = ignore_payload
         self._select_timeout = select_timeout
         self._queue_timeout = select_timeout / 2
@@ -40,7 +45,12 @@ class PgNotificationListener:
         last_message_at = time.time()
         while self._keep_running:
             try:
-                yield self._queue.get(block=True, timeout=self._queue_timeout)
+                item = self._queue.get(block=True, timeout=self._queue_timeout)
+                if isinstance(item, PgNotificationFailure):
+                    raise RuntimeError(
+                        f"Error in PgNotificationListener: {item.exception}"
+                    )
+                yield item
                 last_message_at = time.time()
             except queue.Empty:
                 if timeout > 0:
@@ -88,6 +98,9 @@ class PgNotificationListener:
                         self._psycopg3_loop(conn)
                     else:
                         self._psycopg2_loop(conn)
+        except Exception as exc:
+            self._queue.put(PgNotificationFailure(exception=exc))
+            raise
         finally:
             conn.close()
 
