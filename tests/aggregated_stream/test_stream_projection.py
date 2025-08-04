@@ -19,6 +19,8 @@ def test_stream_projector(db_engine, store_factory, stream_factory, account_ids)
     store = store_factory()
     subject = stream_factory(store)
     assert subject.projector.update_full() == FullUpdateResult(0, False)
+    with db_engine.connect() as conn:
+        assert subject._get_max_aggregated_stream_positions(conn) == {}
 
     account_repo = AccountRepository(store)
 
@@ -26,11 +28,20 @@ def test_stream_projector(db_engine, store_factory, stream_factory, account_ids)
     account.credit(100)
     account_repo.save(account, expected_version=0)
     assert subject.projector.update_full() == FullUpdateResult(2, False)
+    with db_engine.connect() as conn:
+        assert subject._get_max_aggregated_stream_positions(conn) == {
+            1: 1,
+        }
 
     account2 = Account.register(id=ACCOUNT2_ID, owner_id=_uuid.uuid4(), number="234")
     account2.credit(100)
     account_repo.save(account2, expected_version=0)
     assert subject.projector.update_full() == FullUpdateResult(2, False)
+    with db_engine.connect() as conn:
+        assert subject._get_max_aggregated_stream_positions(conn) == {
+            1: 1,
+            2: 1,
+        }
 
     account2.credit(100)
     account2.credit(100)
@@ -38,6 +49,11 @@ def test_stream_projector(db_engine, store_factory, stream_factory, account_ids)
     account2.credit(100)
     account_repo.save(account2, expected_version=2)
     assert subject.projector.update_full() == FullUpdateResult(4, False)
+    with db_engine.connect() as conn:
+        assert subject._get_max_aggregated_stream_positions(conn) == {
+            1: 1,
+            2: 5,
+        }
 
     assert_stream_projection(subject, db_engine, account, account2)
 
