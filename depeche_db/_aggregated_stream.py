@@ -141,7 +141,7 @@ class AggregatedStream(Generic[E]):
         )
 
     @_ft.cached_property
-    def max_partition(self) -> int | None:
+    def max_partition(self) -> Optional[int]:
         if isinstance(self.partitioner, MessagePartitionerWithMax):
             return self.partitioner.get_max()
         return None
