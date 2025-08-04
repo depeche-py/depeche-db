@@ -299,15 +299,22 @@ class AggregatedStream(Generic[E]):
         else:
             yield from _inner(conn)
 
-    def _get_max_aggregated_stream_positions(
+    def get_max_aggregated_stream_positions(
         self,
-        conn: SAConnection,
+        conn: Optional[SAConnection] = None,
     ) -> Dict[int, int]:
-        result = {
-            row.partition: row.max_position
-            for row in conn.execute(_sa.select(self._maxpos_table)).fetchall()
-        }
-        return result
+        def _inner(conn: SAConnection) -> Dict[int, int]:
+            result = {
+                row.partition: row.max_position
+                for row in conn.execute(_sa.select(self._maxpos_table)).fetchall()
+            }
+            return result
+
+        if conn is None:
+            with self._connection() as conn:
+                return _inner(conn)
+        else:
+            return _inner(conn)
 
     def _update_max_aggregated_stream_positions(
         self, conn: SAConnection, positions: Dict[int, int]
@@ -705,7 +712,7 @@ class StreamProjector(Generic[E]):
         if self._checked_maxpos_table:
             return
 
-        if self.stream._get_max_aggregated_stream_positions(conn):
+        if self.stream.get_max_aggregated_stream_positions(conn):
             return
 
         positions = {
@@ -998,7 +1005,7 @@ class StreamProjector(Generic[E]):
         return len(messages)
 
     def _add(self, conn: SAConnection, messages: List[SARow]) -> None:
-        positions = self.stream._get_max_aggregated_stream_positions(conn)
+        positions = self.stream.get_max_aggregated_stream_positions(conn)
 
         rows = []
         updated_positions = {}

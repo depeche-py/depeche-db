@@ -20,7 +20,7 @@ def test_stream_projector(db_engine, store_factory, stream_factory, account_ids)
     subject = stream_factory(store)
     assert subject.projector.update_full() == FullUpdateResult(0, False)
     with db_engine.connect() as conn:
-        assert subject._get_max_aggregated_stream_positions(conn) == {}
+        assert subject.get_max_aggregated_stream_positions(conn) == {}
 
     account_repo = AccountRepository(store)
 
@@ -29,7 +29,7 @@ def test_stream_projector(db_engine, store_factory, stream_factory, account_ids)
     account_repo.save(account, expected_version=0)
     assert subject.projector.update_full() == FullUpdateResult(2, False)
     with db_engine.connect() as conn:
-        assert subject._get_max_aggregated_stream_positions(conn) == {
+        assert subject.get_max_aggregated_stream_positions(conn) == {
             1: 1,
         }
 
@@ -38,7 +38,7 @@ def test_stream_projector(db_engine, store_factory, stream_factory, account_ids)
     account_repo.save(account2, expected_version=0)
     assert subject.projector.update_full() == FullUpdateResult(2, False)
     with db_engine.connect() as conn:
-        assert subject._get_max_aggregated_stream_positions(conn) == {
+        assert subject.get_max_aggregated_stream_positions(conn) == {
             1: 1,
             2: 1,
         }
@@ -50,7 +50,7 @@ def test_stream_projector(db_engine, store_factory, stream_factory, account_ids)
     account_repo.save(account2, expected_version=2)
     assert subject.projector.update_full() == FullUpdateResult(4, False)
     with db_engine.connect() as conn:
-        assert subject._get_max_aggregated_stream_positions(conn) == {
+        assert subject.get_max_aggregated_stream_positions(conn) == {
             1: 1,
             2: 5,
         }
@@ -295,12 +295,12 @@ def test_stream_projector_creates_maxpos_table(
 ):
     stream: AggregatedStream = stream_factory(store_with_events[0])
     with db_engine.connect() as conn:
-        assert stream._get_max_aggregated_stream_positions(conn) == {}
+        assert stream.get_max_aggregated_stream_positions(conn) == {}
 
     stream.projector.update_full()
 
     with db_engine.connect() as conn:
-        assert stream._get_max_aggregated_stream_positions(conn) == {
+        assert stream.get_max_aggregated_stream_positions(conn) == {
             1: 2,
             2: 1,
         }
@@ -312,7 +312,7 @@ def test_stream_projector_creates_maxpos_table(
     stream = stream_factory(store_with_events[0])
     stream.projector.update_full()
     with db_engine.connect() as conn:
-        assert stream._get_max_aggregated_stream_positions(conn) == {
+        assert stream.get_max_aggregated_stream_positions(conn) == {
             1: 2,
             2: 1,
         }

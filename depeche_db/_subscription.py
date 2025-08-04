@@ -227,7 +227,7 @@ class Subscription(Generic[E]):
 
         def _refresh_max_aggregated_stream_positions_cache():
             self._max_aggregated_stream_positions_cache = (
-                self._stream._get_max_aggregated_stream_positions(conn=conn)
+                self._stream.get_max_aggregated_stream_positions(conn=conn)
             )
 
         def _calculate_unprocessed_message_counts():
