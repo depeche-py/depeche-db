@@ -129,7 +129,9 @@ class AggregatedStream(Generic[E]):
         )
         self._metadata.create_all(store.engine, checkfirst=True)
         self.partitioner = partitioner
-        self.lookback_for_gaps_hours = lookback_for_gaps_hours or 6
+        if lookback_for_gaps_hours is None:
+            lookback_for_gaps_hours = 6
+        self.lookback_for_gaps_hours = lookback_for_gaps_hours
         self.projector = StreamProjector(
             stream=self,
             partitioner=partitioner,
@@ -636,7 +638,7 @@ class StreamProjector(Generic[E]):
         ]
         self.partitioner = partitioner
         self.batch_size = batch_size or 100
-        self.lookback_for_gaps_hours = lookback_for_gaps_hours or 6
+        self.lookback_for_gaps_hours = lookback_for_gaps_hours
         self._lookback_cache: Optional[LookbackCache] = None
         self._get_origin_stream_positions_cache: Optional[
             OriginStreamPositionsCache

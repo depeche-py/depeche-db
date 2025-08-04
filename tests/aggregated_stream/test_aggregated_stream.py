@@ -9,17 +9,17 @@ def test_stream_statisitics(db_engine, store_with_events, stream_factory):
     subject: AggregatedStream = stream_factory(event_store)
     subject.projector.update_full()
 
-    assert [msg.message_id for msg in subject.read(partition=1)] == [
+    assert [msg.message_id for msg in subject.read(partition=0)] == [
         evt.event_id for evt in account.events
     ]
-    assert [msg.message_id for msg in subject.read(partition=2)] == [
+    assert [msg.message_id for msg in subject.read(partition=1)] == [
         evt.event_id for evt in account2.events
     ]
 
     assert list(subject.get_partition_statistics(result_limit=1))[
         0
     ] == StreamPartitionStatistic(
-        partition_number=1,
+        partition_number=0,
         next_message_id=account.events[0].event_id,
         next_message_position=0,
         next_message_occurred_at=account.events[0].occurred_at,
@@ -51,9 +51,9 @@ def test_global_position_to_position(db_engine, store_with_events, stream_factor
     subject: AggregatedStream = stream_factory(event_store)
     subject.projector.update_full()
 
-    assert subject.global_position_to_positions(0) == {1: -1, 2: -1}
-    assert subject.global_position_to_positions(3) == {1: 1, 2: 0}
-    assert subject.global_position_to_positions(5) == {1: 2, 2: 1}
+    assert subject.global_position_to_positions(0) == {0: -1, 1: -1}
+    assert subject.global_position_to_positions(3) == {0: 1, 1: 0}
+    assert subject.global_position_to_positions(5) == {0: 2, 1: 1}
 
 
 def test_passing_connection(db_engine, store_with_events, stream_factory):

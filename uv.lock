@@ -270,7 +270,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
-    { name = "pytest-watch" },
+    { name = "pytest-watcher" },
     { name = "python-language-server" },
     { name = "pytz" },
     { name = "ruff" },
@@ -307,7 +307,7 @@ dev = [
     { name = "pytest", specifier = ">=8.2.0,<9" },
     { name = "pytest-asyncio", specifier = ">=0.26.0,<0.27" },
     { name = "pytest-cov", specifier = ">=4.1.0,<5" },
-    { name = "pytest-watch", specifier = ">=4.2.0,<5" },
+    { name = "pytest-watcher" },
     { name = "python-language-server", specifier = ">=0.36.2,<0.37" },
     { name = "pytz", specifier = "~=2025.2" },
     { name = "ruff", specifier = ">=0.0.285,<0.0.286" },
@@ -338,12 +338,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/1b/ee/3070e64c5e468d1f3
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b3/4c/62c4646bd0101c24ee581b803955f340c2e35fa6f3c9704be08d74c6bbb9/diagrams-0.23.3-py3-none-any.whl", hash = "sha256:c497094f9d3600a94bdcfb62b6daf331d2eb7f9b355246e548dae7a4b5c97be0", size = 24370056, upload-time = "2023-01-13T00:59:49.039Z" },
 ]
-
-[[package]]
-name = "docopt"
-version = "0.6.2"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/a2/55/8f8cab2afd404cf578136ef2cc5dfb50baa1761b68c9da1fb1e4eed343c9/docopt-0.6.2.tar.gz", hash = "sha256:49b3a825280bd66b3aa83585ef59c4a8c82f2c8a522dbe754a8bc8d08c85c491", size = 25901, upload-time = "2014-06-16T11:18:57.406Z" }
 
 [[package]]
 name = "editorconfig"
@@ -1032,16 +1026,17 @@ wheels = [
 ]
 
 [[package]]
-name = "pytest-watch"
-version = "4.2.0"
+name = "pytest-watcher"
+version = "0.4.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "colorama" },
-    { name = "docopt" },
-    { name = "pytest" },
+    { name = "tomli", marker = "python_full_version < '3.11'" },
     { name = "watchdog" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/36/47/ab65fc1d682befc318c439940f81a0de1026048479f732e84fe714cd69c0/pytest-watch-4.2.0.tar.gz", hash = "sha256:06136f03d5b361718b8d0d234042f7b2f203910d8568f63df2f866b547b3d4b9", size = 16340, upload-time = "2018-05-20T19:52:16.194Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/72/72/a2a1e81f1b272ddd9a1848af4959c87c39aa95c0bbfb3007cacb86c47fa9/pytest_watcher-0.4.3.tar.gz", hash = "sha256:0cb0e4661648c8c0ff2b2d25efa5a8e421784b9e4c60fcecbf9b7c30b2d731b3", size = 10386, upload-time = "2024-08-28T17:37:46.662Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/5b/3a/c44a76c6bb5e9e896d9707fb1c704a31a0136950dec9514373ced0684d56/pytest_watcher-0.4.3-py3-none-any.whl", hash = "sha256:d59b1e1396f33a65ea4949b713d6884637755d641646960056a90b267c3460f9", size = 11852, upload-time = "2024-08-28T17:37:45.731Z" },
+]
 
 [[package]]
 name = "python-dateutil"

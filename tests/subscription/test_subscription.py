@@ -201,7 +201,7 @@ def test_subscription_refresh_max_aggregated_stream_positions_cache(
     db_engine, stream_with_events, subscription_factory
 ):
     subject: Subscription = subscription_factory(stream_with_events)
-    subject._stream._get_max_aggregated_stream_positions = mock.Mock(
+    subject._stream._get_max_aggregated_stream_positions = mock.Mock(  # type: ignore
         wraps=subject._stream._get_max_aggregated_stream_positions
     )
 
@@ -211,16 +211,27 @@ def test_subscription_refresh_max_aggregated_stream_positions_cache(
         )
         subject._get_next_partitions(conn)
         subject._stream._get_max_aggregated_stream_positions.assert_called_with(
-            conn=conn, min_global_position=None
+            conn=conn, min_global_position=-1
         )
-    raise
 
 
+@pytest.mark.parametrize(
+    "lookback_for_gaps_hours, expected_min_global_position", [(0, 4), (1, -1)]
+)
 def test_subscription_refresh_max_aggregated_stream_positions_cache_min_positions(
-    db_engine, stream_with_events, subscription_factory
+    lookback_for_gaps_hours,
+    expected_min_global_position,
+    db_engine,
+    store_with_events,
+    stream_factory,
+    subscription_factory,
 ):
-    subject: Subscription = subscription_factory(stream_with_events)
-    subject._stream._get_max_aggregated_stream_positions = mock.Mock(
+    store, *_ = store_with_events
+    stream = stream_factory(store, lookback_for_gaps_hours=lookback_for_gaps_hours)
+    stream.projector.update_full()
+
+    subject: Subscription = subscription_factory(stream)
+    subject._stream._get_max_aggregated_stream_positions = mock.Mock(  # type: ignore
         wraps=subject._stream._get_max_aggregated_stream_positions
     )
     with db_engine.connect() as conn:
@@ -232,10 +243,8 @@ def test_subscription_refresh_max_aggregated_stream_positions_cache_min_position
         )
         subject._get_next_partitions(conn)
         subject._stream._get_max_aggregated_stream_positions.assert_called_with(
-            conn=conn, min_global_position=4
+            conn=conn, min_global_position=expected_min_global_position
         )
-
-    raise
 
 
 def assert_subscription_event_order(events: List[SubscriptionMessage[AccountEvent]]):

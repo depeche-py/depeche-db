@@ -27,7 +27,7 @@ def test_out_of_order_commits(db_engine, store_factory, stream_factory, account_
         # Because of the out-of-order commit, the messages in partition 1
         # are not in the order given by their global position.
         # This tests checks that no messages are lost in this case.
-        assert [msg.message_id for msg in subject.read(partition=1)] == [
+        assert [msg.message_id for msg in subject.read(partition=0)] == [
             msg2.event_id,
             msg1.event_id,
         ]
@@ -57,7 +57,7 @@ def test_gaps_in_global_position(db_engine, store_factory, stream_factory, accou
         conn.commit()
 
     assert subject.projector.update_full() == FullUpdateResult(2, False)
-    assert [msg.message_id for msg in subject.read(partition=1)] == [
+    assert [msg.message_id for msg in subject.read(partition=0)] == [
         msg1.event_id,
         msg2.event_id,
     ]

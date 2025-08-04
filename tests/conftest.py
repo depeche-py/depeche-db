@@ -128,13 +128,19 @@ def store_with_events(store_factory):
 
 @pytest.fixture
 def stream_factory(identifier, db_engine):
-    def _inner(store: MessageStore[AccountEvent], partitioner=None, batch_size=None):
+    def _inner(
+        store: MessageStore[AccountEvent],
+        partitioner=None,
+        batch_size=None,
+        lookback_for_gaps_hours=None,
+    ):
         stream = AggregatedStream[AccountEvent](
             name=identifier(),
             store=store,
             partitioner=partitioner or MyPartitioner(),
             stream_wildcards=["account-%"],
             update_batch_size=batch_size,
+            lookback_for_gaps_hours=lookback_for_gaps_hours,
         )
         with db_engine.connect() as conn:
             stream.truncate(conn)
