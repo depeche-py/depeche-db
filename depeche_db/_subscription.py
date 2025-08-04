@@ -238,53 +238,54 @@ class Subscription(Generic[E]):
             max_position, current_value
         )
 
-    def _get_cutoff(self, conn: SAConnection) -> int:
+    def _refresh_cutoff_cache(self, conn: SAConnection) -> None:
         state = self._state_provider.read(self.name)
-        if self._cutoff_cache.calculated_at < _now() - _dt.timedelta(hours=2):
-            min_global_position = None
-            if self._stream.max_partition is not None:
-                all_partitions_in_state = all(
-                    n in state.positions for n in range(self._stream.max_partition + 1)
+        min_global_position = None
+        if self._stream.max_partition is not None:
+            all_partitions_in_state = all(
+                n in state.positions for n in range(self._stream.max_partition + 1)
+            )
+            if all_partitions_in_state:
+                vals = _sa.sql.Values(
+                    _sa.column("partition", _sa.Integer),
+                    _sa.column("position", _sa.Integer),
+                    name="vals",
+                ).data(
+                    [
+                        (partition, position)
+                        for partition, position in state.positions.items()
+                    ]
                 )
-                if all_partitions_in_state:
-                    vals = _sa.sql.Values(
-                        _sa.column("partition", _sa.Integer),
-                        _sa.column("position", _sa.Integer),
-                        name="vals",
-                    ).data(
-                        [
-                            (partition, position)
-                            for partition, position in state.positions.items()
-                        ]
+                vals_cte = _sa.select(vals.c.partition, vals.c.position).cte()
+                qry = _sa.select(
+                    _sa.func.min(self._stream._table.c.origin_stream_global_position)
+                ).select_from(
+                    vals_cte.join(
+                        self._stream._table,
+                        _sa.and_(
+                            vals_cte.c.partition == self._stream._table.c.partition,
+                            vals_cte.c.position == self._stream._table.c.position,
+                        ),
                     )
-                    vals_cte = _sa.select(vals.c.partition, vals.c.position).cte()
-                    qry = _sa.select(
-                        _sa.func.min(
-                            self._stream._table.c.origin_stream_global_position
-                        )
-                    ).select_from(
-                        vals_cte.join(
-                            self._stream._table,
-                            _sa.and_(
-                                vals_cte.c.partition == self._stream._table.c.partition,
-                                vals_cte.c.position == self._stream._table.c.position,
-                            ),
-                        )
+                )
+                min_global_position = conn.execute(qry).scalar_one_or_none()
+                if min_global_position:
+                    cutoff = max(
+                        min_global_position
+                        - int(
+                            self._stream.get_hourly_message_rate(conn)
+                            * self._stream.lookback_for_gaps_hours
+                        ),
+                        -1,
                     )
-                    min_global_position = conn.execute(qry).scalar_one_or_none()
-                    if min_global_position:
-                        cutoff = max(
-                            min_global_position
-                            - int(
-                                self._stream.get_hourly_message_rate(conn)
-                                * self._stream.lookback_for_gaps_hours
-                            ),
-                            -1,
-                        )
-                        self._cutoff_cache = _CutoffCache(
-                            global_position=cutoff,
-                            calculated_at=_now(),
-                        )
+                    self._cutoff_cache = _CutoffCache(
+                        global_position=cutoff,
+                        calculated_at=_now(),
+                    )
+
+    def _get_cutoff(self, conn: SAConnection) -> int:
+        if self._cutoff_cache.calculated_at < _now() - _dt.timedelta(hours=2):
+            self._refresh_cutoff_cache(conn=conn)
 
         return self._cutoff_cache.global_position
 
