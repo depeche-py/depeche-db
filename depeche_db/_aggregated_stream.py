@@ -709,6 +709,8 @@ class StreamProjector(Generic[E]):
         return FullUpdateResult(result, batch_num == self.batch_size)
 
     def _check_and_create_maxpos_table(self, conn: SAConnection) -> None:
+        # The maxpos table was only introduced in 0.12.3, so we need to check
+        # if it has data and fill it if not.
         if self._checked_maxpos_table:
             return
 

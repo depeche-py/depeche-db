@@ -1,3 +1,8 @@
+# 0.12.3
+
+* Add internal storage of maximum position per partition on aggregated stream.
+  This should fix a lot of performance issues.
+
 # 0.12.2
 
 * Fix silent failure in PgNotificationListener
