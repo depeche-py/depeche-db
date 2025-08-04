@@ -337,7 +337,7 @@ class AggregatedStream(Generic[E]):
     def _get_max_aggregated_stream_positions(
         self,
         conn: SAConnection,
-        min_global_position: int | None,
+        min_global_position: Optional[int],
     ) -> Dict[int, int]:
         # Relatively expensive operation, so we should try hard to do it only when required
         tbl = self._table
