@@ -1,3 +1,8 @@
+# 0.12.3
+
+* Improve performance of subscription queries
+    * In order to gain performance, you need to implement the new `MessagePartitionerWithMax` interface
+
 # 0.12.2
 
 * Fix silent failure in PgNotificationListener

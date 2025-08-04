@@ -29,6 +29,11 @@ class NumMessagePartitioner:
         if isinstance(message.message, EventA):
             return message.message.num % 3
         return 0
+
+    def get_max(self) -> int:
+        # This is the maximum partition number we will use.
+        # You can leave this out, but it can improve performance if you know the maximum.
+        return 2
 ```
 
 Now we can put together the aggregated stream.

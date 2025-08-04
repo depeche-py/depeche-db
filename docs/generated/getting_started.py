@@ -147,6 +147,11 @@ class NumMessagePartitioner:
             return message.message.num % 3
         return 0
 
+    def get_max(self) -> int:
+        # This is the maximum partition number we will use.
+        # You can leave this out, but it can improve performance if you know the maximum.
+        return 2
+
 
 doc.md(
     """\
