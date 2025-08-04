@@ -113,6 +113,16 @@ class AggregatedStream(Generic[E]):
                 name=f"depeche_stream_{name}_uq",
             ),
         )
+        self._maxpos_table = _sa.Table(
+            self.stream_table_name(name) + "_maxpos",
+            self._metadata,
+            _sa.Column("partition", _sa.Integer, primary_key=True, autoincrement=False),
+            _sa.Column(
+                "max_position",
+                _sa.Integer,
+                nullable=False,
+            ),
+        )
         self.notification_channel = self.notification_channel_name(name)
         trigger = _sa.DDL(
             _notify_trigger(
@@ -138,13 +148,6 @@ class AggregatedStream(Generic[E]):
         Truncate aggregated stream.
         """
         conn.execute(self._table.delete())
-
-    def _add(
-        self,
-        conn: SAConnection,
-        rows,
-    ) -> None:
-        conn.execute(self._table.insert().values(rows))
 
     def read(
         self, partition: int, conn: Optional[SAConnection] = None
@@ -296,26 +299,41 @@ class AggregatedStream(Generic[E]):
         else:
             yield from _inner(conn)
 
-    def _get_max_aggregated_stream_positions(
+    def get_max_aggregated_stream_positions(
         self,
-        conn: SAConnection,
-        # min_position: int,
+        conn: Optional[SAConnection] = None,
     ) -> Dict[int, int]:
-        # Relatively expensive operation, so we should try hard to do it only when required
-        tbl = self._table
-        qry = (
-            _sa.select(
-                tbl.c.partition,
-                _sa.func.max(tbl.c.position).label("max_position"),
-            )
-            # TODO this filter would be very helpful performance-wise!
-            # .where(tbl.c.position >= min_position)
-            .group_by(tbl.c.partition)
+        def _inner(conn: SAConnection) -> Dict[int, int]:
+            result = {
+                row.partition: row.max_position
+                for row in conn.execute(_sa.select(self._maxpos_table)).fetchall()
+            }
+            return result
+
+        if conn is None:
+            with self._connection() as conn:
+                return _inner(conn)
+        else:
+            return _inner(conn)
+
+    def _update_max_aggregated_stream_positions(
+        self, conn: SAConnection, positions: Dict[int, int]
+    ) -> None:
+        from sqlalchemy.dialects.postgresql import insert
+
+        insert_stmt = insert(self._maxpos_table).values(
+            [
+                {"partition": partition, "max_position": max_position}
+                for partition, max_position in positions.items()
+            ]
         )
-        result = {
-            row.partition: row.max_position for row in conn.execute(qry).fetchall()
-        }
-        return result
+        insert_with_update = insert_stmt.on_conflict_do_update(
+            index_elements=[
+                self._maxpos_table.c.partition,
+            ],
+            set_={self._maxpos_table.c.max_position: insert_stmt.excluded.max_position},
+        )
+        conn.execute(insert_with_update)
 
     def time_to_positions(self, time: _dt.datetime) -> Dict[int, int]:
         """
@@ -614,6 +632,7 @@ class StreamProjector(Generic[E]):
         self._get_origin_stream_positions_cache: Optional[
             OriginStreamPositionsCache
         ] = None
+        self._checked_maxpos_table = False
 
     def interested_in_notification(self, notification: dict) -> bool:
         # Check if the projector is interested in the notification.
@@ -673,6 +692,9 @@ class StreamProjector(Generic[E]):
                         "Cannot update stream projection, because another process is already updating it."
                     )
                 raise
+
+            self._check_and_create_maxpos_table(conn)
+
             while True:
                 batch_num = self._update_batch(conn, cutoff)
                 result += batch_num
@@ -685,6 +707,30 @@ class StreamProjector(Generic[E]):
                     break
             conn.commit()
         return FullUpdateResult(result, batch_num == self.batch_size)
+
+    def _check_and_create_maxpos_table(self, conn: SAConnection) -> None:
+        # The maxpos table was only introduced in 0.12.3, so we need to check
+        # if it has data and fill it if not.
+        if self._checked_maxpos_table:
+            return
+
+        if self.stream.get_max_aggregated_stream_positions(conn):
+            return
+
+        positions = {
+            row.partition: row.max_position
+            for row in conn.execute(
+                _sa.select(
+                    self.stream._table.c.partition,
+                    _sa.func.max(self.stream._table.c.position).label("max_position"),
+                ).group_by(self.stream._table.c.partition)
+            )
+        }
+        if positions:
+            self.stream._update_max_aggregated_stream_positions(
+                conn=conn, positions=positions
+            )
+        self._checked_maxpos_table = True
 
     def get_aggregate_stream_positions(
         self,
@@ -961,17 +1007,10 @@ class StreamProjector(Generic[E]):
         return len(messages)
 
     def _add(self, conn: SAConnection, messages: List[SARow]) -> None:
-        positions = {
-            row.partition: row.max_position
-            for row in conn.execute(
-                _sa.select(
-                    self.stream._table.c.partition,
-                    _sa.func.max(self.stream._table.c.position).label("max_position"),
-                ).group_by(self.stream._table.c.partition)
-            )
-        }
+        positions = self.stream.get_max_aggregated_stream_positions(conn)
 
         rows = []
+        updated_positions = {}
         for message_id, stream, version, message, global_position, added_at in messages:
             message = StoredMessage(
                 message_id=message_id,
@@ -986,6 +1025,7 @@ class StreamProjector(Generic[E]):
                 raise ValueError("partition must be >= 0")
             position = positions.get(partition, -1) + 1
             positions[partition] = position
+            updated_positions[partition] = position
             rows.append(
                 (
                     message_id,
@@ -998,7 +1038,8 @@ class StreamProjector(Generic[E]):
                     added_at,
                 )
             )
-        self.stream._add(
-            conn=conn,
-            rows=rows,
+
+        conn.execute(self.stream._table.insert().values(rows))
+        self.stream._update_max_aggregated_stream_positions(
+            conn=conn, positions=updated_positions
         )

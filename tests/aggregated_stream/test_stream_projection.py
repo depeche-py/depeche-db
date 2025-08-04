@@ -19,6 +19,8 @@ def test_stream_projector(db_engine, store_factory, stream_factory, account_ids)
     store = store_factory()
     subject = stream_factory(store)
     assert subject.projector.update_full() == FullUpdateResult(0, False)
+    with db_engine.connect() as conn:
+        assert subject.get_max_aggregated_stream_positions(conn) == {}
 
     account_repo = AccountRepository(store)
 
@@ -26,11 +28,20 @@ def test_stream_projector(db_engine, store_factory, stream_factory, account_ids)
     account.credit(100)
     account_repo.save(account, expected_version=0)
     assert subject.projector.update_full() == FullUpdateResult(2, False)
+    with db_engine.connect() as conn:
+        assert subject.get_max_aggregated_stream_positions(conn) == {
+            1: 1,
+        }
 
     account2 = Account.register(id=ACCOUNT2_ID, owner_id=_uuid.uuid4(), number="234")
     account2.credit(100)
     account_repo.save(account2, expected_version=0)
     assert subject.projector.update_full() == FullUpdateResult(2, False)
+    with db_engine.connect() as conn:
+        assert subject.get_max_aggregated_stream_positions(conn) == {
+            1: 1,
+            2: 1,
+        }
 
     account2.credit(100)
     account2.credit(100)
@@ -38,6 +49,11 @@ def test_stream_projector(db_engine, store_factory, stream_factory, account_ids)
     account2.credit(100)
     account_repo.save(account2, expected_version=2)
     assert subject.projector.update_full() == FullUpdateResult(4, False)
+    with db_engine.connect() as conn:
+        assert subject.get_max_aggregated_stream_positions(conn) == {
+            1: 1,
+            2: 5,
+        }
 
     assert_stream_projection(subject, db_engine, account, account2)
 
@@ -272,3 +288,31 @@ def test_stream_projector_work_left(
         # There are only 3 messages in total, so the total number of calls
         # to _update_batch should be 2.
         assert mock_update_full.call_count == 2
+
+
+def test_stream_projector_creates_maxpos_table(
+    db_engine, store_with_events, stream_factory, account_ids
+):
+    stream: AggregatedStream = stream_factory(store_with_events[0])
+    with db_engine.connect() as conn:
+        assert stream.get_max_aggregated_stream_positions(conn) == {}
+
+    stream.projector.update_full()
+
+    with db_engine.connect() as conn:
+        assert stream.get_max_aggregated_stream_positions(conn) == {
+            1: 2,
+            2: 1,
+        }
+        # Simulate empty table because the stream was created before the maxpos table was created
+        conn.execute(stream._maxpos_table.delete())
+        conn.commit()
+
+    # New instance of the stream should recreate the maxpos table
+    stream = stream_factory(store_with_events[0])
+    stream.projector.update_full()
+    with db_engine.connect() as conn:
+        assert stream.get_max_aggregated_stream_positions(conn) == {
+            1: 2,
+            2: 1,
+        }
