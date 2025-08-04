@@ -263,24 +263,30 @@ class AggregatedStream(Generic[E]):
         finally:
             conn.close()
 
-    def get_hourly_message_rate(self, conn: SAConnection) -> float:
+    def get_max_hourly_message_rate(
+        self, conn: SAConnection, last_n_days: int = 14
+    ) -> int:
         tbl = self._table.alias()
+        hour = _sa.func.date_trunc("hour", tbl.c.origin_stream_added_at).label("hour")
+        hourly = (
+            _sa.select(
+                hour,
+                _sa.func.count(tbl.c.message_id).label("message_count"),
+            )
+            .where(
+                tbl.c.origin_stream_added_at
+                >= _dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=last_n_days)
+            )
+            .group_by(hour)
+            .cte()
+        )
         qry = _sa.select(
-            _sa.func.count(tbl.c.message_id).label("message_count"),
-            _sa.func.max(tbl.c.origin_stream_added_at).label("max_added_at"),
-            _sa.func.min(tbl.c.origin_stream_added_at).label("min_added_at"),
-        ).where(
-            tbl.c.origin_stream_added_at
-            >= _dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=14)
+            _sa.func.max(hourly.c.message_count).label("message_count"),
         )
-        result = conn.execute(qry).fetchone()
-        if not result or result.min_added_at == result.max_added_at:
+        result = conn.execute(qry).scalar_one_or_none()
+        if not result:
             return 100
-        return (
-            result.message_count
-            / (result.max_added_at - result.min_added_at).total_seconds()
-            * 3600
-        )
+        return result  # type: ignore[no-any-return]
 
     def get_partition_statistics(
         self,

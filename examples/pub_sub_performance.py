@@ -2,7 +2,7 @@ import os
 import random
 import sys
 import time
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 import pytz
 from uuid import UUID, uuid4
 
@@ -46,7 +46,9 @@ db_engine.connect = connect  # type: ignore
 class MyMessage(pydantic.BaseModel):
     content: int
     message_id: UUID = pydantic.Field(default_factory=uuid4)
-    sent_at: datetime = pydantic.Field(default_factory=datetime.utcnow)
+    sent_at: datetime = pydantic.Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
 
     def get_message_id(self) -> UUID:
         return self.message_id
@@ -98,9 +100,7 @@ subscription = stream.subscription(
     handlers=handlers,
     batch_size=100,
     ack_strategy=AckStrategy.BATCHED,
-    start_point=StartAtPointInTime(
-        datetime.utcnow().replace(tzinfo=pytz.UTC) - timedelta(days=1)
-    ),
+    start_point=StartAtPointInTime(datetime.now(timezone.utc) - timedelta(days=1)),
 )
 
 
@@ -224,6 +224,11 @@ def usage():
 
 
 def main():
+    import logging
+
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    )
     if len(sys.argv) < 2:
         usage()
 

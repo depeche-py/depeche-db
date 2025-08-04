@@ -273,7 +273,7 @@ class Subscription(Generic[E]):
                     cutoff = max(
                         min_global_position
                         - int(
-                            self._stream.get_hourly_message_rate(conn)
+                            self._stream.get_max_hourly_message_rate(conn)
                             * self._stream.lookback_for_gaps_hours
                         ),
                         -1,
