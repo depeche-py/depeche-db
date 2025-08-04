@@ -272,3 +272,31 @@ def test_stream_projector_work_left(
         # There are only 3 messages in total, so the total number of calls
         # to _update_batch should be 2.
         assert mock_update_full.call_count == 2
+
+
+def test_stream_projector_creates_maxpos_table(
+    db_engine, store_with_events, stream_factory, account_ids
+):
+    stream: AggregatedStream = stream_factory(store_with_events[0])
+    with db_engine.connect() as conn:
+        assert stream._get_max_aggregated_stream_positions(conn) == {}
+
+    stream.projector.update_full()
+
+    with db_engine.connect() as conn:
+        assert stream._get_max_aggregated_stream_positions(conn) == {
+            1: 2,
+            2: 1,
+        }
+        # Simulate empty table because the stream was created before the maxpos table was created
+        conn.execute(stream._maxpos_table.delete())
+        conn.commit()
+
+    # New instance of the stream should recreate the maxpos table
+    stream = stream_factory(store_with_events[0])
+    stream.projector.update_full()
+    with db_engine.connect() as conn:
+        assert stream._get_max_aggregated_stream_positions(conn) == {
+            1: 2,
+            2: 1,
+        }

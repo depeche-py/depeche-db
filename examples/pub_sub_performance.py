@@ -2,7 +2,7 @@ import os
 import random
 import sys
 import time
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 import pytz
 from uuid import UUID, uuid4
 
@@ -46,7 +46,9 @@ db_engine.connect = connect  # type: ignore
 class MyMessage(pydantic.BaseModel):
     content: int
     message_id: UUID = pydantic.Field(default_factory=uuid4)
-    sent_at: datetime = pydantic.Field(default_factory=datetime.utcnow)
+    sent_at: datetime = pydantic.Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
 
     def get_message_id(self) -> UUID:
         return self.message_id
@@ -94,9 +96,7 @@ subscription = stream.subscription(
     handlers=handlers,
     batch_size=100,
     ack_strategy=AckStrategy.BATCHED,
-    start_point=StartAtPointInTime(
-        datetime.utcnow().replace(tzinfo=pytz.UTC) - timedelta(days=1)
-    ),
+    start_point=StartAtPointInTime(datetime.now(timezone.utc) - timedelta(days=1)),
 )
 
 
@@ -139,6 +139,10 @@ def sub():
     )
 
 
+PUBLISHER_COUNT = 2
+SUBSCRIBER_COUNT = 1
+
+
 def run_test():
     import subprocess
     import select
@@ -153,7 +157,7 @@ def run_test():
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
         )
-        for _ in range(4)
+        for _ in range(PUBLISHER_COUNT)
     ]
     pub = pubs[0]
     projector = subprocess.Popen(
@@ -174,7 +178,7 @@ def run_test():
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
         )
-        for i in range(4)
+        for i in range(SUBSCRIBER_COUNT)
     ]
     pub_done = False
 
@@ -203,9 +207,13 @@ def run_test():
                 line = fd.readline()
                 if line:
                     print(prefix, line.decode("utf-8"), end="")
+
         for sub in subs:
             for line in sub.stdout.readlines():
                 print("sub", line.decode("utf-8"), end="")
+        projector.terminate()
+        for line in projector.stdout.readlines():
+            print("proj", line.decode("utf-8"), end="")
     finally:
         for pub1 in pubs:
             pub1.kill()

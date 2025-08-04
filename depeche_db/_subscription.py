@@ -226,12 +226,8 @@ class Subscription(Generic[E]):
         state = self._state_provider.read(self.name)
 
         def _refresh_max_aggregated_stream_positions_cache():
-            self._max_aggregated_stream_positions_cache = self._stream._get_max_aggregated_stream_positions(
-                conn=conn,
-                # TODO how to make sure we have all partitions in the state?
-                # min_position=min(
-                #    (position - 1000 for position in state.positions), default=0
-                # ),
+            self._max_aggregated_stream_positions_cache = (
+                self._stream._get_max_aggregated_stream_positions(conn=conn)
             )
 
         def _calculate_unprocessed_message_counts():
