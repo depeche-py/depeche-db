@@ -116,7 +116,7 @@ class AggregatedStream(Generic[E]):
         self._maxpos_table = _sa.Table(
             self.stream_table_name(name) + "_maxpos",
             self._metadata,
-            _sa.Column("partition", _sa.Integer, primary_key=True),
+            _sa.Column("partition", _sa.Integer, primary_key=True, autoincrement=False),
             _sa.Column(
                 "max_position",
                 _sa.Integer,
