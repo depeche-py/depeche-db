@@ -1,5 +1,6 @@
 import collections as _collections
 import dataclasses as _dc
+import logging as _logging
 import queue as _queue
 import signal as _signal
 import threading as _threading
@@ -10,6 +11,8 @@ from typing import Dict, List, Optional
 from .._executor import UniqueQueue
 from .._interfaces import FixedTimeBudget, RunOnNotification, RunOnNotificationResult
 from ..tools import PgNotificationListener
+
+LOGGER = _logging.getLogger("depeche_db.threaded_executor")
 
 
 @_dc.dataclass
@@ -56,6 +59,7 @@ class ThreadedExecutor:
         ] = _collections.defaultdict(list)
         self.stimulation_interval = stimulation_interval
         self.keep_running = True
+        self.failed_handlers: Dict[_uuid.UUID, Exception] = {}
         self.handler_queues: Dict[_uuid.UUID, UniqueQueue] = {}
         self.handler_threads: List[_threading.Thread] = []
         self.stimulator_thread = _threading.Thread(target=self._stimulate, daemon=True)
@@ -110,6 +114,11 @@ class ThreadedExecutor:
         self.listener.start()
 
         for notification in self.listener.messages():
+            if self.failed_handlers:
+                LOGGER.error("One or more handlers failed, stopping executor...")
+                self._stop()
+                break
+
             for registration in self.channel_register[notification.channel]:
                 if registration.handler.interested_in_notification(
                     notification.payload
@@ -117,22 +126,32 @@ class ThreadedExecutor:
                     registration.handler.take_notification_hint(notification.payload)
                     self.handler_queues[registration.id].put(registration.id)
 
+        if self.failed_handlers:
+            for handler_id, exc in self.failed_handlers.items():
+                LOGGER.error(f"Handler {handler_id} failed with exception: {exc}")
+
         for thread in self.handler_threads:
             thread.join()
         self.stimulator_thread.join()
 
     def _run_handler(self, registration: HandlerRegistration):
         def run_handler():
-            while self.keep_running:
-                try:
-                    self.handler_queues[registration.id].get(timeout=0.5)
-                    result = registration.handler.run(budget=FixedTimeBudget(seconds=3))
-                    result = result or RunOnNotificationResult.DONE_FOR_NOW
-                    if result == RunOnNotificationResult.WORK_REMAINING:
-                        # Re-queue the handler if it has work remaining
-                        self.handler_queues[registration.id].put(registration.id)
-                except _queue.Empty:
-                    pass
+            try:
+                while self.keep_running:
+                    try:
+                        self.handler_queues[registration.id].get(timeout=0.5)
+                        result = registration.handler.run(
+                            budget=FixedTimeBudget(seconds=3)
+                        )
+                        result = result or RunOnNotificationResult.DONE_FOR_NOW
+                        if result == RunOnNotificationResult.WORK_REMAINING:
+                            # Re-queue the handler if it has work remaining
+                            self.handler_queues[registration.id].put(registration.id)
+                    except _queue.Empty:
+                        pass
+            except Exception as exc:
+                self.failed_handlers[registration.id] = exc
+                raise
 
         return run_handler
 
