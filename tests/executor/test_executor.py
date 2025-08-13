@@ -43,6 +43,11 @@ class FakeHandler(RunOnNotification):
         pass
 
 
+class FailingHandler(FakeHandler):
+    def run(self, budget: TimeBudget):
+        raise RuntimeError("Simulated failure in handler run method")
+
+
 @contextlib.contextmanager
 def setup(pg_db, subject_class, stimulation_interval=20.0):
     obj = subject_class(
@@ -95,6 +100,19 @@ def test_no_stimulation(pg_db, subject_class):
         thread.start()
         time.sleep(1)
         assert len(handler.calls) == 0
+
+
+@pytest.mark.parametrize("subject_class", EXECUTOR_CLASSES)
+def test_failure(pg_db, subject_class):
+    with setup(pg_db, subject_class, stimulation_interval=0) as (thread, subject):
+        handler = FailingHandler()
+        subject.register(handler)
+        thread.start()
+        time.sleep(0.2)
+        _send_notifications(pg_db, handler.notification_channel, 1)
+        time.sleep(0.2)
+
+        assert not subject.keep_running
 
 
 @pytest.mark.parametrize("subject_class", EXECUTOR_CLASSES)

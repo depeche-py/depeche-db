@@ -1,3 +1,7 @@
+# 0.12.4
+
+* Exit when handler fails in ThreadedExecutor
+
 # 0.12.3
 
 * Add internal storage of maximum position per partition on aggregated stream.

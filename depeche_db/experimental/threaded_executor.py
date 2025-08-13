@@ -114,11 +114,6 @@ class ThreadedExecutor:
         self.listener.start()
 
         for notification in self.listener.messages():
-            if self.failed_handlers:
-                LOGGER.error("One or more handlers failed, stopping executor...")
-                self._stop()
-                break
-
             for registration in self.channel_register[notification.channel]:
                 if registration.handler.interested_in_notification(
                     notification.payload
@@ -151,6 +146,7 @@ class ThreadedExecutor:
                         pass
             except Exception as exc:
                 self.failed_handlers[registration.id] = exc
+                self._stop()
                 raise
 
         return run_handler
