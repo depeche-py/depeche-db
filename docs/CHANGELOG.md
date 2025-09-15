@@ -1,3 +1,7 @@
+# 0.12.5
+
+* Fix slow query in MessageStore.synchronize
+
 # 0.12.4
 
 * Exit when handler fails in ThreadedExecutor

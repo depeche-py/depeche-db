@@ -280,16 +280,14 @@ class MessageStore(Generic[E]):
         expected_version: int,
         messages: Sequence[E],
     ) -> MessagePosition:
-        stored_version = self._storage.get_max_version(conn, stream)
-        if stored_version is not None:
-            stored_ids = list(self._storage.get_message_ids(conn, stream))
-            message_ids = [message.get_message_id() for message in messages]
-            for stored, given in zip(stored_ids, message_ids):
-                if stored != given:
-                    raise MessageIdMismatchError(
-                        "Message ID mismatch, has the stream been modified in the meantime?"
-                    )
-            messages = messages[len(stored_ids) :]
+        stored_ids = list(self._storage.get_message_ids(conn, stream))
+        message_ids = [message.get_message_id() for message in messages]
+        for stored, given in zip(stored_ids, message_ids):
+            if stored != given:
+                raise MessageIdMismatchError(
+                    "Message ID mismatch, has the stream been modified in the meantime?"
+                )
+        messages = messages[len(stored_ids) :]
         if messages:
             result = self._storage.add_all(
                 conn,
@@ -304,7 +302,7 @@ class MessageStore(Generic[E]):
                 ],
             )
         else:
-            result = stored_version
+            result = self._storage.get_max_version(conn, stream)
         return result
 
     def _get_reader(self, conn: SAConnection) -> MessageStoreReader[E]:
