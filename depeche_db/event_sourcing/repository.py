@@ -4,8 +4,8 @@ from typing import Callable, Generic, TypeVar
 from depeche_db import (
     MessagePosition,
     MessageProtocol,
-    MessageStore,
-    MessageStoreReader,
+    MessageStoreProtocol,
+    MessageStoreReaderProtocol,
 )
 
 from .aggregate_root import EventSourcedAggregateRoot
@@ -49,7 +49,7 @@ class Repo(_abc.ABC, Generic[OBJ, ID]):
 class EventStoreRepo(Generic[E, OBJ, ID], Repo[OBJ, ID]):
     def __init__(
         self,
-        event_store: MessageStore[E],
+        event_store: MessageStoreProtocol[E],
         constructor: Callable[[], OBJ],
         stream_prefix: str,
     ):
@@ -83,7 +83,7 @@ class NotFound(Exception):
 class ReadRepository(Generic[E, OBJ, ID]):
     def __init__(
         self,
-        event_store_reader: MessageStoreReader[E],
+        event_store_reader: MessageStoreReaderProtocol[E],
         constructor: Callable[[], OBJ],
         stream_prefix: str,
     ):

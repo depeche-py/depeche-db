@@ -1,6 +1,6 @@
 import contextlib as _contextlib
 import uuid as _uuid
-from typing import Generic, Iterator, Optional, Sequence, TypeVar
+from typing import Generic, Iterator, Optional, Protocol, Sequence, TypeVar
 
 import sqlalchemy as _sa
 
@@ -16,6 +16,54 @@ from ._interfaces import (
 from ._storage import Storage
 
 E = TypeVar("E", bound=MessageProtocol)
+
+
+class MessageStoreReaderProtocol(Protocol, Generic[E]):
+    def get_message_by_id(self, message_id: _uuid.UUID) -> StoredMessage[E]:
+        ...
+
+    def get_messages_by_ids(
+        self, message_ids: Sequence[_uuid.UUID]
+    ) -> Iterator[StoredMessage[E]]:
+        ...
+
+    def read(self, stream: str) -> Iterator[StoredMessage[E]]:
+        ...
+
+    def read_wildcard(self, stream_wildcard: str) -> Iterator[StoredMessage[E]]:
+        ...
+
+
+class MessageStoreProtocol(Protocol, Generic[E]):
+    def truncate(self):
+        ...
+
+    def write(
+        self,
+        stream: str,
+        message: E,
+        expected_version: Optional[int] = None,
+        conn: Optional[SAConnection] = None,
+    ) -> MessagePosition:
+        ...
+
+    def synchronize(
+        self,
+        stream: str,
+        expected_version: int,
+        messages: Sequence[E],
+        conn: Optional[SAConnection] = None,
+    ) -> MessagePosition:
+        ...
+
+    @_contextlib.contextmanager
+    def reader(
+        self, conn: Optional[SAConnection] = None
+    ) -> Iterator[MessageStoreReaderProtocol[E]]:
+        ...
+
+    def read(self, stream: str) -> Iterator[StoredMessage[E]]:
+        ...
 
 
 class MessageStoreReader(Generic[E]):

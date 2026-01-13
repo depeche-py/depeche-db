@@ -1,3 +1,7 @@
+# 0.12.6
+
+* Make event sourcing use MessageStoreProtocol instead of concrete type
+
 # 0.12.5
 
 * Fix slow query in MessageStore.synchronize
