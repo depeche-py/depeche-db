@@ -363,7 +363,7 @@ class MessageStore(Generic[E]):
     @_contextlib.contextmanager
     def reader(
         self, conn: Optional[SAConnection] = None
-    ) -> Iterator[MessageStoreReader[E]]:
+    ) -> Iterator[MessageStoreReaderProtocol[E]]:
         """
         Get a reader for the store.
 

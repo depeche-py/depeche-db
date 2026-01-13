@@ -1,3 +1,7 @@
+# 0.12.7
+
+* Typing fix
+
 # 0.12.6
 
 * Make event sourcing use MessageStoreProtocol instead of concrete type
