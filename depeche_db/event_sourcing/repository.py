@@ -1,6 +1,7 @@
 import abc as _abc
 import logging as _logging
 import pickle as _pickle
+import threading as _threading
 from typing import Callable, Generic, Optional, Protocol, TypeVar, cast
 
 from depeche_db import (
@@ -147,30 +148,34 @@ class ReadRepository(Generic[E, OBJ, ID]):
 class BaseCache(Generic[OBJ, ID]):
     _versions: dict[ID, int]
     _cache_every_x_version: int
+    _lock: _threading.Lock
 
     def __init__(self, cache_every_x_version: int = 20) -> None:
         self._versions = {}
         self._cache_every_x_version = cache_every_x_version
+        self._lock = _threading.Lock()
 
     def get(self, id: ID) -> Optional[OBJ]:
-        obj = self._get(id)
-        if obj is not None:
-            self._versions[id] = obj._version
-        else:
-            self._versions.pop(id, None)
-        return obj
+        with self._lock:
+            obj = self._get(id)
+            if obj is not None:
+                self._versions[id] = obj._version
+            else:
+                self._versions.pop(id, None)
+            return obj
 
     def _get(self, id: ID) -> Optional[OBJ]:
         raise NotImplementedError
 
     def set(self, id: ID, obj: OBJ) -> None:
-        cached_version = self._versions.get(id)
-        if (
-            cached_version is None
-            or (obj._version - cached_version) >= self._cache_every_x_version
-        ):
-            self._versions[id] = obj._version
-            self._set(id, obj)
+        with self._lock:
+            cached_version = self._versions.get(id)
+            if (
+                cached_version is None
+                or (obj._version - cached_version) >= self._cache_every_x_version
+            ):
+                self._versions[id] = obj._version
+                self._set(id, obj)
 
     def _set(self, id: ID, obj: OBJ) -> None:
         raise NotImplementedError
