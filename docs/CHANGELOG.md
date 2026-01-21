@@ -1,3 +1,11 @@
+# 0.13.0
+
+* Add `min_version` parameter to `MessageStoreReader.read()` to allow reading events starting from a specific version
+* Add cache support to `EventStoreRepo` for improved read performance
+    * New `RepoCache` protocol for custom cache implementations
+    * `InMemoryCache` implementation with configurable write frequency
+    * `NoOpCache` for disabling caching
+
 # 0.12.7
 
 * Typing fix
