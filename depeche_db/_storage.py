@@ -164,13 +164,12 @@ class Storage:
             yield id
 
     def read(
-        self, conn: SAConnection, stream: str
+        self, conn: SAConnection, stream: str, min_version: Optional[int] = None
     ) -> Iterator[Tuple[_uuid.UUID, int, dict, int, _dt.datetime]]:
-        return conn.execute(  # type: ignore
-            self._select_without_stream.where(
-                self.message_table.c.stream == stream
-            ).order_by(self.message_table.c.version)
-        )
+        query = self._select_without_stream.where(self.message_table.c.stream == stream)
+        if min_version is not None:
+            query = query.where(self.message_table.c.version >= min_version)
+        return conn.execute(query.order_by(self.message_table.c.version))  # type: ignore
 
     def read_multiple(
         self, conn: SAConnection, streams: Sequence[str]
