@@ -129,7 +129,7 @@ class ReadRepository(Generic[E, OBJ, ID]):
                 self._update_object(id, obj, cache_hit=True)
                 self._cache.set(id, obj)
                 return obj
-            except (KeyError, ValueError, TypeError) as e:
+            except (KeyError, ValueError, TypeError, _pickle.UnpicklingError) as e:
                 LOGGER.warning(f"Failed to update cached object {id}, refetching: {e}")
         return None
 
