@@ -1,7 +1,7 @@
 import abc as _abc
 import logging as _logging
 import pickle as _pickle
-from typing import Callable, Generic, Optional, Protocol, TypeVar
+from typing import Callable, Generic, Optional, Protocol, TypeVar, cast
 
 from depeche_db import (
     MessagePosition,
@@ -14,7 +14,7 @@ from .aggregate_root import EventSourcedAggregateRoot
 
 E = TypeVar("E", bound=MessageProtocol)
 OBJ = TypeVar("OBJ", bound=EventSourcedAggregateRoot)
-ID = TypeVar("ID")
+ID = TypeVar("ID", contravariant=True)
 
 LOGGER = _logging.getLogger(__name__)
 
@@ -122,7 +122,7 @@ class ReadRepository(Generic[E, OBJ, ID]):
         return obj
 
     def _get_from_cache(self, id: ID) -> Optional[OBJ]:
-        obj = self._cache.get(id)
+        obj: Optional[OBJ] = self._cache.get(id)
         if obj is not None:
             try:
                 self._update_object(id, obj, cache_hit=True)
@@ -192,11 +192,10 @@ class InMemoryCache(BaseCache[OBJ, ID], Generic[OBJ, ID]):
         self._store = {}
 
     def _get(self, id: ID) -> Optional[OBJ]:
-        obj = self._store.get(id)
-        if obj is None:
+        data = self._store.get(id)
+        if data is None:
             return None
-        result = _pickle.loads(obj)
-        return result
+        return cast(OBJ, _pickle.loads(data))
 
     def _set(self, id: ID, obj: OBJ) -> None:
         self._store[id] = _pickle.dumps(obj)
