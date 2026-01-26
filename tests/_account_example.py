@@ -9,8 +9,8 @@ from depeche_db import (
     MessageProtocol,
     MessageSerializer,
     MessageStore,
-    MessageStoreReader,
 )
+from depeche_db._message_store import MessageStoreReaderProtocol
 
 E = TypeVar("E", bound=MessageProtocol)
 
@@ -149,7 +149,7 @@ class AccountNotFound(Exception):
 
 
 class AccountReadRepository:
-    def __init__(self, event_store_reader: MessageStoreReader[AccountEvent]):
+    def __init__(self, event_store_reader: MessageStoreReaderProtocol[AccountEvent]):
         self._event_store_reader = event_store_reader
 
     def get(self, id: _uuid.UUID) -> Account:

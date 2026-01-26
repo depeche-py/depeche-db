@@ -27,7 +27,9 @@ class MessageStoreReaderProtocol(Protocol, Generic[E]):
     ) -> Iterator[StoredMessage[E]]:
         ...
 
-    def read(self, stream: str) -> Iterator[StoredMessage[E]]:
+    def read(
+        self, stream: str, min_version: Optional[int] = None
+    ) -> Iterator[StoredMessage[E]]:
         ...
 
     def read_wildcard(self, stream_wildcard: str) -> Iterator[StoredMessage[E]]:
@@ -62,7 +64,9 @@ class MessageStoreProtocol(Protocol, Generic[E]):
     ) -> Iterator[MessageStoreReaderProtocol[E]]:
         ...
 
-    def read(self, stream: str) -> Iterator[StoredMessage[E]]:
+    def read(
+        self, stream: str, min_version: Optional[int] = None
+    ) -> Iterator[StoredMessage[E]]:
         ...
 
 
@@ -120,12 +124,16 @@ class MessageStoreReader(Generic[E]):
                 added_at=added_at,
             )
 
-    def read(self, stream: str) -> Iterator[StoredMessage[E]]:
+    def read(
+        self, stream: str, min_version: Optional[int] = None
+    ) -> Iterator[StoredMessage[E]]:
         """
         Returns all messages from a stream.
 
         Args:
             stream (str): Stream name
+            min_version (Optional[int]): If provided, only return messages with
+                version >= min_version
         """
         for (
             message_id,
@@ -133,7 +141,7 @@ class MessageStoreReader(Generic[E]):
             message,
             global_position,
             added_at,
-        ) in self._storage.read(self._conn, stream):
+        ) in self._storage.read(self._conn, stream, min_version):
             yield StoredMessage(
                 message_id=message_id,
                 stream=stream,
@@ -388,15 +396,19 @@ class MessageStore(Generic[E]):
             with self._get_connection() as conn:
                 yield self._get_reader(conn)
 
-    def read(self, stream: str) -> Iterator[StoredMessage[E]]:
+    def read(
+        self, stream: str, min_version: Optional[int] = None
+    ) -> Iterator[StoredMessage[E]]:
         """
         Read all messages from a stream.
 
         Args:
             stream (str): The name of the stream.
+            min_version (Optional[int]): If provided, only return messages with
+                version >= min_version
 
         Returns:
             Iterator[StoredMessage]: An iterator over the messages.
         """
         with self.reader() as reader:
-            yield from reader.read(stream)
+            yield from reader.read(stream, min_version)
