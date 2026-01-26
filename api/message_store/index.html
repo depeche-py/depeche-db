@@ -1222,7 +1222,7 @@ the database objects that are created.</p>
 
 
 <h3 id="depeche_db.MessageStore.read" class="doc doc-heading">
-          <code class="highlight language-python"><span class="n">read</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span></code>
+          <code class="highlight language-python"><span class="n">read</span><span class="p">(</span><span class="n">stream</span><span class="p">,</span> <span class="n">min_version</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 </h3>
 
@@ -1256,6 +1256,21 @@ the database objects that are created.</p>
           </td>
           <td>
               <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>min_version</code></td>
+          <td>
+                <code><span title="typing.Optional">Optional</span>[int]</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>If provided, only return messages with
+version &gt;= min_version</p>
+            </div>
+          </td>
+          <td>
+                <code>None</code>
           </td>
         </tr>
     </tbody>
@@ -1770,7 +1785,7 @@ commit the transaction yourself</strong>.</p>
 
 
 <h3 id="depeche_db.MessageStoreReader.read" class="doc doc-heading">
-          <code class="highlight language-python"><span class="n">read</span><span class="p">(</span><span class="n">stream</span><span class="p">)</span></code>
+          <code class="highlight language-python"><span class="n">read</span><span class="p">(</span><span class="n">stream</span><span class="p">,</span> <span class="n">min_version</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span></code>
 
 </h3>
 
@@ -1804,6 +1819,21 @@ commit the transaction yourself</strong>.</p>
           </td>
           <td>
               <em>required</em>
+          </td>
+        </tr>
+        <tr>
+          <td><code>min_version</code></td>
+          <td>
+                <code><span title="typing.Optional">Optional</span>[int]</code>
+          </td>
+          <td>
+            <div class="doc-md-description">
+              <p>If provided, only return messages with
+version &gt;= min_version</p>
+            </div>
+          </td>
+          <td>
+                <code>None</code>
           </td>
         </tr>
     </tbody>

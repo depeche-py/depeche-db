@@ -78,7 +78,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#0127" class="md-skip">
+        <a href="#0130" class="md-skip">
           Skip to content
         </a>
       
@@ -845,6 +845,16 @@
   
 
 
+<h1 id="0130">0.13.0</h1>
+<ul>
+<li>Add <code>min_version</code> parameter to <code>MessageStoreReader.read()</code> to allow reading events starting from a specific version</li>
+<li>Add cache support to <code>EventStoreRepo</code> for improved read performance<ul>
+<li>New <code>RepoCache</code> protocol for custom cache implementations</li>
+<li><code>InMemoryCache</code> implementation with configurable write frequency</li>
+<li><code>NoOpCache</code> for disabling caching</li>
+</ul>
+</li>
+</ul>
 <h1 id="0127">0.12.7</h1>
 <ul>
 <li>Typing fix</li>
