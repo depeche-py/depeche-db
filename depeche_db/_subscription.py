@@ -2,7 +2,6 @@ import datetime as _dt
 import enum as _enum
 import logging as _logging
 import random as _random
-import threading as _threading
 import time as _time
 from concurrent.futures import Executor, ThreadPoolExecutor
 from typing import (
@@ -136,7 +135,7 @@ class AckOp:
 
 class Subscription(Generic[E]):
     _state_provider: SubscriptionStateProvider
-    runner: "Union[SubscriptionRunner[E], BatchedAckSubscriptionRunner[E]]"
+    runner: "Union[SubscriptionRunner[E], BatchedAckSubscriptionRunner[E], PooledSubscriptionRunner[E], PooledBatchedAckSubscriptionRunner[E]]"
 
     def __init__(
         self,
@@ -148,6 +147,7 @@ class Subscription(Generic[E]):
         lock_provider: Optional[LockProvider] = None,
         start_point: Optional[SubscriptionStartPoint] = None,
         ack_strategy: AckStrategy = AckStrategy.SINGLE,
+        executor: Union[Executor, bool] = False,
     ):
         """
         A subscription is a way to read messages from an aggregated stream.
@@ -163,6 +163,11 @@ class Subscription(Generic[E]):
             lock_provider: Provider for the locks, defaults to a PostgreSQL provider
             start_point: The start point for the subscription, defaults to beginning of the stream
             ack_strategy: The strategy to use for acknowledging messages, defaults to AckStrategy.SINGLE.
+            executor: An executor to use for processing messages in parallel
+                - False means parallel processing is disabled
+                - True will instantiate a ThreadPoolExecutor(max_workers=5)
+                - An instance of Executor will be used as is (make sure to shutdown the executor when done)
+                - It is recommended to give an executor from the outside which is shared between multiple subscriptions to avoid creating too many threads
         """
         assert name.isidentifier(), "Group name must be a valid identifier"
         self.name = name
@@ -175,22 +180,33 @@ class Subscription(Generic[E]):
         )
         self._start_point = start_point
         if ack_strategy == AckStrategy.BATCHED:
-            self.runner = PooledSubscriptionRunner(
-                subscription=self,
-                message_handler=message_handler,
-                batch_size=batch_size,
-            )
-            # self.runner = BatchedAckSubscriptionRunner(
-            #    subscription=self,
-            #    message_handler=message_handler,
-            #    batch_size=batch_size,
-            # )
+            if executor:
+                self.runner = PooledBatchedAckSubscriptionRunner(
+                    subscription=self,
+                    message_handler=message_handler,
+                    batch_size=batch_size,
+                    executor=executor,
+                )
+            else:
+                self.runner = BatchedAckSubscriptionRunner(
+                    subscription=self,
+                    message_handler=message_handler,
+                    batch_size=batch_size,
+                )
         elif ack_strategy == AckStrategy.SINGLE:
-            self.runner = SubscriptionRunner(
-                subscription=self,
-                message_handler=message_handler,
-                batch_size=batch_size,
-            )
+            if executor:
+                self.runner = PooledSubscriptionRunner(
+                    subscription=self,
+                    message_handler=message_handler,
+                    batch_size=batch_size,
+                    executor=executor,
+                )
+            else:
+                self.runner = SubscriptionRunner(
+                    subscription=self,
+                    message_handler=message_handler,
+                    batch_size=batch_size,
+                )
         else:
             raise NotImplementedError(f"Ack strategy {ack_strategy} is not implemented")
 
@@ -233,7 +249,6 @@ class Subscription(Generic[E]):
     def get_next_partitions(
         self, conn: SAConnection, partition_count: int = 20
     ) -> List[int]:
-        # TODO partition count?
         state = self._state_provider.read(self.name)
 
         def _refresh_max_aggregated_stream_positions_cache():
@@ -415,12 +430,12 @@ class Subscription(Generic[E]):
                         ack=ack,
                     )
                     if ack.rolled_back:
-                        # the message was not ack'd or the acknolwedgement was rolled back
+                        # the message was not ack'd or the acknowledgement was rolled back
                         break
                     try:
                         ack.execute()
                     except AckRolledback:
-                        # the message was not ack'd or the acknolwedgement was rolled back
+                        # the message was not ack'd or the acknowledgement was rolled back
                         break
         finally:
             if batch:
@@ -567,40 +582,56 @@ class BatchedAckSubscriptionRunner(SubscriptionRunner[E]):
 
 
 class PooledSubscriptionRunner(SubscriptionRunner[E]):
+    _executor: Executor
+
     def __init__(
         self,
         subscription: Subscription[E],
         message_handler: SubscriptionMessageHandler,
+        executor: Union[Executor, bool],
         batch_size: Optional[int] = None,
-        executor: Optional[Executor] = None,
     ):
         super().__init__(
             subscription=subscription,
             message_handler=message_handler,
             batch_size=batch_size,
         )
-        self._own_executor = executor is None
-        self._executor = executor or ThreadPoolExecutor(
-            max_workers=10,
-            thread_name_prefix=f"depeche_db_subscription_pool_{subscription.name}",
-        )
-        self._lock = _threading.Lock()
+        assert (
+            executor is not False
+        ), "Executor must be provided for pooled subscription runner"
+        self._own_executor = executor is True
+        if self._own_executor:
+            self._executor = ThreadPoolExecutor(
+                max_workers=5,
+                thread_name_prefix=f"depeche_db_subscription_pool_{subscription.name}",
+            )
+        else:
+            self._executor = executor  # type: ignore
         self._active_partitions: Set[int] = set()
+        self._errors = []
 
     def run_once(self, budget: Optional[TimeBudget] = None) -> RunOnNotificationResult:
-        while self._keep_running:
-            with self._subscription._stream._store.engine.connect() as conn:
-                for partition_number in self._subscription.get_next_partitions(
-                    conn=conn, partition_count=20
-                ):
-                    if partition_number in self._active_partitions:
-                        # already processing this partition
-                        continue
-                    self._active_partitions.add(partition_number)
-                    self._executor.submit(self._process_partition, partition_number)
-            if budget and budget.over_budget():
-                return RunOnNotificationResult.WORK_REMAINING
-        return RunOnNotificationResult.DONE_FOR_NOW
+        if self._errors:
+            if len(self._errors) > 1:
+                DEPECHE_LOGGER.error(
+                    f"Multiple errors occurred in subscription {self._subscription.name}: {self._errors}"
+                )
+            raise self._errors[0]
+
+        new_active_partitions = set()
+        with self._subscription._stream._store.engine.connect() as conn:
+            for partition_number in self._subscription.get_next_partitions(
+                conn=conn, partition_count=20
+            ):
+                if partition_number in self._active_partitions:
+                    # already processing this partition
+                    continue
+                self._active_partitions.add(partition_number)
+                new_active_partitions.add(partition_number)
+                self._executor.submit(self._process_partition, partition_number)
+        if not new_active_partitions:
+            return RunOnNotificationResult.DONE_FOR_NOW
+        return RunOnNotificationResult.WORK_REMAINING
 
     def stop(self):
         super().stop()
@@ -616,33 +647,35 @@ class PooledSubscriptionRunner(SubscriptionRunner[E]):
                     message_count=self._batch_size,
                 ):
                     self.handle(message)
+        except Exception as exc:
+            self._errors.append(exc)
         finally:
             self._active_partitions.remove(partition_number)
-        print(f"Finished processing partition {partition_number}")
-        # TODO bubble errors into main thread!
 
 
 class PooledBatchedAckSubscriptionRunner(PooledSubscriptionRunner[E]):
     def _process_partition(self, partition_number: int):
-        with self._subscription._stream._store.engine.connect() as conn:
-            message_batch = self._subscription.get_message_batch(
-                conn=conn,
-                partition_number=partition_number,
-                message_count=self._batch_size,
-            )
-            if message_batch is None:
-                return
-            try:
-                for message in message_batch.messages:
-                    self.handle(message)
-                    message_batch.ack(message)
-            finally:
-                self._subscription.ack_message_batch(
-                    message_batch=message_batch, success=True
+        try:
+            with self._subscription._stream._store.engine.connect() as conn:
+                message_batch = self._subscription.get_message_batch(
+                    conn=conn,
+                    partition_number=partition_number,
+                    message_count=self._batch_size,
                 )
-                self._active_partitions.remove(partition_number)
-        print(f"Finished processing partition {partition_number}")
-        # TODO bubble errors into main thread!
+                if message_batch is None:
+                    return
+                try:
+                    for message in message_batch.messages:
+                        self.handle(message)
+                        message_batch.ack(message)
+                finally:
+                    self._subscription.ack_message_batch(
+                        message_batch=message_batch, success=True
+                    )
+        except Exception as exc:
+            self._errors.append(exc)
+        finally:
+            self._active_partitions.remove(partition_number)
 
 
 class StartAtNextMessage(SubscriptionStartPoint):
