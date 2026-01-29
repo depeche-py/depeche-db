@@ -646,6 +646,8 @@ class PooledSubscriptionRunner(SubscriptionRunner[E]):
                     partition_number=partition_number,
                     message_count=self._batch_size,
                 ):
+                    if not self._keep_running:
+                        break
                     self.handle(message)
         except Exception as exc:
             self._errors.append(exc)
@@ -666,6 +668,8 @@ class PooledBatchedAckSubscriptionRunner(PooledSubscriptionRunner[E]):
                     return
                 try:
                     for message in message_batch.messages:
+                        if not self._keep_running:
+                            break
                         self.handle(message)
                         message_batch.ack(message)
                 finally:
