@@ -2,6 +2,7 @@ import datetime as _dt
 import enum as _enum
 import logging as _logging
 import random as _random
+import threading as _threading
 import time as _time
 from concurrent.futures import Executor, ThreadPoolExecutor
 from typing import (
@@ -11,6 +12,7 @@ from typing import (
     Iterator,
     List,
     Optional,
+    Set,
     TypeVar,
     Union,
 )
@@ -387,6 +389,43 @@ class Subscription(Generic[E]):
             if batch:
                 self.unlock_message_batch(batch)
 
+    def get_next_messages_in_partition(
+        self, conn: SAConnection, partition_number: int, message_count: int
+    ) -> Iterator[SubscriptionMessage[E]]:
+        batch = None
+        try:
+            batch = self.get_message_batch(
+                conn=conn,
+                partition_number=partition_number,
+                message_count=message_count,
+            )
+            if batch:
+                for message in batch.messages:
+                    ack = AckOp(
+                        name=self.name,
+                        partition=message.partition,
+                        position=message.position,
+                        state_provider=self._state_provider,
+                    )
+
+                    yield SubscriptionMessage(
+                        partition=message.partition,
+                        position=message.position,
+                        stored_message=message.stored_message,
+                        ack=ack,
+                    )
+                    if ack.rolled_back:
+                        # the message was not ack'd or the acknolwedgement was rolled back
+                        break
+                    try:
+                        ack.execute()
+                    except AckRolledback:
+                        # the message was not ack'd or the acknolwedgement was rolled back
+                        break
+        finally:
+            if batch:
+                self.unlock_message_batch(batch)
+
 
 class SubscriptionMessageHandler(Generic[E]):
     def __init__(
@@ -540,29 +579,51 @@ class PooledSubscriptionRunner(SubscriptionRunner[E]):
             message_handler=message_handler,
             batch_size=batch_size,
         )
-        self.executor = executor or ThreadPoolExecutor(
+        self._own_executor = executor is None
+        self._executor = executor or ThreadPoolExecutor(
             max_workers=10,
             thread_name_prefix=f"depeche_db_subscription_pool_{subscription.name}",
         )
+        self._lock = _threading.Lock()
+        self._active_partitions: Set[int] = set()
 
     def run_once(self, budget: Optional[TimeBudget] = None) -> RunOnNotificationResult:
         while self._keep_running:
             with self._subscription._stream._store.engine.connect() as conn:
-                results = list(
-                    self.executor.map(
-                        self._process_partition,
-                        self._subscription.get_next_partitions(
-                            conn=conn, partition_count=20
-                        ),
-                    )
-                )
-                print("Processed partitions:", results)
+                for partition_number in self._subscription.get_next_partitions(
+                    conn=conn, partition_count=20
+                ):
+                    if partition_number in self._active_partitions:
+                        # already processing this partition
+                        continue
+                    self._active_partitions.add(partition_number)
+                    self._executor.submit(self._process_partition, partition_number)
             if budget and budget.over_budget():
                 return RunOnNotificationResult.WORK_REMAINING
         return RunOnNotificationResult.DONE_FOR_NOW
 
+    def stop(self):
+        super().stop()
+        if self._own_executor:
+            self._executor.shutdown(wait=True)
+
     def _process_partition(self, partition_number: int):
-        count = 0
+        try:
+            with self._subscription._stream._store.engine.connect() as conn:
+                for message in self._subscription.get_next_messages_in_partition(
+                    conn=conn,
+                    partition_number=partition_number,
+                    message_count=self._batch_size,
+                ):
+                    self.handle(message)
+        finally:
+            self._active_partitions.remove(partition_number)
+        print(f"Finished processing partition {partition_number}")
+        # TODO bubble errors into main thread!
+
+
+class PooledBatchedAckSubscriptionRunner(PooledSubscriptionRunner[E]):
+    def _process_partition(self, partition_number: int):
         with self._subscription._stream._store.engine.connect() as conn:
             message_batch = self._subscription.get_message_batch(
                 conn=conn,
@@ -573,14 +634,15 @@ class PooledSubscriptionRunner(SubscriptionRunner[E]):
                 return
             try:
                 for message in message_batch.messages:
-                    count += 1
                     self.handle(message)
                     message_batch.ack(message)
             finally:
                 self._subscription.ack_message_batch(
                     message_batch=message_batch, success=True
                 )
-        return partition_number, count
+                self._active_partitions.remove(partition_number)
+        print(f"Finished processing partition {partition_number}")
+        # TODO bubble errors into main thread!
 
 
 class StartAtNextMessage(SubscriptionStartPoint):
