@@ -608,7 +608,7 @@ class PooledSubscriptionRunner(SubscriptionRunner[E]):
         else:
             self._executor = executor  # type: ignore
         self._active_partitions: Set[int] = set()
-        self._errors = []
+        self._errors: List[Exception] = []
 
     def run_once(self, budget: Optional[TimeBudget] = None) -> RunOnNotificationResult:
         if self._errors:

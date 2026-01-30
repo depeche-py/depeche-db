@@ -1,9 +1,11 @@
+from concurrent.futures import Executor
 from typing import (
     TYPE_CHECKING,
     Generic,
     List,
     Optional,
     TypeVar,
+    Union,
 )
 
 from ._interfaces import (
@@ -97,6 +99,7 @@ class SubscriptionFactory(Generic[E]):
         lock_provider: Optional[LockProvider] = None,
         start_point: Optional[SubscriptionStartPoint] = None,
         ack_strategy: Optional["AckStrategy"] = None,
+        executor: Union[Executor, bool] = False,
     ) -> "Subscription[E]":
         """
         Create a subscription.
@@ -111,6 +114,10 @@ class SubscriptionFactory(Generic[E]):
             lock_provider: Provider for the locks, defaults to a PostgreSQL provider
             start_point: The start point for the subscription, defaults to beginning of the stream
             ack_strategy: Strategy for acknowledging messages, defaults to AckStrategy.SINGLE
+            executor: An executor to use for processing messages in parallel.
+                False means parallel processing is disabled.
+                True will instantiate a ThreadPoolExecutor(max_workers=5).
+                An instance of Executor will be used as is.
         """
         from ._message_handler import MessageHandlerRegister
         from ._subscription import AckStrategy, Subscription, SubscriptionMessageHandler
@@ -132,4 +139,5 @@ class SubscriptionFactory(Generic[E]):
             start_point=start_point,
             batch_size=batch_size,
             ack_strategy=ack_strategy or AckStrategy.SINGLE,
+            executor=executor,
         )
