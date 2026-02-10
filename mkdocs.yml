@@ -38,6 +38,7 @@ nav:
   - Examples:
     - Bank (event sourced): examples/bank-eventsourced.md
   - Changelog: CHANGELOG.md
+  - Performance: performance.md
 plugins:
   - mermaid2:
       version: 9.3.0
