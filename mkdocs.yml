@@ -23,6 +23,7 @@ nav:
       - Exactly once Delivery: getting-started/ack_in_client_transaction.md
   - Concepts:
     - Data model: concepts/data-model.md
+    - The journey of a message: concepts/journey-of-a-message.md
     - Subscriptions: concepts/subscriptions.md
   - API Docs:
     - MessageStore: api/message_store.md
