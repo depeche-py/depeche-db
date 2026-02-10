@@ -1,0 +1,866 @@
+
+<!DOCTYPE html>
+
+<html class="no-js" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width,initial-scale=1" name="viewport"/>
+<link href="../data-model/" rel="prev"/>
+<link href="../subscriptions/" rel="next"/>
+<link href="../../assets/logo-bg256.png" rel="icon"/>
+<meta content="mkdocs-1.5.3, mkdocs-material-9.4.6" name="generator"/>
+<title>The journey of a message - Depeche DB</title>
+<link href="../../assets/stylesheets/main.35e1ed30.min.css" rel="stylesheet"/>
+<link href="../../assets/stylesheets/palette.356b1318.min.css" rel="stylesheet"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback" rel="stylesheet"/>
+<style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+<link href="../../assets/_mkdocstrings.css" rel="stylesheet"/>
+<script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce((e,_)=>(e<<5)-e+_.charCodeAt(0),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+<script async="" data-website-id="2345d8d5-eea9-4d04-b71b-f898bcc7333c" defer="" src="https://ma2.moserei.de/script.js"></script>
+<script>"undefined"!=typeof __md_analytics&&__md_analytics()</script>
+</head>
+<body data-md-color-accent="indigo" data-md-color-primary="light-green" data-md-color-scheme="default" dir="ltr">
+<input autocomplete="off" class="md-toggle" data-md-toggle="drawer" id="__drawer" type="checkbox"/>
+<input autocomplete="off" class="md-toggle" data-md-toggle="search" id="__search" type="checkbox"/>
+<label class="md-overlay" for="__drawer"></label>
+<div data-md-component="skip">
+<a class="md-skip" href="#the-journey-of-a-message">
+          Skip to content
+        </a>
+</div>
+<div data-md-component="announce">
+</div>
+<header class="md-header md-header--shadow" data-md-component="header">
+<nav aria-label="Header" class="md-header__inner md-grid">
+<a aria-label="Depeche DB" class="md-header__button md-logo" data-md-component="logo" href="../.." title="Depeche DB">
+<img alt="logo" src="../../assets/logo512.png"/>
+</a>
+<label class="md-header__button md-icon" for="__drawer">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M3 6h18v2H3V6m0 5h18v2H3v-2m0 5h18v2H3v-2Z"></path></svg>
+</label>
+<div class="md-header__title" data-md-component="header-title">
+<div class="md-header__ellipsis">
+<div class="md-header__topic">
+<span class="md-ellipsis">
+            Depeche DB
+          </span>
+</div>
+<div class="md-header__topic" data-md-component="header-topic">
+<span class="md-ellipsis">
+            
+              The journey of a message
+            
+          </span>
+</div>
+</div>
+</div>
+<label class="md-header__button md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"></path></svg>
+</label>
+<div class="md-search" data-md-component="search" role="dialog">
+<label class="md-search__overlay" for="__search"></label>
+<div class="md-search__inner" role="search">
+<form class="md-search__form" name="search">
+<input aria-label="Search" autocapitalize="off" autocomplete="off" autocorrect="off" class="md-search__input" data-md-component="search-query" name="query" placeholder="Search" required="" spellcheck="false" type="text"/>
+<label class="md-search__icon md-icon" for="__search">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z"></path></svg>
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"></path></svg>
+</label>
+<nav aria-label="Search" class="md-search__options">
+<button aria-label="Clear" class="md-search__icon md-icon" tabindex="-1" title="Clear" type="reset">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41Z"></path></svg>
+</button>
+</nav>
+</form>
+<div class="md-search__output">
+<div class="md-search__scrollwrap" data-md-scrollfix="">
+<div class="md-search-result" data-md-component="search-result">
+<div class="md-search-result__meta">
+            Initializing search
+          </div>
+<ol class="md-search-result__list" role="presentation"></ol>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="md-header__source">
+<a class="md-source" data-md-component="source" href="https://github.com/depeche-py/depeche-db" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 496 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"></path></svg>
+</div>
+<div class="md-source__repository">
+    depeche-py/depeche-db
+  </div>
+</a>
+</div>
+</nav>
+</header>
+<div class="md-container" data-md-component="container">
+<main class="md-main" data-md-component="main">
+<div class="md-main__inner md-grid">
+<div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Navigation" class="md-nav md-nav--primary" data-md-level="0">
+<label class="md-nav__title" for="__drawer">
+<a aria-label="Depeche DB" class="md-nav__button md-logo" data-md-component="logo" href="../.." title="Depeche DB">
+<img alt="logo" src="../../assets/logo512.png"/>
+</a>
+    Depeche DB
+  </label>
+<div class="md-nav__source">
+<a class="md-source" data-md-component="source" href="https://github.com/depeche-py/depeche-db" title="Go to repository">
+<div class="md-source__icon md-icon">
+<svg viewbox="0 0 496 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"></path></svg>
+</div>
+<div class="md-source__repository">
+    depeche-py/depeche-db
+  </div>
+</a>
+</div>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../..">
+<span class="md-ellipsis">
+    Home
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_2" type="checkbox"/>
+<label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+<span class="md-ellipsis">
+    Walk through
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_2_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_2">
+<span class="md-nav__icon md-icon"></span>
+            Walk through
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../getting-started/installation/">
+<span class="md-ellipsis">
+    Installation
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../generated/output/getting-started-write-read/">
+<span class="md-ellipsis">
+    Writing &amp; reading messages
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../generated/output/getting-started-aggregated-stream/">
+<span class="md-ellipsis">
+    Aggregated streams
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../generated/output/getting-started-subscription/">
+<span class="md-ellipsis">
+    Subscription
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../getting-started/executor/">
+<span class="md-ellipsis">
+    Executor
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../getting-started/ack_in_client_transaction/">
+<span class="md-ellipsis">
+    Exactly once Delivery
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--active md-nav__item--nested">
+<input checked="" class="md-nav__toggle md-toggle" id="__nav_3" type="checkbox"/>
+<label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+<span class="md-ellipsis">
+    Concepts
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="true" aria-labelledby="__nav_3_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_3">
+<span class="md-nav__icon md-icon"></span>
+            Concepts
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../data-model/">
+<span class="md-ellipsis">
+    Data model
+  </span>
+</a>
+</li>
+<li class="md-nav__item md-nav__item--active">
+<input class="md-nav__toggle md-toggle" id="__toc" type="checkbox"/>
+<label class="md-nav__link md-nav__link--active" for="__toc">
+<span class="md-ellipsis">
+    The journey of a message
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<a class="md-nav__link md-nav__link--active" href="./">
+<span class="md-ellipsis">
+    The journey of a message
+  </span>
+</a>
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#1-defining-creating-a-message">
+    1. Defining &amp; creating a message
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#2-writing-to-the-message-store">
+    2. Writing to the message store
+  </a>
+<nav aria-label="2. Writing to the message store" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#what-happens-inside">
+    What happens inside
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#3-notification">
+    3. Notification
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#4-stream-projection">
+    4. Stream projection
+  </a>
+<nav aria-label="4. Stream projection" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#what-happens-inside_1">
+    What happens inside
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#partitioning">
+    Partitioning
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#5-subscription">
+    5. Subscription
+  </a>
+<nav aria-label="5. Subscription" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#what-happens-inside_2">
+    What happens inside
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#6-handling">
+    6. Handling
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#7-acknowledgement">
+    7. Acknowledgement
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#8-the-executor-ties-it-all-together">
+    8. The executor ties it all together
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-event-sourcing-path">
+    The event sourcing path
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#summary">
+    Summary
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../subscriptions/">
+<span class="md-ellipsis">
+    Subscriptions
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_4" type="checkbox"/>
+<label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+<span class="md-ellipsis">
+    API Docs
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_4_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_4">
+<span class="md-nav__icon md-icon"></span>
+            API Docs
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/message_store/">
+<span class="md-ellipsis">
+    MessageStore
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/aggregated_stream/">
+<span class="md-ellipsis">
+    AggregatedStream
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/subscription/">
+<span class="md-ellipsis">
+    Subscription
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/executor/">
+<span class="md-ellipsis">
+    Executor
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/message_handlers/">
+<span class="md-ellipsis">
+    Message handlers
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/datastructures/">
+<span class="md-ellipsis">
+    Data structures
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/exceptions/">
+<span class="md-ellipsis">
+    Exceptions
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/event_sourcing/">
+<span class="md-ellipsis">
+    Event Sourcing
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../api/tools/">
+<span class="md-ellipsis">
+    Tools
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item md-nav__item--nested">
+<input class="md-nav__toggle md-toggle md-toggle--indeterminate" id="__nav_5" type="checkbox"/>
+<label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+<span class="md-ellipsis">
+    Examples
+  </span>
+<span class="md-nav__icon md-icon"></span>
+</label>
+<nav aria-expanded="false" aria-labelledby="__nav_5_label" class="md-nav" data-md-level="1">
+<label class="md-nav__title" for="__nav_5">
+<span class="md-nav__icon md-icon"></span>
+            Examples
+          </label>
+<ul class="md-nav__list" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../examples/bank-eventsourced/">
+<span class="md-ellipsis">
+    Bank (event sourced)
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../CHANGELOG/">
+<span class="md-ellipsis">
+    Changelog
+  </span>
+</a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="../../performance/">
+<span class="md-ellipsis">
+    Performance
+  </span>
+</a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+<div class="md-sidebar__scrollwrap">
+<div class="md-sidebar__inner">
+<nav aria-label="Table of contents" class="md-nav md-nav--secondary">
+<label class="md-nav__title" for="__toc">
+<span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+<ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#1-defining-creating-a-message">
+    1. Defining &amp; creating a message
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#2-writing-to-the-message-store">
+    2. Writing to the message store
+  </a>
+<nav aria-label="2. Writing to the message store" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#what-happens-inside">
+    What happens inside
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#3-notification">
+    3. Notification
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#4-stream-projection">
+    4. Stream projection
+  </a>
+<nav aria-label="4. Stream projection" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#what-happens-inside_1">
+    What happens inside
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#partitioning">
+    Partitioning
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#5-subscription">
+    5. Subscription
+  </a>
+<nav aria-label="5. Subscription" class="md-nav">
+<ul class="md-nav__list">
+<li class="md-nav__item">
+<a class="md-nav__link" href="#what-happens-inside_2">
+    What happens inside
+  </a>
+</li>
+</ul>
+</nav>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#6-handling">
+    6. Handling
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#7-acknowledgement">
+    7. Acknowledgement
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#8-the-executor-ties-it-all-together">
+    8. The executor ties it all together
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#the-event-sourcing-path">
+    The event sourcing path
+  </a>
+</li>
+<li class="md-nav__item">
+<a class="md-nav__link" href="#summary">
+    Summary
+  </a>
+</li>
+</ul>
+</nav>
+</div>
+</div>
+</div>
+<div class="md-content" data-md-component="content">
+<article class="md-content__inner md-typeset">
+<h1 id="the-journey-of-a-message">The journey of a message</h1>
+<p>This page follows a single message through all the stages of Depeche DB --
+from creation in your application code to being handled by a subscription.</p>
+<div class="mermaid">flowchart LR
+    A[Your code] --&gt;|write| B[Message Store]
+    B --&gt;|notify| C[Stream Projector]
+    C --&gt;|project| D[Aggregated Stream]
+    D --&gt;|deliver| E[Subscription]
+    E --&gt;|dispatch| F[Your handler]
+</div>
+<h2 id="1-defining-creating-a-message">1. Defining &amp; creating a message</h2>
+<p>A message is a plain Pydantic model that implements two methods:
+<code>get_message_id</code> and <code>get_message_time</code>. These are required by
+Depeche DB to identify and order messages.</p>
+<div class="language-python highlight"><pre><span></span><code><a href="#__codelineno-0-1" id="__codelineno-0-1" name="__codelineno-0-1"></a><span class="kn">import</span> <span class="nn">uuid</span>
+<a href="#__codelineno-0-2" id="__codelineno-0-2" name="__codelineno-0-2"></a><span class="kn">import</span> <span class="nn">datetime</span> <span class="k">as</span> <span class="nn">dt</span>
+<a href="#__codelineno-0-3" id="__codelineno-0-3" name="__codelineno-0-3"></a><span class="kn">import</span> <span class="nn">pydantic</span>
+<a href="#__codelineno-0-4" id="__codelineno-0-4" name="__codelineno-0-4"></a>
+<a href="#__codelineno-0-5" id="__codelineno-0-5" name="__codelineno-0-5"></a><span class="k">class</span> <span class="nc">AccountCredited</span><span class="p">(</span><span class="n">pydantic</span><span class="o">.</span><span class="n">BaseModel</span><span class="p">):</span>
+<a href="#__codelineno-0-6" id="__codelineno-0-6" name="__codelineno-0-6"></a>    <span class="n">account_id</span><span class="p">:</span> <span class="n">uuid</span><span class="o">.</span><span class="n">UUID</span>
+<a href="#__codelineno-0-7" id="__codelineno-0-7" name="__codelineno-0-7"></a>    <span class="n">amount</span><span class="p">:</span> <span class="nb">int</span>
+<a href="#__codelineno-0-8" id="__codelineno-0-8" name="__codelineno-0-8"></a>    <span class="n">event_id</span><span class="p">:</span> <span class="n">uuid</span><span class="o">.</span><span class="n">UUID</span> <span class="o">=</span> <span class="n">pydantic</span><span class="o">.</span><span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">uuid</span><span class="o">.</span><span class="n">uuid4</span><span class="p">)</span>
+<a href="#__codelineno-0-9" id="__codelineno-0-9" name="__codelineno-0-9"></a>    <span class="n">occurred_at</span><span class="p">:</span> <span class="n">dt</span><span class="o">.</span><span class="n">datetime</span> <span class="o">=</span> <span class="n">pydantic</span><span class="o">.</span><span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">dt</span><span class="o">.</span><span class="n">datetime</span><span class="o">.</span><span class="n">utcnow</span><span class="p">)</span>
+<a href="#__codelineno-0-10" id="__codelineno-0-10" name="__codelineno-0-10"></a>
+<a href="#__codelineno-0-11" id="__codelineno-0-11" name="__codelineno-0-11"></a>    <span class="k">def</span> <span class="nf">get_message_id</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">uuid</span><span class="o">.</span><span class="n">UUID</span><span class="p">:</span>
+<a href="#__codelineno-0-12" id="__codelineno-0-12" name="__codelineno-0-12"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">event_id</span>
+<a href="#__codelineno-0-13" id="__codelineno-0-13" name="__codelineno-0-13"></a>
+<a href="#__codelineno-0-14" id="__codelineno-0-14" name="__codelineno-0-14"></a>    <span class="k">def</span> <span class="nf">get_message_time</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">dt</span><span class="o">.</span><span class="n">datetime</span><span class="p">:</span>
+<a href="#__codelineno-0-15" id="__codelineno-0-15" name="__codelineno-0-15"></a>        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">occurred_at</span>
+</code></pre></div>
+<p>The message content is completely transparent to Depeche DB. It only cares
+about the ID and the timestamp.</p>
+<h2 id="2-writing-to-the-message-store">2. Writing to the message store</h2>
+<p>When you call <code>message_store.write()</code>, the message is serialized to JSON
+and inserted into a PostgreSQL table.</p>
+<div class="language-python highlight"><pre><span></span><code><a href="#__codelineno-1-1" id="__codelineno-1-1" name="__codelineno-1-1"></a><span class="n">position</span> <span class="o">=</span> <span class="n">message_store</span><span class="o">.</span><span class="n">write</span><span class="p">(</span>
+<a href="#__codelineno-1-2" id="__codelineno-1-2" name="__codelineno-1-2"></a>    <span class="n">stream</span><span class="o">=</span><span class="s2">"account-123"</span><span class="p">,</span>
+<a href="#__codelineno-1-3" id="__codelineno-1-3" name="__codelineno-1-3"></a>    <span class="n">message</span><span class="o">=</span><span class="n">AccountCredited</span><span class="p">(</span><span class="n">account_id</span><span class="o">=</span><span class="n">account_id</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mi">100</span><span class="p">),</span>
+<a href="#__codelineno-1-4" id="__codelineno-1-4" name="__codelineno-1-4"></a><span class="p">)</span>
+<a href="#__codelineno-1-5" id="__codelineno-1-5" name="__codelineno-1-5"></a><span class="c1"># position.stream == "account-123"</span>
+<a href="#__codelineno-1-6" id="__codelineno-1-6" name="__codelineno-1-6"></a><span class="c1"># position.version == 1          (sequential within the stream)</span>
+<a href="#__codelineno-1-7" id="__codelineno-1-7" name="__codelineno-1-7"></a><span class="c1"># position.global_position == 42 (sequential across all streams)</span>
+</code></pre></div>
+<h3 id="what-happens-inside">What happens inside</h3>
+<ol>
+<li>The <code>PydanticMessageSerializer</code> converts the message to a JSON dict
+   and adds a <code>__typename__</code> field so it can be deserialized later.</li>
+<li>A PL/pgSQL function executes the actual insert. It acquires
+   a <strong>stream-level advisory lock</strong> (based on a hash of the stream name)
+   to prevent concurrent writes to the same stream.</li>
+<li>If you passed an <code>expected_version</code>, it is compared to the current
+   maximum version in the stream. A mismatch raises an
+   <code>OptimisticConcurrencyError</code> -- this is how optimistic concurrency
+   control works.</li>
+<li>The message is assigned the next sequential <code>version</code> within the
+   stream and the next <code>global_position</code> from a database sequence.</li>
+<li>A PostgreSQL trigger fires <code>pg_notify()</code> to broadcast the new
+   message on a notification channel.</li>
+<li>The transaction commits.</li>
+</ol>
+<div class="mermaid">sequenceDiagram
+    participant App as Your code
+    participant MS as MessageStore
+    participant PG as PostgreSQL
+
+    App-&gt;&gt;MS: write(stream, message)
+    MS-&gt;&gt;MS: serialize(message) → JSON
+    MS-&gt;&gt;PG: CALL write_message(...)
+    PG-&gt;&gt;PG: advisory lock on stream
+    PG-&gt;&gt;PG: check expected_version
+    PG-&gt;&gt;PG: INSERT with version &amp; global_position
+    PG-&gt;&gt;PG: pg_notify(channel, payload)
+    PG--&gt;&gt;MS: return position
+    MS--&gt;&gt;App: MessagePosition
+</div>
+<h2 id="3-notification">3. Notification</h2>
+<p>The PostgreSQL trigger sends a <code>NOTIFY</code> on a channel specific to the message
+store (e.g. <code>depeche_example_store_messages</code>). The payload includes the
+<code>message_id</code>, <code>stream</code>, <code>version</code>, and <code>global_position</code>.</p>
+<p>This notification is what makes Depeche DB <strong>poll-free</strong>. The executor
+(see below) listens for these notifications and wakes up the relevant
+components immediately.</p>
+<h2 id="4-stream-projection">4. Stream projection</h2>
+<p>The aggregated stream's <strong>projector</strong> picks up the notification and projects
+the message into the aggregated stream.</p>
+<h3 id="what-happens-inside_1">What happens inside</h3>
+<ol>
+<li>The projector acquires an exclusive lock on the aggregated stream table
+   (to prevent concurrent projections).</li>
+<li>It finds all origin streams that have unprocessed messages -- by comparing
+   the last known <code>global_position</code> with the current state of the message
+   store.</li>
+<li>For each new message, it deserializes the content and calls your
+   <code>MessagePartitioner</code> to determine which partition the message belongs to.</li>
+<li>It inserts a row into the aggregated stream table. This row is a
+   <strong>reference</strong> to the original message (not a copy).</li>
+<li>It fires another <code>pg_notify()</code> on the aggregated stream's channel.</li>
+</ol>
+<div class="mermaid">sequenceDiagram
+    participant PG as PostgreSQL
+    participant Proj as Stream Projector
+    participant AS as Aggregated Stream Table
+
+    PG-&gt;&gt;Proj: NOTIFY (new message)
+    Proj-&gt;&gt;PG: LOCK aggregated stream table
+    Proj-&gt;&gt;PG: find unprocessed messages
+    PG--&gt;&gt;Proj: new messages
+    Proj-&gt;&gt;Proj: partitioner.get_partition(msg)
+    Proj-&gt;&gt;AS: INSERT reference (partition, position)
+    Proj-&gt;&gt;PG: pg_notify(aggregated channel)
+    Proj-&gt;&gt;PG: COMMIT
+</div>
+<h3 id="partitioning">Partitioning</h3>
+<p>Your partitioner decides which partition a message goes to. Messages within
+the same partition are processed <strong>in order</strong> and <strong>by a single consumer at a
+time</strong>. Messages in different partitions can be processed <strong>in parallel</strong>.</p>
+<div class="language-python highlight"><pre><span></span><code><a href="#__codelineno-2-1" id="__codelineno-2-1" name="__codelineno-2-1"></a><span class="k">class</span> <span class="nc">AccountIdPartitioner</span><span class="p">:</span>
+<a href="#__codelineno-2-2" id="__codelineno-2-2" name="__codelineno-2-2"></a>    <span class="k">def</span> <span class="nf">get_partition</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="n">StoredMessage</span><span class="p">[</span><span class="n">AccountEvent</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<a href="#__codelineno-2-3" id="__codelineno-2-3" name="__codelineno-2-3"></a>        <span class="k">return</span> <span class="nb">hash</span><span class="p">(</span><span class="n">message</span><span class="o">.</span><span class="n">message</span><span class="o">.</span><span class="n">account_id</span><span class="p">)</span> <span class="o">%</span> <span class="mi">10</span>
+</code></pre></div>
+<p>Choose your partition key carefully: messages that must be processed in order
+need to end up in the same partition.</p>
+<h2 id="5-subscription">5. Subscription</h2>
+<p>The subscription is notified (again via <code>pg_notify</code>) that there are new
+messages in the aggregated stream.</p>
+<h3 id="what-happens-inside_2">What happens inside</h3>
+<ol>
+<li>The subscription reads its <strong>state</strong> -- the last processed position for
+   each partition.</li>
+<li>It selects partitions that have unprocessed messages, preferring
+   partitions with the most work to do.</li>
+<li>It tries to acquire a <strong>partition lock</strong> (a non-blocking advisory lock).
+   If another instance already holds the lock, it moves on to the next
+   partition. This is the <strong>competing consumers</strong> pattern.</li>
+<li>It reads a batch of message references from the aggregated stream and
+   fetches the actual message content from the message store.</li>
+<li>It returns a <code>SubscriptionMessageBatch</code>.</li>
+</ol>
+<div class="mermaid">sequenceDiagram
+    participant PG as PostgreSQL
+    participant Sub as Subscription
+    participant State as State Provider
+    participant Lock as Lock Provider
+
+    PG-&gt;&gt;Sub: NOTIFY (new in aggregated stream)
+    Sub-&gt;&gt;State: get positions per partition
+    Sub-&gt;&gt;Sub: select partition with most work
+    Sub-&gt;&gt;Lock: try lock(partition)
+    Lock--&gt;&gt;Sub: acquired
+    Sub-&gt;&gt;PG: read message batch
+    PG--&gt;&gt;Sub: SubscriptionMessageBatch
+</div>
+<h2 id="6-handling">6. Handling</h2>
+<p>The subscription runner iterates over the batch and dispatches each message
+to your handler.</p>
+<div class="language-python highlight"><pre><span></span><code><a href="#__codelineno-3-1" id="__codelineno-3-1" name="__codelineno-3-1"></a><span class="k">class</span> <span class="nc">MyHandlers</span><span class="p">(</span><span class="n">MessageHandler</span><span class="p">[</span><span class="n">AccountEvent</span><span class="p">]):</span>
+<a href="#__codelineno-3-2" id="__codelineno-3-2" name="__codelineno-3-2"></a>    <span class="nd">@MessageHandler</span><span class="o">.</span><span class="n">register</span>
+<a href="#__codelineno-3-3" id="__codelineno-3-3" name="__codelineno-3-3"></a>    <span class="k">def</span> <span class="nf">handle_credited</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="p">:</span> <span class="n">AccountCredited</span><span class="p">):</span>
+<a href="#__codelineno-3-4" id="__codelineno-3-4" name="__codelineno-3-4"></a>        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Account credited: </span><span class="si">{</span><span class="n">message</span><span class="o">.</span><span class="n">amount</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div>
+<p>You can choose what your handler receives:</p>
+<ul>
+<li>The <strong>plain message</strong> (<code>AccountCredited</code>) -- just the domain object.</li>
+<li>A <strong><code>StoredMessage[AccountCredited]</code></strong> -- includes metadata like <code>stream</code>,
+  <code>version</code>, <code>global_position</code>, and <code>added_at</code>.</li>
+<li>A <strong><code>SubscriptionMessage[AccountCredited]</code></strong> -- includes the partition,
+  position within the partition, and an ack handle.</li>
+</ul>
+<h2 id="7-acknowledgement">7. Acknowledgement</h2>
+<p>After your handler returns successfully, the message is acknowledged. This
+means the subscription's position for that partition is advanced, so the
+message will not be delivered again.</p>
+<p>Two strategies are available:</p>
+<table>
+<thead>
+<tr>
+<th>Strategy</th>
+<th>Behavior</th>
+<th>Trade-off</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SINGLE</code></td>
+<td>Position is stored after <strong>each</strong> message</td>
+<td>Safer, but more DB writes</td>
+</tr>
+<tr>
+<td><code>BATCHED</code></td>
+<td>Position is stored after the <strong>entire batch</strong></td>
+<td>Faster, but replays the batch on crash</td>
+</tr>
+</tbody>
+</table>
+<p>Both strategies provide <strong>at least once</strong> delivery. If your handler fails or
+the process crashes before acknowledgement, the message will be delivered
+again on the next run.</p>
+<p>You can achieve <strong>exactly once</strong> semantics by storing the subscription state
+in the same database transaction as your application state (see
+<a href="../../getting-started/ack_in_client_transaction/">Exactly once Delivery</a>).</p>
+<h2 id="8-the-executor-ties-it-all-together">8. The executor ties it all together</h2>
+<p>In production, you don't call <code>projector.run()</code> and <code>subscription.runner.run()</code>
+manually. Instead, the <strong>executor</strong> runs them for you. It listens for
+PostgreSQL notifications and dispatches work to handler threads.</p>
+<div class="language-python highlight"><pre><span></span><code><a href="#__codelineno-4-1" id="__codelineno-4-1" name="__codelineno-4-1"></a><span class="n">executor</span> <span class="o">=</span> <span class="n">Executor</span><span class="p">(</span><span class="n">db_dsn</span><span class="o">=</span><span class="n">DB_DSN</span><span class="p">)</span>
+<a href="#__codelineno-4-2" id="__codelineno-4-2" name="__codelineno-4-2"></a><span class="n">executor</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">aggregated_stream</span><span class="o">.</span><span class="n">projector</span><span class="p">)</span>
+<a href="#__codelineno-4-3" id="__codelineno-4-3" name="__codelineno-4-3"></a><span class="n">executor</span><span class="o">.</span><span class="n">register</span><span class="p">(</span><span class="n">subscription</span><span class="o">.</span><span class="n">runner</span><span class="p">)</span>
+<a href="#__codelineno-4-4" id="__codelineno-4-4" name="__codelineno-4-4"></a><span class="n">executor</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</code></pre></div>
+<p>The executor also runs a <strong>stimulator</strong> thread that periodically nudges the
+handlers, ensuring that messages are processed even if a notification was
+missed.</p>
+<h2 id="the-event-sourcing-path">The event sourcing path</h2>
+<p>When using event sourcing, messages take a slightly different route into the
+message store. Instead of calling <code>message_store.write()</code> directly, you work
+with an aggregate root and a repository.</p>
+<div class="language-python highlight"><pre><span></span><code><a href="#__codelineno-5-1" id="__codelineno-5-1" name="__codelineno-5-1"></a><span class="c1"># Load aggregate &amp; apply a new event</span>
+<a href="#__codelineno-5-2" id="__codelineno-5-2" name="__codelineno-5-2"></a><span class="n">account</span> <span class="o">=</span> <span class="n">repo</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">account_id</span><span class="p">)</span>
+<a href="#__codelineno-5-3" id="__codelineno-5-3" name="__codelineno-5-3"></a><span class="n">account</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">AccountCredited</span><span class="p">(</span><span class="n">account_id</span><span class="o">=</span><span class="n">account_id</span><span class="p">,</span> <span class="n">amount</span><span class="o">=</span><span class="mi">100</span><span class="p">))</span>
+<a href="#__codelineno-5-4" id="__codelineno-5-4" name="__codelineno-5-4"></a>
+<a href="#__codelineno-5-5" id="__codelineno-5-5" name="__codelineno-5-5"></a><span class="c1"># Save: synchronize events to the message store</span>
+<a href="#__codelineno-5-6" id="__codelineno-5-6" name="__codelineno-5-6"></a><span class="n">repo</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">account</span><span class="p">,</span> <span class="n">expected_version</span><span class="o">=</span><span class="n">account</span><span class="o">.</span><span class="n">version</span><span class="p">)</span>
+</code></pre></div>
+<p>Under the hood:</p>
+<ol>
+<li><code>account.apply()</code> updates the aggregate's internal state and collects
+   the event.</li>
+<li><code>repo.save()</code> calls <code>message_store.synchronize()</code> which compares the
+   aggregate's events against what is already stored, and only writes the
+   new ones.</li>
+<li>The stream name is derived from the aggregate: e.g. <code>account-{id}</code>.</li>
+<li>From here on, the message follows the same journey described above --
+   notification, projection, subscription, handling.</li>
+</ol>
+<div class="mermaid">flowchart LR
+    A[Aggregate.apply] --&gt; B[repo.save]
+    B --&gt; C[MessageStore.synchronize]
+    C --&gt; D["Same journey as above ↑"]
+</div>
+<h2 id="summary">Summary</h2>
+<div class="mermaid">flowchart TB
+    subgraph "Your code"
+        Create[Create message]
+        Handle[Handle message]
+    end
+    subgraph "Message Store"
+        Write[Serialize &amp; insert]
+        Notify1[pg_notify]
+    end
+    subgraph "Stream Projector"
+        Project[Partition &amp; link]
+        Notify2[pg_notify]
+    end
+    subgraph "Subscription"
+        Lock[Acquire partition lock]
+        Fetch[Fetch batch]
+        Dispatch[Dispatch to handler]
+        Ack[Acknowledge]
+    end
+
+    Create --&gt; Write --&gt; Notify1 --&gt; Project --&gt; Notify2 --&gt; Lock --&gt; Fetch --&gt; Dispatch --&gt; Handle --&gt; Ack
+</div>
+</article>
+</div>
+</div>
+</main>
+<footer class="md-footer">
+<nav aria-label="Footer" class="md-footer__inner md-grid">
+<a aria-label="Previous: Data model" class="md-footer__link md-footer__link--prev" href="../data-model/">
+<div class="md-footer__button md-icon">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11h12Z"></path></svg>
+</div>
+<div class="md-footer__title">
+<span class="md-footer__direction">
+                Previous
+              </span>
+<div class="md-ellipsis">
+                Data model
+              </div>
+</div>
+</a>
+<a aria-label="Next: Subscriptions" class="md-footer__link md-footer__link--next" href="../subscriptions/">
+<div class="md-footer__title">
+<span class="md-footer__direction">
+                Next
+              </span>
+<div class="md-ellipsis">
+                Subscriptions
+              </div>
+</div>
+<div class="md-footer__button md-icon">
+<svg viewbox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11H4Z"></path></svg>
+</div>
+</a>
+</nav>
+<div class="md-footer-meta md-typeset">
+<div class="md-footer-meta__inner md-grid">
+<div class="md-copyright">
+<div class="md-copyright__highlight">
+      Copyright © 2023 Martin Vielsmaier
+    </div>
+</div>
+<div class="md-social">
+<a class="md-social__link" href="https://github.com/depeche-py/depeche-db/" rel="noopener" target="_blank" title="github.com">
+<svg viewbox="0 0 496 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"></path></svg>
+</a>
+<a class="md-social__link" href="https://pypi.org/project/depeche-db/" rel="noopener" target="_blank" title="pypi.org">
+<svg viewbox="0 0 448 512" xmlns="http://www.w3.org/2000/svg"><!--! Font Awesome Free 6.4.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2023 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6zM286.2 404c11.1 0 20.1 9.1 20.1 20.3 0 11.3-9 20.4-20.1 20.4-11 0-20.1-9.2-20.1-20.4.1-11.3 9.1-20.3 20.1-20.3zM167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4zm-6.7-142.6c-11.1 0-20.1-9.1-20.1-20.3.1-11.3 9-20.4 20.1-20.4 11 0 20.1 9.2 20.1 20.4s-9 20.3-20.1 20.3z"></path></svg>
+</a>
+</div>
+</div>
+</div>
+</footer>
+</div>
+<div class="md-dialog" data-md-component="dialog">
+<div class="md-dialog__inner md-typeset"></div>
+</div>
+<script id="__config" type="application/json">{"base": "../..", "features": ["navigation.expand", "navigation.footer"], "search": "../../assets/javascripts/workers/search.f886a092.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+<script src="../../assets/javascripts/bundle.aecac24b.min.js"></script>
+<script src="https://unpkg.com/mermaid@9.3.0/dist/mermaid.min.js"></script><script>mermaid.initialize({});</script></body>
+</html>
