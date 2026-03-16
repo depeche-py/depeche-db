@@ -1,3 +1,7 @@
+# 0.13.1
+
+* Fix dict size changed error in ThreadedExecutor logging
+
 # 0.13.0
 
 * Add `min_version` parameter to `MessageStoreReader.read()` to allow reading events starting from a specific version

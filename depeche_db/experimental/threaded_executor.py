@@ -122,7 +122,9 @@ class ThreadedExecutor:
                     self.handler_queues[registration.id].put(registration.id)
 
         if self.failed_handlers:
-            for handler_id, exc in self.failed_handlers.items():
+            # Copy to list to avoid "dictionary changed size during iteration"
+            # if handlers keep failing while we're logging
+            for handler_id, exc in list(self.failed_handlers.items()):
                 LOGGER.error(f"Handler {handler_id} failed with exception: {exc}")
 
         for thread in self.handler_threads:
