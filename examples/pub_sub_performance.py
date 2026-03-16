@@ -28,7 +28,7 @@ from depeche_db.tools import (
 )
 
 DB_DSN = "postgresql+psycopg://depeche:depeche@localhost:4888/depeche_demo"
-db_engine = create_engine(DB_DSN)
+db_engine = create_engine(DB_DSN, pool_size=50, max_overflow=10)
 original_connect = db_engine.connect
 
 CONNECTIONS = 0
@@ -76,7 +76,7 @@ stream = message_store.aggregated_stream(
 )
 
 HANDLED = 0
-HANDLER_DELAY = 0.001
+HANDLER_DELAY = 0.1
 handlers = MessageHandlerRegister[MyMessage]()
 
 

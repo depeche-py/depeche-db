@@ -1,3 +1,4 @@
+import threading as _threading
 from typing import Dict
 
 import pals as _pals
@@ -13,23 +14,27 @@ class DbLockProvider:
             create_engine_callable=lambda: self._engine,
             blocking_default=False,
         )
+        self._thread_lock = _threading.Lock()
         self._locks: Dict[str, _pals.Lock] = {}  # type: ignore
 
     def lock(self, name: str) -> bool:
         # assert name not in self._locks, "Lock already acquired"
-        if name in self._locks:
-            return False
-        lock = self._locks[name] = self.locker.lock(name, blocking=False)
+        with self._thread_lock:
+            if name in self._locks:
+                return False
+            lock = self._locks[name] = self.locker.lock(name, blocking=False)
         result = lock.acquire()
         if not result:
             if lock.conn:
                 lock.conn.close()
-            del self._locks[name]
+            with self._thread_lock:
+                del self._locks[name]
         return result  # type: ignore
 
     def unlock(self, name: str):
-        lock = self._locks.pop(name)
-        lock.release()
+        with self._thread_lock:
+            lock = self._locks.pop(name)
+            lock.release()
 
     def finalize(self):
         try:

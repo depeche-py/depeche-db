@@ -3,6 +3,7 @@ import enum as _enum
 import logging as _logging
 import random as _random
 import time as _time
+from concurrent.futures import Executor, ThreadPoolExecutor
 from typing import (
     Callable,
     Dict,
@@ -10,6 +11,7 @@ from typing import (
     Iterator,
     List,
     Optional,
+    Set,
     TypeVar,
     Union,
 )
@@ -133,7 +135,7 @@ class AckOp:
 
 class Subscription(Generic[E]):
     _state_provider: SubscriptionStateProvider
-    runner: "Union[SubscriptionRunner[E], BatchedAckSubscriptionRunner[E]]"
+    runner: "Union[SubscriptionRunner[E], BatchedAckSubscriptionRunner[E], PooledSubscriptionRunner[E], PooledBatchedAckSubscriptionRunner[E]]"
 
     def __init__(
         self,
@@ -145,6 +147,7 @@ class Subscription(Generic[E]):
         lock_provider: Optional[LockProvider] = None,
         start_point: Optional[SubscriptionStartPoint] = None,
         ack_strategy: AckStrategy = AckStrategy.SINGLE,
+        executor: Union[Executor, bool] = False,
     ):
         """
         A subscription is a way to read messages from an aggregated stream.
@@ -160,6 +163,11 @@ class Subscription(Generic[E]):
             lock_provider: Provider for the locks, defaults to a PostgreSQL provider
             start_point: The start point for the subscription, defaults to beginning of the stream
             ack_strategy: The strategy to use for acknowledging messages, defaults to AckStrategy.SINGLE.
+            executor: An executor to use for processing messages in parallel
+                - False means parallel processing is disabled
+                - True will instantiate a ThreadPoolExecutor(max_workers=5)
+                - An instance of Executor will be used as is (make sure to shutdown the executor when done)
+                - It is recommended to give an executor from the outside which is shared between multiple subscriptions to avoid creating too many threads
         """
         assert name.isidentifier(), "Group name must be a valid identifier"
         self.name = name
@@ -172,17 +180,33 @@ class Subscription(Generic[E]):
         )
         self._start_point = start_point
         if ack_strategy == AckStrategy.BATCHED:
-            self.runner = BatchedAckSubscriptionRunner(
-                subscription=self,
-                message_handler=message_handler,
-                batch_size=batch_size,
-            )
+            if executor:
+                self.runner = PooledBatchedAckSubscriptionRunner(
+                    subscription=self,
+                    message_handler=message_handler,
+                    batch_size=batch_size,
+                    executor=executor,
+                )
+            else:
+                self.runner = BatchedAckSubscriptionRunner(
+                    subscription=self,
+                    message_handler=message_handler,
+                    batch_size=batch_size,
+                )
         elif ack_strategy == AckStrategy.SINGLE:
-            self.runner = SubscriptionRunner(
-                subscription=self,
-                message_handler=message_handler,
-                batch_size=batch_size,
-            )
+            if executor:
+                self.runner = PooledSubscriptionRunner(
+                    subscription=self,
+                    message_handler=message_handler,
+                    batch_size=batch_size,
+                    executor=executor,
+                )
+            else:
+                self.runner = SubscriptionRunner(
+                    subscription=self,
+                    message_handler=message_handler,
+                    batch_size=batch_size,
+                )
         else:
             raise NotImplementedError(f"Ack strategy {ack_strategy} is not implemented")
 
@@ -222,7 +246,9 @@ class Subscription(Generic[E]):
             max_position, current_value
         )
 
-    def _get_next_partitions(self, conn: SAConnection) -> List[int]:
+    def get_next_partitions(
+        self, conn: SAConnection, partition_count: int = 20
+    ) -> List[int]:
         state = self._state_provider.read(self.name)
 
         def _refresh_max_aggregated_stream_positions_cache():
@@ -252,7 +278,7 @@ class Subscription(Generic[E]):
             _refresh_max_aggregated_stream_positions_cache()
             unprocessed_message_counts = _calculate_unprocessed_message_counts()
 
-        # Take the top 20 partitions with the most messages to read
+        # Take the top `count` partitions with the most messages to read
         result = [
             partition_number
             for _, partition_number in sorted(
@@ -260,10 +286,60 @@ class Subscription(Generic[E]):
                 reverse=True,
             )
         ]
-        result = result[:20]
+        result = result[:partition_count]
         # Shuffle the partitions to avoid reading them in the same order on multiple instances
         _random.shuffle(result)
         return result
+
+    def get_message_batch(
+        self, conn: SAConnection, partition_number: int, message_count: int
+    ) -> Optional[SubscriptionMessageBatch[E]]:
+        lock_key = f"subscription-{self.name}-{partition_number}"
+        if not self._lock_provider.lock(lock_key):
+            return None
+
+        # now we have the lock, we need to get the current state of
+        # the partition to determine where to start reading
+        state = self._state_provider.read(self.name)
+        current_position = state.positions.get(partition_number, -1)
+        next_message_position = current_position + 1
+
+        message_pointers = list(
+            self._stream.read_slice(
+                partition=partition_number,
+                start=next_message_position,
+                count=message_count,
+                conn=conn,
+            )
+        )
+        if not message_pointers:
+            # No messages
+            self._lock_provider.unlock(lock_key)
+            return None
+
+        with self._stream._store.reader(conn=conn) as reader:
+            stored_messages = {
+                message.message_id: message
+                for message in reader.get_messages_by_ids(
+                    [pointer.message_id for pointer in message_pointers]
+                )
+            }
+        messages = [
+            SubscriptionMessage(
+                partition=pointer.partition,
+                position=pointer.position,
+                stored_message=stored_messages[pointer.message_id],
+                ack=NoAckOp(),
+            )
+            for pointer in message_pointers
+        ]
+        return SubscriptionMessageBatch(
+            partition=partition_number,
+            first_position=min(msg.position for msg in messages),
+            last_position=max(msg.position for msg in messages),
+            lock_key=lock_key,
+            messages=messages,
+        )
 
     def get_next_message_batch(
         self, count: int
@@ -273,53 +349,14 @@ class Subscription(Generic[E]):
         assert self._state_provider.initialized(self.name)
 
         with self._stream._store.engine.connect() as conn:
-            for partition_number in self._get_next_partitions(conn=conn):
-                lock_key = f"subscription-{self.name}-{partition_number}"
-                if not self._lock_provider.lock(lock_key):
-                    continue
-
-                # now we have the lock, we need to get the current state of
-                # the partition to determine where to start reading
-                state = self._state_provider.read(self.name)
-                current_position = state.positions.get(partition_number, -1)
-                next_message_position = current_position + 1
-
-                message_pointers = list(
-                    self._stream.read_slice(
-                        partition=partition_number,
-                        start=next_message_position,
-                        count=count,
-                        conn=conn,
-                    )
+            for partition_number in self.get_next_partitions(conn=conn):
+                batch = self.get_message_batch(
+                    conn=conn,
+                    partition_number=partition_number,
+                    message_count=count,
                 )
-                if not message_pointers:
-                    # No messages -> try the next partition
-                    self._lock_provider.unlock(lock_key)
-                    continue
-
-                with self._stream._store.reader(conn=conn) as reader:
-                    stored_messages = {
-                        message.message_id: message
-                        for message in reader.get_messages_by_ids(
-                            [pointer.message_id for pointer in message_pointers]
-                        )
-                    }
-                messages = [
-                    SubscriptionMessage(
-                        partition=pointer.partition,
-                        position=pointer.position,
-                        stored_message=stored_messages[pointer.message_id],
-                        ack=NoAckOp(),
-                    )
-                    for pointer in message_pointers
-                ]
-                return SubscriptionMessageBatch(
-                    partition=partition_number,
-                    first_position=min(msg.position for msg in messages),
-                    last_position=max(msg.position for msg in messages),
-                    lock_key=lock_key,
-                    messages=messages,
-                )
+                if batch:
+                    return batch
             return None
 
     def ack_message_batch(
@@ -362,6 +399,43 @@ class Subscription(Generic[E]):
                         ack.execute()
                     except AckRolledback:
                         # the message was not ack'd or the acknolwedgement was rolled back
+                        break
+        finally:
+            if batch:
+                self.unlock_message_batch(batch)
+
+    def get_next_messages_in_partition(
+        self, conn: SAConnection, partition_number: int, message_count: int
+    ) -> Iterator[SubscriptionMessage[E]]:
+        batch = None
+        try:
+            batch = self.get_message_batch(
+                conn=conn,
+                partition_number=partition_number,
+                message_count=message_count,
+            )
+            if batch:
+                for message in batch.messages:
+                    ack = AckOp(
+                        name=self.name,
+                        partition=message.partition,
+                        position=message.position,
+                        state_provider=self._state_provider,
+                    )
+
+                    yield SubscriptionMessage(
+                        partition=message.partition,
+                        position=message.position,
+                        stored_message=message.stored_message,
+                        ack=ack,
+                    )
+                    if ack.rolled_back:
+                        # the message was not ack'd or the acknowledgement was rolled back
+                        break
+                    try:
+                        ack.execute()
+                    except AckRolledback:
+                        # the message was not ack'd or the acknowledgement was rolled back
                         break
         finally:
             if batch:
@@ -505,6 +579,107 @@ class BatchedAckSubscriptionRunner(SubscriptionRunner[E]):
             if budget and budget.over_budget():
                 return RunOnNotificationResult.WORK_REMAINING
         return RunOnNotificationResult.DONE_FOR_NOW
+
+
+class PooledSubscriptionRunner(SubscriptionRunner[E]):
+    _executor: Executor
+
+    def __init__(
+        self,
+        subscription: Subscription[E],
+        message_handler: SubscriptionMessageHandler,
+        executor: Union[Executor, bool],
+        batch_size: Optional[int] = None,
+    ):
+        super().__init__(
+            subscription=subscription,
+            message_handler=message_handler,
+            batch_size=batch_size,
+        )
+        assert (
+            executor is not False
+        ), "Executor must be provided for pooled subscription runner"
+        self._own_executor = executor is True
+        if self._own_executor:
+            self._executor = ThreadPoolExecutor(
+                max_workers=5,
+                thread_name_prefix=f"depeche_db_subscription_pool_{subscription.name}",
+            )
+        else:
+            self._executor = executor  # type: ignore
+        self._active_partitions: Set[int] = set()
+        self._errors: List[Exception] = []
+
+    def run_once(self, budget: Optional[TimeBudget] = None) -> RunOnNotificationResult:
+        if self._errors:
+            if len(self._errors) > 1:
+                DEPECHE_LOGGER.error(
+                    f"Multiple errors occurred in subscription {self._subscription.name}: {self._errors}"
+                )
+            raise self._errors[0]
+
+        new_active_partitions = set()
+        with self._subscription._stream._store.engine.connect() as conn:
+            for partition_number in self._subscription.get_next_partitions(
+                conn=conn, partition_count=20
+            ):
+                if partition_number in self._active_partitions:
+                    # already processing this partition
+                    continue
+                self._active_partitions.add(partition_number)
+                new_active_partitions.add(partition_number)
+                self._executor.submit(self._process_partition, partition_number)
+        if not new_active_partitions:
+            return RunOnNotificationResult.DONE_FOR_NOW
+        return RunOnNotificationResult.WORK_REMAINING
+
+    def stop(self):
+        super().stop()
+        if self._own_executor:
+            self._executor.shutdown(wait=True)
+
+    def _process_partition(self, partition_number: int):
+        try:
+            with self._subscription._stream._store.engine.connect() as conn:
+                for message in self._subscription.get_next_messages_in_partition(
+                    conn=conn,
+                    partition_number=partition_number,
+                    message_count=self._batch_size,
+                ):
+                    if not self._keep_running:
+                        break
+                    self.handle(message)
+        except Exception as exc:
+            self._errors.append(exc)
+        finally:
+            self._active_partitions.remove(partition_number)
+
+
+class PooledBatchedAckSubscriptionRunner(PooledSubscriptionRunner[E]):
+    def _process_partition(self, partition_number: int):
+        try:
+            with self._subscription._stream._store.engine.connect() as conn:
+                message_batch = self._subscription.get_message_batch(
+                    conn=conn,
+                    partition_number=partition_number,
+                    message_count=self._batch_size,
+                )
+                if message_batch is None:
+                    return
+                try:
+                    for message in message_batch.messages:
+                        if not self._keep_running:
+                            break
+                        self.handle(message)
+                        message_batch.ack(message)
+                finally:
+                    self._subscription.ack_message_batch(
+                        message_batch=message_batch, success=True
+                    )
+        except Exception as exc:
+            self._errors.append(exc)
+        finally:
+            self._active_partitions.remove(partition_number)
 
 
 class StartAtNextMessage(SubscriptionStartPoint):
