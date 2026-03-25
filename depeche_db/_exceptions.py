@@ -8,3 +8,11 @@ class OptimisticConcurrencyError(Exception):
 
 class MessageIdMismatchError(ValueError):
     pass
+
+
+class StreamClosedError(Exception):
+    pass
+
+
+class StreamNotClosedError(Exception):
+    pass

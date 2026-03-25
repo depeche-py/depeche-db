@@ -312,11 +312,22 @@ class Subscription(Generic[E]):
                         ack=NoAckOp(),
                     )
                     for pointer in message_pointers
+                    if pointer.message_id in stored_messages
                 ]
+                if not messages:
+                    # All pointers in this batch pointed to deleted/archived
+                    # messages. Advance position past them.
+                    self._state_provider.store(
+                        subscription_name=self.name,
+                        partition=partition_number,
+                        position=max(p.position for p in message_pointers),
+                    )
+                    self._lock_provider.unlock(lock_key)
+                    continue
                 return SubscriptionMessageBatch(
                     partition=partition_number,
-                    first_position=min(msg.position for msg in messages),
-                    last_position=max(msg.position for msg in messages),
+                    first_position=message_pointers[0].position,
+                    last_position=message_pointers[-1].position,
                     lock_key=lock_key,
                     messages=messages,
                 )

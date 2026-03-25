@@ -12,7 +12,7 @@ from sqlalchemy.dialects.postgresql import JSONB as _PostgresJsonb
 from sqlalchemy_utils import UUIDType as _UUIDType
 
 from ._compat import PsycoPgJson, SAConnection
-from ._exceptions import OptimisticConcurrencyError
+from ._exceptions import OptimisticConcurrencyError, StreamClosedError
 from ._interfaces import MessagePosition
 
 
@@ -111,20 +111,13 @@ class Storage:
                         ).alias()
                     )
                 )
-        except _sa.exc.InternalError as exc:
-            # psycopg2
+        except (_sa.exc.InternalError, _sa.exc.ProgrammingError) as exc:
             from depeche_db._compat import PsycoPgRaiseException
 
             if isinstance(exc.orig, PsycoPgRaiseException):
-                raise OptimisticConcurrencyError(
-                    f"optimistic concurrency failure: {exc.orig}"
-                )
-            raise
-        except _sa.exc.ProgrammingError as exc:
-            # psycopg3
-            from depeche_db._compat import PsycoPgRaiseException
-
-            if isinstance(exc.orig, PsycoPgRaiseException):
+                msg = str(exc.orig)
+                if "Stream is closed" in msg:
+                    raise StreamClosedError(msg)
                 raise OptimisticConcurrencyError(
                     f"optimistic concurrency failure: {exc.orig}"
                 )
@@ -206,9 +199,103 @@ class Storage:
     def truncate(self, conn: SAConnection):
         conn.execute(self.message_table.delete())
 
+    def is_stream_closed(self, conn: SAConnection, stream: str) -> bool:
+        return self.get_close_message_id(conn, stream) is not None
+
+    def get_close_message_id(
+        self, conn: SAConnection, stream: str
+    ) -> Optional[_uuid.UUID]:
+        max_version = conn.execute(
+            _sa.select(_sa.func.max(self.message_table.c.version)).where(
+                self.message_table.c.stream == stream
+            )
+        ).scalar()
+        if max_version is None:
+            return None
+        row = conn.execute(
+            _sa.select(self.message_table.c.message_id).where(
+                _sa.and_(
+                    self.message_table.c.stream == stream,
+                    self.message_table.c.version == max_version,
+                    self.message_table.c.message.has_key("__depeche_closed"),
+                )
+            )
+        ).first()
+        return row.message_id if row else None
+
+    def copy_stream_to_archive(
+        self, conn: SAConnection, stream: str, archive_table: _sa.Table
+    ):
+        select_for_archive = _sa.select(
+            self.message_table.c.message_id,
+            self.message_table.c.global_position,
+            self.message_table.c.added_at,
+            self.message_table.c.stream,
+            self.message_table.c.version,
+            self.message_table.c.message,
+        ).where(self.message_table.c.stream == stream)
+        conn.execute(
+            archive_table.insert().from_select(
+                [
+                    "message_id",
+                    "global_position",
+                    "added_at",
+                    "stream",
+                    "version",
+                    "message",
+                ],
+                select_for_archive,
+            )
+        )
+
+    def delete_stream_messages(
+        self,
+        conn: SAConnection,
+        stream: str,
+        keep_closed: bool = True,
+    ):
+        condition = self.message_table.c.stream == stream
+        if keep_closed:
+            condition = _sa.and_(
+                condition,
+                ~self.message_table.c.message.has_key("__depeche_closed"),
+            )
+        conn.execute(self.message_table.delete().where(condition))
+
     @staticmethod
     def message_table_name(name: str) -> str:
         return f"depeche_msgs_{name}"
+
+    @staticmethod
+    def create_archive_table(name: str, engine: _sa.engine.Engine) -> _sa.Table:
+        """
+        Create an archive table for storing archived stream messages.
+
+        The table has the same columns as the message store table
+        (without the global_position sequence).
+
+        Args:
+            name: Table name (e.g. 'my_archive', 'archive_2026_03').
+            engine: SQLAlchemy engine.
+
+        Returns:
+            The created SQLAlchemy Table object.
+        """
+        metadata = _sa.MetaData()
+        table = _sa.Table(
+            name,
+            metadata,
+            _sa.Column("message_id", _UUIDType(), primary_key=True),
+            _sa.Column("global_position", _sa.Integer, nullable=False),
+            _sa.Column(
+                "added_at", _sa.DateTime, nullable=False, server_default=_sa.func.now()
+            ),
+            _sa.Column("stream", _sa.String(255), nullable=False),
+            _sa.Column("version", _sa.Integer, nullable=False),
+            _sa.Column("message", _PostgresJsonb, nullable=False),
+        )
+        metadata.create_all(engine, tables=[table], checkfirst=True)
+        return table
 
     @staticmethod
     def notification_channel_name(name: str) -> str:
@@ -303,6 +390,17 @@ def _write_message_fn(name: str, tablename: str) -> str:
 
           IF _stream_version IS NULL THEN
             _stream_version := 0;
+          END IF;
+
+          IF _stream_version > 0 THEN
+            PERFORM 1 FROM {tablename}
+            WHERE {tablename}.stream = {function_name}.stream
+              AND {tablename}.version = _stream_version
+              AND {tablename}.message ? '__depeche_closed';
+
+            IF FOUND THEN
+              RAISE EXCEPTION 'Stream is closed: %%', {function_name}.stream;
+            END IF;
           END IF;
 
           IF {function_name}.expected_version IS NOT NULL THEN
