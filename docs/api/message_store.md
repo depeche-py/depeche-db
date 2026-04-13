@@ -5,3 +5,5 @@
 ::: depeche_db.MessageSerializer
     options:
       show_signature_annotations: true
+---
+::: depeche_db.Storage.create_archive_table

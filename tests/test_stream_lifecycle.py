@@ -1,5 +1,7 @@
 """Tests for stream closing, archiving, and subscription resilience."""
 
+import uuid
+
 import pytest
 
 from depeche_db import (
@@ -90,7 +92,7 @@ def test_close_event_flows_through_pipeline(
     stream.projector.update_full()
 
     sub = subscription_factory(stream)
-    all_message_ids = set()
+    all_message_ids: set[uuid.UUID] = set()
     for _ in range(10):
         messages = list(sub.get_next_messages(count=100))
         if not messages:
