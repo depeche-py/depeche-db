@@ -25,6 +25,7 @@ nav:
     - Data model: concepts/data-model.md
     - The journey of a message: concepts/journey-of-a-message.md
     - Subscriptions: concepts/subscriptions.md
+    - Stream lifecycle: concepts/stream-lifecycle.md
   - API Docs:
     - MessageStore: api/message_store.md
     - AggregatedStream: api/aggregated_stream.md

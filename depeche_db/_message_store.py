@@ -1,11 +1,27 @@
 import contextlib as _contextlib
 import uuid as _uuid
-from typing import Generic, Iterator, Optional, Protocol, Sequence, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Generic,
+    Iterator,
+    List,
+    Optional,
+    Protocol,
+    Sequence,
+    TypeVar,
+)
 
 import sqlalchemy as _sa
 
 from ._compat import SAConnection
-from ._exceptions import MessageIdMismatchError, MessageNotFound
+from ._exceptions import (
+    MessageIdMismatchError,
+    MessageNotFound,
+    StreamNotClosedError,
+)
+
+if TYPE_CHECKING:
+    from ._aggregated_stream import AggregatedStream
 from ._factories import AggregatedStreamFactory
 from ._interfaces import (
     MessagePosition,
@@ -182,7 +198,21 @@ class MessageStoreReader(Generic[E]):
             )
 
 
+class _ClosedStreamAwareSerializer(Generic[E]):
+    def __init__(self, inner: MessageSerializer[E]):
+        self._inner = inner
+
+    def serialize(self, message: E) -> dict:
+        return self._inner.serialize(message)
+
+    def deserialize(self, message: dict) -> E:
+        clean = {k: v for k, v in message.items() if k != "__depeche_closed"}
+        return self._inner.deserialize(clean)
+
+
 class MessageStore(Generic[E]):
+    _aggregated_streams: List["AggregatedStream[E]"]
+
     def __init__(
         self,
         name: str,
@@ -203,7 +233,8 @@ class MessageStore(Generic[E]):
         """
         self.engine = engine
         self._storage = Storage(name=name, engine=engine)
-        self._serializer = serializer
+        self._serializer = _ClosedStreamAwareSerializer(serializer)
+        self._aggregated_streams = []
         self.aggregated_stream = AggregatedStreamFactory(store=self)
 
     def _get_connection(self) -> SAConnection:
@@ -412,3 +443,106 @@ class MessageStore(Generic[E]):
         """
         with self.reader() as reader:
             yield from reader.read(stream, min_version)
+
+    def close_stream(
+        self,
+        stream: str,
+        message: E,
+        expected_version: int,
+        conn: Optional[SAConnection] = None,
+    ) -> MessagePosition:
+        """
+        Close a stream by writing a tombstone message.
+
+        After closing, no further messages can be written to the stream.
+        The close message flows through the normal pipeline (projector,
+        aggregated streams, subscriptions) so consumers can react to it.
+
+        Args:
+            stream: The name of the stream to close.
+            message: The close message (user-provided, implements MessageProtocol).
+            expected_version: The expected current version of the stream (required).
+            conn: Optional database connection for transactional use.
+
+        Returns:
+            MessagePosition: The position of the close message.
+
+        Raises:
+            OptimisticConcurrencyError: If the stream version doesn't match.
+            StreamClosedError: If the stream is already closed.
+        """
+        serialized = self._serializer.serialize(message)
+        serialized["__depeche_closed"] = True
+        if conn is None:
+            with self._get_connection() as conn:
+                result = self._storage.add(
+                    conn=conn,
+                    stream=stream,
+                    expected_version=expected_version,
+                    message_id=message.get_message_id(),
+                    message=serialized,
+                )
+                conn.commit()
+                return result
+        else:
+            return self._storage.add(
+                conn=conn,
+                stream=stream,
+                expected_version=expected_version,
+                message_id=message.get_message_id(),
+                message=serialized,
+            )
+
+    def archive_stream(
+        self,
+        stream: str,
+        archive_table: "_sa.Table",
+        conn: Optional[SAConnection] = None,
+    ):
+        """
+        Archive a closed stream.
+
+        Copies all messages (including the close event) to the given archive
+        table, then deletes all non-close messages from the main table and
+        removes aggregated stream pointers (except for the close event).
+
+        The close message (tombstone) remains in the main table permanently,
+        preventing re-use of the stream name.
+
+        Use `Storage.create_archive_table()` to create archive tables.
+
+        Args:
+            stream: The name of the stream to archive.
+            archive_table: The SQLAlchemy Table to copy messages into.
+            conn: Optional database connection. If not provided, a new
+                connection is created and the operation is committed. If
+                provided, **you must commit the transaction yourself**.
+
+        Raises:
+            StreamNotClosedError: If the stream is not closed.
+        """
+        if conn is None:
+            with self._get_connection() as conn:
+                self._archive_stream(conn, stream, archive_table)
+                conn.commit()
+        else:
+            self._archive_stream(conn, stream, archive_table)
+
+    def _archive_stream(
+        self, conn: SAConnection, stream: str, archive_table: "_sa.Table"
+    ):
+        close_message_id = self._storage.get_close_message_id(conn, stream)
+        if close_message_id is None:
+            raise StreamNotClosedError(
+                f"Stream '{stream}' is not closed. Call close_stream() first."
+            )
+
+        self._storage.copy_stream_to_archive(conn, stream, archive_table)
+        self._storage.delete_stream_messages(conn, stream, keep_closed=True)
+
+        for agg_stream in self._aggregated_streams:
+            agg_stream.remove_origin_stream(
+                origin_stream=stream,
+                conn=conn,
+                exclude_message_ids=[close_message_id],
+            )

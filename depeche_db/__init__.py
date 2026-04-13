@@ -10,6 +10,8 @@ from ._exceptions import (  # noqa: F401
     MessageIdMismatchError,
     MessageNotFound,
     OptimisticConcurrencyError,
+    StreamClosedError,
+    StreamNotClosedError,
 )
 from ._executor import Executor  # noqa: F401
 from ._factories import AggregatedStreamFactory, SubscriptionFactory  # noqa: F401

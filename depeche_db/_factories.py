@@ -59,7 +59,7 @@ class AggregatedStreamFactory(Generic[E]):
         """
         from ._aggregated_stream import AggregatedStream
 
-        return AggregatedStream(
+        stream = AggregatedStream(
             store=self._store,
             name=name,
             partitioner=partitioner,
@@ -67,6 +67,8 @@ class AggregatedStreamFactory(Generic[E]):
             update_batch_size=update_batch_size,
             lookback_for_gaps_hours=lookback_for_gaps_hours,
         )
+        self._store._aggregated_streams.append(stream)
+        return stream
 
 
 class SubscriptionFactory(Generic[E]):

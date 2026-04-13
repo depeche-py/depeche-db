@@ -117,8 +117,8 @@ class SubscriptionMessageBatch(Generic[E]):
                 self.ackd_position = message.position
             else:
                 assert (
-                    self.ackd_position + 1 == message.position
-                ), "You cannot leave gaps in the acknowledged messages"
+                    self.ackd_position < message.position
+                ), "Messages must be acknowledged in order"
                 self.ackd_position = message.position
         else:
             raise ValueError("Message not found in the batch")

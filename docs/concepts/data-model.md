@@ -31,6 +31,9 @@ Messages in a stream are ordered. Their position within the stream is called
 Usually, a stream will be relatively small because it only contains messages
 concerning a single domain object.
 
+Streams can be [closed and archived](stream-lifecycle.md) to manage storage
+growth.
+
 
 ## Message store
 

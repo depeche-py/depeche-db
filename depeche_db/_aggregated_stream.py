@@ -3,6 +3,7 @@ import datetime as _dt
 import logging as _logging
 import re as _re
 import textwrap as _textwrap
+import uuid as _uuid
 from collections import namedtuple
 from typing import (
     TYPE_CHECKING,
@@ -148,6 +149,28 @@ class AggregatedStream(Generic[E]):
         Truncate aggregated stream.
         """
         conn.execute(self._table.delete())
+
+    def remove_origin_stream(
+        self,
+        origin_stream: str,
+        conn: SAConnection,
+        exclude_message_ids: Optional[List["_uuid.UUID"]] = None,
+    ):
+        """
+        Remove all pointers for an origin stream from the aggregated stream.
+
+        Args:
+            origin_stream: The origin stream name to remove.
+            conn: A database connection.
+            exclude_message_ids: Message IDs to keep (e.g., the close event).
+        """
+        condition = self._table.c.origin_stream == origin_stream
+        if exclude_message_ids:
+            condition = _sa.and_(
+                condition,
+                self._table.c.message_id.notin_(exclude_message_ids),
+            )
+        conn.execute(self._table.delete().where(condition))
 
     def read(
         self, partition: int, conn: Optional[SAConnection] = None
