@@ -3,6 +3,8 @@ import datetime as _dt
 import logging as _logging
 import re as _re
 import textwrap as _textwrap
+import time as _time
+from collections import defaultdict as _defaultdict
 from collections import namedtuple
 from typing import (
     TYPE_CHECKING,
@@ -600,6 +602,33 @@ FullUpdateResult = namedtuple(
 )
 
 
+class ProjectorTimings:
+    """
+    Opt-in timing for StreamProjector sub-stages. Disabled by default — the
+    span() context manager is a near no-op when ``enabled`` is False.
+
+    When enabled, per-stage wall-clock samples are appended to ``samples``.
+    """
+
+    def __init__(self, enabled: bool = False) -> None:
+        self.enabled = enabled
+        self.samples: Dict[str, List[float]] = _defaultdict(list)
+
+    @_contextlib.contextmanager
+    def span(self, name: str):
+        if not self.enabled:
+            yield
+            return
+        t0 = _time.perf_counter()
+        try:
+            yield
+        finally:
+            self.samples[name].append(_time.perf_counter() - t0)
+
+    def reset(self) -> None:
+        self.samples = _defaultdict(list)
+
+
 class StreamProjector(Generic[E]):
     def __init__(
         self,
@@ -633,6 +662,7 @@ class StreamProjector(Generic[E]):
             OriginStreamPositionsCache
         ] = None
         self._checked_maxpos_table = False
+        self.timings = ProjectorTimings(enabled=False)
 
     def interested_in_notification(self, notification: dict) -> bool:
         # Check if the projector is interested in the notification.
@@ -677,35 +707,43 @@ class StreamProjector(Generic[E]):
         """
         result = 0
         batch_num = 0
-        with self.stream._store.engine.connect() as conn:
-            cutoff = self.stream._store._storage.get_global_position(conn)
-            try:
-                conn.execute(
-                    _sa.text(
-                        f"LOCK TABLE {self.stream._table.name} IN EXCLUSIVE MODE NOWAIT"
-                    )
-                )
-            except _sa.exc.OperationalError as exc:
-                if isinstance(exc.orig, PsycoPgLockNotAvailable):
-                    self._aggregate_stream_positions_cache = None
-                    raise _AlreadyUpdating(
-                        "Cannot update stream projection, because another process is already updating it."
-                    )
-                raise
+        with self.timings.span("update_full"):
+            with self.stream._store.engine.connect() as conn:
+                with self.timings.span("get_global_position"):
+                    cutoff = self.stream._store._storage.get_global_position(conn)
+                try:
+                    with self.timings.span("lock_table"):
+                        conn.execute(
+                            _sa.text(
+                                f"LOCK TABLE {self.stream._table.name} IN EXCLUSIVE MODE NOWAIT"
+                            )
+                        )
+                except _sa.exc.OperationalError as exc:
+                    if isinstance(exc.orig, PsycoPgLockNotAvailable):
+                        self._aggregate_stream_positions_cache = None
+                        raise _AlreadyUpdating(
+                            "Cannot update stream projection, because another process is already updating it."
+                        )
+                    raise
 
-            self._check_and_create_maxpos_table(conn)
+                with self.timings.span("check_maxpos_table"):
+                    self._check_and_create_maxpos_table(conn)
 
-            while True:
-                batch_num = self._update_batch(conn, cutoff)
-                result += batch_num
-                LOGGER.debug(f"{self.stream.name}: Batch updated: {batch_num} messages")
-                if batch_num < self.batch_size:
-                    # No more messages to process
-                    break
-                if budget and budget.over_budget():
-                    # Budget exceeded, stop processing
-                    break
-            conn.commit()
+                while True:
+                    with self.timings.span("update_batch"):
+                        batch_num = self._update_batch(conn, cutoff)
+                    result += batch_num
+                    LOGGER.debug(
+                        f"{self.stream.name}: Batch updated: {batch_num} messages"
+                    )
+                    if batch_num < self.batch_size:
+                        # No more messages to process
+                        break
+                    if budget and budget.over_budget():
+                        # Budget exceeded, stop processing
+                        break
+                with self.timings.span("commit"):
+                    conn.commit()
         return FullUpdateResult(result, batch_num == self.batch_size)
 
     def _check_and_create_maxpos_table(self, conn: SAConnection) -> None:
@@ -860,21 +898,24 @@ class StreamProjector(Generic[E]):
     def _select_origin_streams(
         self, conn: SAConnection, cutoff: Optional[int] = None
     ) -> List[SelectedOriginStream]:
-        head = self._get_aggregated_stream_head(conn)
+        with self.timings.span("select.head"):
+            head = self._get_aggregated_stream_head(conn)
         if head.global_position > 0:
-            estimated_gap_look_back_start = self._estimate_gap_look_back_start(
-                conn, head.added_at
-            )
+            with self.timings.span("select.lookback_estimate"):
+                estimated_gap_look_back_start = self._estimate_gap_look_back_start(
+                    conn, head.added_at
+                )
         else:
             estimated_gap_look_back_start = 0
         LOGGER.debug(
             f"{self.stream.name}: Estimated gap look back start: {estimated_gap_look_back_start}"
         )
 
-        stream_positions = self.get_aggregate_stream_positions(
-            conn,
-            estimated_gap_look_back_start=estimated_gap_look_back_start,
-        )
+        with self.timings.span("select.aggregated_positions"):
+            stream_positions = self.get_aggregate_stream_positions(
+                conn,
+                estimated_gap_look_back_start=estimated_gap_look_back_start,
+            )
 
         candidate_streams: List[SelectedOriginStream] = []
         if self._get_origin_stream_positions_cache is not None:
@@ -883,11 +924,12 @@ class StreamProjector(Generic[E]):
                 == estimated_gap_look_back_start
             ):
                 # We are using the cached origin streams
-                candidate_streams = self._calculate_selected_streams(
-                    origin_streams=self._get_origin_stream_positions_cache.origin_streams,
-                    stream_positions=stream_positions,
-                    estimated_gap_look_back_start=estimated_gap_look_back_start,
-                )
+                with self.timings.span("select.calculate_cached"):
+                    candidate_streams = self._calculate_selected_streams(
+                        origin_streams=self._get_origin_stream_positions_cache.origin_streams,
+                        stream_positions=stream_positions,
+                        estimated_gap_look_back_start=estimated_gap_look_back_start,
+                    )
                 if candidate_streams:
                     LOGGER.debug(
                         f"{self.stream.name}: Found {len(candidate_streams)} candidate streams (using cached origin streams)"
@@ -895,20 +937,22 @@ class StreamProjector(Generic[E]):
         if not candidate_streams:
             # Cached origin streams either did not give us any candidates or
             # were not available.
-            origin_streams = self.get_origin_stream_positions(
-                conn=conn,
-                min_global_position=estimated_gap_look_back_start,
-                max_global_position=cutoff,
-            )
+            with self.timings.span("select.origin_positions"):
+                origin_streams = self.get_origin_stream_positions(
+                    conn=conn,
+                    min_global_position=estimated_gap_look_back_start,
+                    max_global_position=cutoff,
+                )
             self._get_origin_stream_positions_cache = OriginStreamPositionsCache(
                 estimated_gap_look_back_start=estimated_gap_look_back_start,
                 origin_streams=origin_streams,
             )
-            candidate_streams = self._calculate_selected_streams(
-                origin_streams=origin_streams,
-                stream_positions=stream_positions,
-                estimated_gap_look_back_start=estimated_gap_look_back_start,
-            )
+            with self.timings.span("select.calculate_live"):
+                candidate_streams = self._calculate_selected_streams(
+                    origin_streams=origin_streams,
+                    stream_positions=stream_positions,
+                    estimated_gap_look_back_start=estimated_gap_look_back_start,
+                )
             LOGGER.debug(
                 f"{self.stream.name}: Found {len(candidate_streams)} candidate streams (using live origin streams)"
             )
@@ -958,7 +1002,8 @@ class StreamProjector(Generic[E]):
     def _update_batch(self, conn: SAConnection, cutoff: Optional[int] = None) -> int:
         message_table = self.stream._store._storage.message_table
 
-        selected_origin_streams = self._select_origin_streams(conn, cutoff=cutoff)
+        with self.timings.span("select_origin_streams"):
+            selected_origin_streams = self._select_origin_streams(conn, cutoff=cutoff)
         if not selected_origin_streams:
             return 0
 
@@ -997,49 +1042,62 @@ class StreamProjector(Generic[E]):
             .order_by(message_table.c.global_position)
             .limit(self.batch_size)
         )
-        messages = list(conn.execute(qry).fetchall())
+        with self.timings.span("read_messages"):
+            messages = list(conn.execute(qry).fetchall())
 
         LOGGER.debug(f"{self.stream.name}: Found {len(messages)} new messages")
         if not messages:
             return 0
 
-        self._add(conn, messages)
+        with self.timings.span("add"):
+            self._add(conn, messages)
         return len(messages)
 
     def _add(self, conn: SAConnection, messages: List[SARow]) -> None:
-        positions = self.stream.get_max_aggregated_stream_positions(conn)
+        with self.timings.span("add.get_maxpos"):
+            positions = self.stream.get_max_aggregated_stream_positions(conn)
 
-        rows = []
-        updated_positions = {}
-        for message_id, stream, version, message, global_position, added_at in messages:
-            message = StoredMessage(
-                message_id=message_id,
-                stream=stream,
-                version=version,
-                message=self.stream._store._serializer.deserialize(message),
-                global_position=global_position,
-                added_at=added_at,
-            )
-            partition = self.partitioner.get_partition(message)
-            if partition < 0:
-                raise ValueError("partition must be >= 0")
-            position = positions.get(partition, -1) + 1
-            positions[partition] = position
-            updated_positions[partition] = position
-            rows.append(
-                (
-                    message_id,
-                    stream,
-                    version,
-                    partition,
-                    position,
-                    message.message.get_message_time(),
-                    global_position,
-                    added_at,
+        with self.timings.span("add.deserialize_and_partition"):
+            rows = []
+            updated_positions = {}
+            for (
+                message_id,
+                stream,
+                version,
+                message,
+                global_position,
+                added_at,
+            ) in messages:
+                message = StoredMessage(
+                    message_id=message_id,
+                    stream=stream,
+                    version=version,
+                    message=self.stream._store._serializer.deserialize(message),
+                    global_position=global_position,
+                    added_at=added_at,
                 )
-            )
+                partition = self.partitioner.get_partition(message)
+                if partition < 0:
+                    raise ValueError("partition must be >= 0")
+                position = positions.get(partition, -1) + 1
+                positions[partition] = position
+                updated_positions[partition] = position
+                rows.append(
+                    (
+                        message_id,
+                        stream,
+                        version,
+                        partition,
+                        position,
+                        message.message.get_message_time(),
+                        global_position,
+                        added_at,
+                    )
+                )
 
-        conn.execute(self.stream._table.insert().values(rows))
-        self.stream._update_max_aggregated_stream_positions(
-            conn=conn, positions=updated_positions
-        )
+        with self.timings.span("add.insert_rows"):
+            conn.execute(self.stream._table.insert().values(rows))
+        with self.timings.span("add.update_maxpos"):
+            self.stream._update_max_aggregated_stream_positions(
+                conn=conn, positions=updated_positions
+            )
