@@ -168,11 +168,11 @@ def test_stream_projector_cutoff(db_engine, store_factory, stream_factory, accou
 
     orig_projector_add = subject.projector._add
 
-    def slow_projector_add(conn, messages):
+    def slow_projector_add(conn, messages, **kwargs):
         import time
 
         time.sleep(0.2)
-        orig_projector_add(conn, messages)
+        orig_projector_add(conn, messages, **kwargs)
 
     subject.projector._add = slow_projector_add
 

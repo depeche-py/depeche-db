@@ -14,6 +14,7 @@ from typing import (
     Iterator,
     List,
     Optional,
+    Set,
     Tuple,
     TypeVar,
 )
@@ -768,7 +769,6 @@ class StreamProjector(Generic[E]):
                         )
                 except _sa.exc.OperationalError as exc:
                     if isinstance(exc.orig, PsycoPgLockNotAvailable):
-                        self._aggregate_stream_positions_cache = None
                         raise _AlreadyUpdating(
                             "Cannot update stream projection, because another process is already updating it."
                         )
@@ -777,9 +777,25 @@ class StreamProjector(Generic[E]):
                 with self.timings.span("check_maxpos_table"):
                     self._check_and_create_maxpos_table(conn)
 
+                # Read the per-partition maxpos once and mutate the dict in
+                # memory across batches, writing it back once at the end.
+                # The omax table can't be hoisted the same way:
+                # _select_origin_streams reads it from the DB on every batch
+                # to decide which streams are still behind, so omax has to be
+                # written per batch for the next iteration to see the right
+                # state.
+                with self.timings.span("get_maxpos"):
+                    maxpos = self.stream.get_max_aggregated_stream_positions(conn)
+                touched_partitions: Set[int] = set()
+
                 while True:
                     with self.timings.span("update_batch"):
-                        batch_num = self._update_batch(conn, cutoff)
+                        batch_num = self._update_batch(
+                            conn,
+                            cutoff,
+                            maxpos=maxpos,
+                            touched_partitions=touched_partitions,
+                        )
                     result += batch_num
                     LOGGER.debug(
                         f"{self.stream.name}: Batch updated: {batch_num} messages"
@@ -790,6 +806,14 @@ class StreamProjector(Generic[E]):
                     if budget and budget.over_budget():
                         # Budget exceeded, stop processing
                         break
+
+                if touched_partitions:
+                    with self.timings.span("update_maxpos"):
+                        self.stream._update_max_aggregated_stream_positions(
+                            conn=conn,
+                            positions={p: maxpos[p] for p in touched_partitions},
+                        )
+
                 with self.timings.span("commit"):
                     conn.commit()
         return FullUpdateResult(result, batch_num == self.batch_size)
@@ -941,24 +965,13 @@ class StreamProjector(Generic[E]):
     def _select_origin_streams(
         self, conn: SAConnection, cutoff: Optional[int] = None
     ) -> List[SelectedOriginStream]:
-        # Single joined query against the two meta tables: returns only
-        # streams that are actually behind, with their start-at position
-        # already computed SQL-side. Replaces the prior two-roundtrip
-        # fetch-everything-then-join-in-Python approach (which transferred
-        # one row per known stream regardless of how many were behind).
+        # Single joined query against the two meta tables: returns only the
+        # origin streams that are actually behind (msgs_meta has more than
+        # has been projected into omax), with start_at already computed
+        # SQL-side. Limited to batch_size candidates ordered by start
+        # position so the per-batch read covers the lowest-position work
+        # first.
         del cutoff  # _update_batch caps by cutoff when reading messages
-        with self.timings.span("select.head"):
-            head = self._get_aggregated_stream_head(conn)
-        if head.global_position > 0:
-            with self.timings.span("select.lookback_estimate"):
-                estimated_gap_look_back_start = self._estimate_gap_look_back_start(
-                    conn, head.added_at
-                )
-        else:
-            estimated_gap_look_back_start = 0
-        LOGGER.debug(
-            f"{self.stream.name}: Estimated gap look back start: {estimated_gap_look_back_start}"
-        )
 
         msgs_meta = self.stream._store._storage.meta_table
         omax = self.stream._origin_meta_table
@@ -966,15 +979,13 @@ class StreamProjector(Generic[E]):
         agg_max_or_minus_one = _sa.func.coalesce(
             omax.c.max_aggregated_origin_global_position, -1
         )
-        # For never-projected streams the start is the stream's first message
-        # (clamped to the lookback start). For partially-projected streams it
-        # is the next position after what we already have.
+        # For never-projected streams: start at the stream's first ever
+        # message. For partially-projected streams: the next position after
+        # what we already have.
         start_at_expr = _sa.case(
             (
                 omax.c.max_aggregated_origin_global_position.is_(None),
-                _sa.func.greatest(
-                    msgs_meta.c.min_global_position, estimated_gap_look_back_start
-                ),
+                msgs_meta.c.min_global_position,
             ),
             else_=omax.c.max_aggregated_origin_global_position + 1,
         )
@@ -990,7 +1001,6 @@ class StreamProjector(Generic[E]):
             .where(
                 _sa.and_(
                     msgs_meta.c.max_global_position > agg_max_or_minus_one,
-                    msgs_meta.c.max_global_position >= estimated_gap_look_back_start,
                     _sa.or_(
                         *[
                             msgs_meta.c.stream.like(wildcard)
@@ -1015,7 +1025,17 @@ class StreamProjector(Generic[E]):
         LOGGER.debug(f"{self.stream.name}: Found {len(candidates)} candidate streams")
         return candidates
 
-    def _update_batch(self, conn: SAConnection, cutoff: Optional[int] = None) -> int:
+    def _update_batch(
+        self,
+        conn: SAConnection,
+        cutoff: Optional[int] = None,
+        *,
+        maxpos: Optional[Dict[int, int]] = None,
+        touched_partitions: Optional[Set[int]] = None,
+    ) -> int:
+        # When called from update_full we get the shared maxpos/touched state
+        # passed in; when called directly (rare, mostly tests) we fall back
+        # to a per-call maxpos read+write inside _add.
         message_table = self.stream._store._storage.message_table
 
         with self.timings.span("select_origin_streams"):
@@ -1066,19 +1086,40 @@ class StreamProjector(Generic[E]):
             return 0
 
         with self.timings.span("add"):
-            self._add(conn, messages)
+            self._add(
+                conn,
+                messages,
+                maxpos=maxpos,
+                touched_partitions=touched_partitions,
+            )
         return len(messages)
 
-    def _add(self, conn: SAConnection, messages: List[SARow]) -> None:
-        with self.timings.span("add.get_maxpos"):
-            positions = self.stream.get_max_aggregated_stream_positions(conn)
+    def _add(
+        self,
+        conn: SAConnection,
+        messages: List[SARow],
+        *,
+        maxpos: Optional[Dict[int, int]] = None,
+        touched_partitions: Optional[Set[int]] = None,
+    ) -> None:
+        # If the caller (update_full) didn't supply shared maxpos state, we
+        # fall back to per-batch read+write — preserves the older direct-call
+        # API used in some tests.
+        standalone_maxpos = maxpos is None
+        if standalone_maxpos:
+            with self.timings.span("add.get_maxpos"):
+                maxpos = self.stream.get_max_aggregated_stream_positions(conn)
+            touched_partitions = set()
+        assert maxpos is not None
+        assert touched_partitions is not None
+
+        # omax is always tracked per batch and written at the end of the
+        # batch so the next iteration's _select_origin_streams sees the
+        # updated state via the omax table.
+        origin_max_in_batch: Dict[str, int] = {}
 
         with self.timings.span("add.deserialize_and_partition"):
             rows = []
-            updated_positions = {}
-            # Highest origin_stream_global_position seen per origin stream in
-            # this batch — used to UPSERT the origin_meta table.
-            origin_max_in_batch: Dict[str, int] = {}
             for (
                 message_id,
                 stream,
@@ -1098,9 +1139,9 @@ class StreamProjector(Generic[E]):
                 partition = self.partitioner.get_partition(message)
                 if partition < 0:
                     raise ValueError("partition must be >= 0")
-                position = positions.get(partition, -1) + 1
-                positions[partition] = position
-                updated_positions[partition] = position
+                position = maxpos.get(partition, -1) + 1
+                maxpos[partition] = position
+                touched_partitions.add(partition)
                 if global_position > origin_max_in_batch.get(stream, -1):
                     origin_max_in_batch[stream] = global_position
                 rows.append(
@@ -1118,9 +1159,12 @@ class StreamProjector(Generic[E]):
 
         with self.timings.span("add.insert_rows"):
             conn.execute(self.stream._table.insert().values(rows))
-        with self.timings.span("add.update_maxpos"):
-            self.stream._update_max_aggregated_stream_positions(
-                conn=conn, positions=updated_positions
-            )
         with self.timings.span("add.update_origin_meta"):
             self.stream._update_origin_meta(conn=conn, origin_max=origin_max_in_batch)
+
+        if standalone_maxpos:
+            with self.timings.span("add.update_maxpos"):
+                self.stream._update_max_aggregated_stream_positions(
+                    conn=conn,
+                    positions={p: maxpos[p] for p in touched_partitions},
+                )
