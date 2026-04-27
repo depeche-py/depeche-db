@@ -87,16 +87,9 @@ def test_stream_projector_origin_selection(
     account2.credit(100)
     account_repo.save(account2, expected_version=0)
 
-    # because of the cached origin streams, the projector will not update
-    # right away...
-    assert get_select_origin_streams() == [
-        SelectedOriginStream(
-            stream=f"account-{account.id}", start_at_global_position=1
-        ),
-    ]
-
-    # ... but only when the cache is cleared
-    subject.projector._get_origin_stream_positions_cache = None
+    # New streams show up immediately — _select_origin_streams reads the
+    # meta tables fresh on every call, so there is no per-call caching that
+    # would hide the new account2 stream.
     assert get_select_origin_streams() == [
         SelectedOriginStream(
             stream=f"account-{account.id}", start_at_global_position=1

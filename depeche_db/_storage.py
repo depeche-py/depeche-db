@@ -45,6 +45,18 @@ class Storage:
                 "stream", "version", name=f"depeche_msgs_{name}_version_uq"
             ),
         )
+        # Per-stream meta: the lowest and highest global_position written for
+        # each stream. Maintained by the INSERT trigger so the projector can
+        # avoid the slow GROUP BY scan it would otherwise need to discover
+        # stream positions. min_global_position is set on first insert and
+        # never updated; max_global_position grows monotonically.
+        self.meta_table = _sa.Table(
+            self.meta_table_name(name),
+            self.metadata,
+            _sa.Column("stream", _sa.String(255), primary_key=True),
+            _sa.Column("min_global_position", _sa.Integer, nullable=False),
+            _sa.Column("max_global_position", _sa.Integer, nullable=False),
+        )
         self.notification_channel = self.notification_channel_name(name)
         ddl = _sa.DDL(
             "\n".join(
@@ -52,6 +64,7 @@ class Storage:
                     _notify_trigger(
                         name=name,
                         tablename=self.message_table.name,
+                        meta_tablename=self.meta_table.name,
                         notification_channel=self.notification_channel,
                     ),
                     _write_message_fn(name=name, tablename=self.message_table.name),
@@ -60,6 +73,22 @@ class Storage:
         )
         _sa.event.listen(
             self.message_table, "after_create", ddl.execute_if(dialect="postgresql")
+        )
+        # Backfill the meta table from existing rows on first creation. The
+        # event fires only when the meta table is actually created, so this is
+        # idempotent.
+        backfill = _sa.DDL(
+            f"""
+            INSERT INTO {self.meta_table.name}
+                (stream, min_global_position, max_global_position)
+            SELECT stream, MIN(global_position), MAX(global_position)
+            FROM {self.message_table.name}
+            GROUP BY stream
+            ON CONFLICT (stream) DO NOTHING;
+            """
+        )
+        _sa.event.listen(
+            self.meta_table, "after_create", backfill.execute_if(dialect="postgresql")
         )
         self.metadata.create_all(engine, checkfirst=True)
         self._select = _sa.select(
@@ -211,6 +240,10 @@ class Storage:
         return f"depeche_msgs_{name}"
 
     @staticmethod
+    def meta_table_name(name: str) -> str:
+        return f"depeche_msgs_{name}_meta"
+
+    @staticmethod
     def notification_channel_name(name: str) -> str:
         return f"depeche_{name}_messages"
 
@@ -225,6 +258,7 @@ class Storage:
                 _notify_trigger(
                     name=name,
                     tablename=tablename,
+                    meta_tablename=cls.meta_table_name(name),
                     notification_channel=cls.notification_channel_name(name),
                 ),
                 _write_message_fn(name=name, tablename=tablename),
@@ -247,13 +281,23 @@ class Storage:
         conn.execute(cls.get_migration_ddl(name=name))
 
 
-def _notify_trigger(name: str, tablename: str, notification_channel: str) -> str:
+def _notify_trigger(
+    name: str, tablename: str, meta_tablename: str, notification_channel: str
+) -> str:
     trigger_name = f"depeche_storage_new_msg_{name}"
     return f"""
         CREATE OR REPLACE FUNCTION {trigger_name}()
           RETURNS trigger AS $$
         DECLARE
         BEGIN
+          INSERT INTO {meta_tablename}
+            (stream, min_global_position, max_global_position)
+          VALUES (NEW.stream, NEW.global_position, NEW.global_position)
+          ON CONFLICT (stream) DO UPDATE
+            SET max_global_position = GREATEST(
+              {meta_tablename}.max_global_position,
+              EXCLUDED.max_global_position
+            );
           PERFORM pg_notify(
             '{notification_channel}',
             json_build_object(
