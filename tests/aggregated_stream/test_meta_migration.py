@@ -30,6 +30,7 @@ from tests.conftest import MyPartitioner
 # char of account_id as an int) doesn't blow up.
 ACCT_A_ID = _uuid.UUID("aaaaaaaa-0000-0000-0000-000000000001")
 ACCT_B_ID = _uuid.UUID("bbbbbbbb-0000-0000-0000-000000000002")
+ACCT_C_ID = _uuid.UUID("cccccccc-0000-0000-0000-000000000003")
 
 
 # --- helpers --------------------------------------------------------------
@@ -284,6 +285,189 @@ def test_full_upgrade_round_trip(db_engine, identifier, store_factory, stream_fa
     assert result.n_updated_messages == 1
     assert _agg_message_count(db_engine, stream.name) == 3
     assert _omax_rows(db_engine, stream.name)[f"account-{acct.id}"] == 3
+
+
+def test_backfill_handles_multiple_streams(
+    db_engine, identifier, store_factory, stream_factory
+):
+    """
+    Backfill must compute the correct min / max per stream when many streams
+    are present, and produce empty meta tables when the source is empty.
+    """
+    store = store_factory()
+    stream = stream_factory(store)
+    repo = AccountRepository(store)
+
+    # 3 streams with different shapes:
+    #   A: 2 messages (positions 1..2)
+    #   B: 3 messages (positions 3..5)
+    #   C: 1 message  (position 6)
+    acct_a = Account.register(id=ACCT_A_ID, owner_id=_uuid.uuid4(), number="1")
+    acct_a.credit(100)
+    repo.save(acct_a, expected_version=0)
+
+    acct_b = Account.register(id=ACCT_B_ID, owner_id=_uuid.uuid4(), number="2")
+    acct_b.credit(100)
+    acct_b.credit(100)
+    repo.save(acct_b, expected_version=0)
+
+    acct_c = Account.register(id=ACCT_C_ID, owner_id=_uuid.uuid4(), number="3")
+    repo.save(acct_c, expected_version=0)
+
+    stream.projector.update_full()
+
+    # Simulate the pre-meta state and re-init.
+    notification_channel = Storage.notification_channel_name(store._storage.name)
+    _drop_meta_tables(
+        db_engine, store_name=store._storage.name, stream_name=stream.name
+    )
+    _install_pre_meta_trigger_function(
+        db_engine,
+        store_name=store._storage.name,
+        notification_channel=notification_channel,
+    )
+
+    store = MessageStore[AccountEvent](
+        name=store._storage.name,
+        engine=db_engine,
+        serializer=AccountEventSerializer(),
+    )
+    stream = AggregatedStream[AccountEvent](
+        name=stream.name,
+        store=store,
+        partitioner=MyPartitioner(),
+        stream_wildcards=["account-%"],
+    )
+
+    msgs_meta = _meta_rows(db_engine, store._storage.name)
+    assert msgs_meta == {
+        f"account-{acct_a.id}": (1, 2),
+        f"account-{acct_b.id}": (3, 5),
+        f"account-{acct_c.id}": (6, 6),
+    }
+    omax = _omax_rows(db_engine, stream.name)
+    assert omax == {
+        f"account-{acct_a.id}": 2,
+        f"account-{acct_b.id}": 5,
+        f"account-{acct_c.id}": 6,
+    }
+
+
+def test_backfill_on_empty_store_is_noop(db_engine, identifier):
+    """
+    Migrating a store that has tables but no message rows is a clean no-op:
+    the backfill SELECT returns nothing, no errors, meta is empty.
+    """
+    store_name = identifier()
+    MessageStore[AccountEvent](
+        name=store_name, engine=db_engine, serializer=AccountEventSerializer()
+    )
+
+    _drop_meta_tables(db_engine, store_name, stream_name="ignored")
+    MessageStore[AccountEvent](
+        name=store_name, engine=db_engine, serializer=AccountEventSerializer()
+    )
+
+    assert _meta_rows(db_engine, store_name) == {}
+
+
+def test_re_init_is_idempotent(db_engine, identifier, store_factory, stream_factory):
+    """
+    Process startup runs metadata.create_all every time. Constructing the
+    store + stream multiple times in a row on an already-migrated install
+    must not change observable state, even with writes interleaved.
+    """
+    store = store_factory()
+    stream = stream_factory(store)
+    repo = AccountRepository(store)
+
+    acct_a = Account.register(id=ACCT_A_ID, owner_id=_uuid.uuid4(), number="1")
+    acct_a.credit(100)
+    repo.save(acct_a, expected_version=0)
+    stream.projector.update_full()
+
+    snapshot_meta = _meta_rows(db_engine, store._storage.name)
+    snapshot_omax = _omax_rows(db_engine, stream.name)
+    snapshot_agg = _agg_message_count(db_engine, stream.name)
+
+    # Re-init twice — simulates two consecutive process restarts after the
+    # initial migration is already in place.
+    for _ in range(2):
+        store = MessageStore[AccountEvent](
+            name=store._storage.name,
+            engine=db_engine,
+            serializer=AccountEventSerializer(),
+        )
+        stream = AggregatedStream[AccountEvent](
+            name=stream.name,
+            store=store,
+            partitioner=MyPartitioner(),
+            stream_wildcards=["account-%"],
+        )
+        assert _meta_rows(db_engine, store._storage.name) == snapshot_meta
+        assert _omax_rows(db_engine, stream.name) == snapshot_omax
+        assert _agg_message_count(db_engine, stream.name) == snapshot_agg
+
+    # Normal operation still works after the redundant inits.
+    acct_b = Account.register(id=ACCT_B_ID, owner_id=_uuid.uuid4(), number="2")
+    acct_b.credit(100)
+    AccountRepository(store).save(acct_b, expected_version=0)
+    result = stream.projector.update_full()
+    assert result.n_updated_messages == 2  # register + credit
+
+
+def test_projector_after_upgrade_is_noop_with_no_new_messages(
+    db_engine, identifier, store_factory, stream_factory
+):
+    """
+    Right after an upgrade, the projector must see "everything already
+    projected" and do nothing — no double-insert, no unique-constraint
+    violation. This pins that omax backfill captures the correct max
+    (a min/max swap or off-by-one would make the projector try to insert
+    rows that already exist).
+    """
+    store = store_factory()
+    stream = stream_factory(store)
+    repo = AccountRepository(store)
+
+    acct_a = Account.register(id=ACCT_A_ID, owner_id=_uuid.uuid4(), number="1")
+    acct_a.credit(100)
+    repo.save(acct_a, expected_version=0)
+    acct_b = Account.register(id=ACCT_B_ID, owner_id=_uuid.uuid4(), number="2")
+    acct_b.credit(100)
+    repo.save(acct_b, expected_version=0)
+
+    stream.projector.update_full()
+    pre_count = _agg_message_count(db_engine, stream.name)
+    assert pre_count == 4
+
+    # Simulate the pre-meta state and re-init.
+    notification_channel = Storage.notification_channel_name(store._storage.name)
+    _drop_meta_tables(
+        db_engine, store_name=store._storage.name, stream_name=stream.name
+    )
+    _install_pre_meta_trigger_function(
+        db_engine,
+        store_name=store._storage.name,
+        notification_channel=notification_channel,
+    )
+    store = MessageStore[AccountEvent](
+        name=store._storage.name,
+        engine=db_engine,
+        serializer=AccountEventSerializer(),
+    )
+    stream = AggregatedStream[AccountEvent](
+        name=stream.name,
+        store=store,
+        partitioner=MyPartitioner(),
+        stream_wildcards=["account-%"],
+    )
+
+    # No new messages have been written; projector should pick up nothing.
+    result = stream.projector.update_full()
+    assert result.n_updated_messages == 0
+    assert result.more_messages_available is False
+    assert _agg_message_count(db_engine, stream.name) == pre_count
 
 
 # --- internal helpers used by the tests above -----------------------------
