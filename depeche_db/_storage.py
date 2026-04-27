@@ -74,11 +74,23 @@ class Storage:
         _sa.event.listen(
             self.message_table, "after_create", ddl.execute_if(dialect="postgresql")
         )
-        # Backfill the meta table from existing rows on first creation. The
-        # event fires only when the meta table is actually created, so this is
-        # idempotent.
-        backfill = _sa.DDL(
-            f"""
+        # When the meta table is being created in this DDL pass, also (re-)
+        # install the trigger function with its meta-aware body and backfill
+        # from existing rows. The event fires only when the meta table is
+        # actually created, so on a fresh install this runs once next to the
+        # main DDL above; on an upgrade from a pre-meta version it runs once
+        # to install the new function body and seed the meta table.
+        #
+        # Note: only the *function* is refreshed, not the trigger itself.
+        # Triggers reference functions by name so an existing trigger picks
+        # up the new body automatically once we CREATE OR REPLACE FUNCTION.
+        meta_create_ddl = _sa.DDL(
+            _notify_trigger_function(
+                name=name,
+                meta_tablename=self.meta_table.name,
+                notification_channel=self.notification_channel,
+            )
+            + f"""
             INSERT INTO {self.meta_table.name}
                 (stream, min_global_position, max_global_position)
             SELECT stream, MIN(global_position), MAX(global_position)
@@ -88,7 +100,9 @@ class Storage:
             """
         )
         _sa.event.listen(
-            self.meta_table, "after_create", backfill.execute_if(dialect="postgresql")
+            self.meta_table,
+            "after_create",
+            meta_create_ddl.execute_if(dialect="postgresql"),
         )
         self.metadata.create_all(engine, checkfirst=True)
         self._select = _sa.select(
@@ -281,9 +295,14 @@ class Storage:
         conn.execute(cls.get_migration_ddl(name=name))
 
 
-def _notify_trigger(
-    name: str, tablename: str, meta_tablename: str, notification_channel: str
+def _notify_trigger_function(
+    name: str, meta_tablename: str, notification_channel: str
 ) -> str:
+    """
+    DDL for the trigger function only. Idempotent (CREATE OR REPLACE) so it
+    can be run on both fresh creation and upgrades to refresh the body when
+    the meta table is added to an existing install.
+    """
     trigger_name = f"depeche_storage_new_msg_{name}"
     return f"""
         CREATE OR REPLACE FUNCTION {trigger_name}()
@@ -309,12 +328,33 @@ def _notify_trigger(
           RETURN NEW;
         END;
         $$ LANGUAGE plpgsql;
+     """
 
+
+def _notify_trigger_create(name: str, tablename: str) -> str:
+    """DDL to attach the trigger to the message table. One-time."""
+    trigger_name = f"depeche_storage_new_msg_{name}"
+    return f"""
         CREATE TRIGGER {trigger_name}
           AFTER INSERT ON {tablename}
           FOR EACH ROW
           EXECUTE PROCEDURE {trigger_name}();
      """
+
+
+def _notify_trigger(
+    name: str, tablename: str, meta_tablename: str, notification_channel: str
+) -> str:
+    """
+    Combined DDL for fresh creation: defines the function and creates the
+    trigger. Used by the message-table after_create event and by the
+    pre-0.8.0 migration helper.
+    """
+    return _notify_trigger_function(
+        name=name,
+        meta_tablename=meta_tablename,
+        notification_channel=notification_channel,
+    ) + _notify_trigger_create(name=name, tablename=tablename)
 
 
 def _write_message_fn(name: str, tablename: str) -> str:
