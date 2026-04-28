@@ -470,6 +470,65 @@ def test_projector_after_upgrade_is_noop_with_no_new_messages(
     assert _agg_message_count(db_engine, stream.name) == pre_count
 
 
+def test_get_migration_ddl_0_14_0_brings_pre_meta_install_to_current_state(
+    db_engine, store_factory, stream_factory
+):
+    """
+    Users who manage schema changes out of band run the SQL emitted by
+    `python -m depeche_db generate-migration-script ... 0.14 ...` instead of
+    relying on `metadata.create_all`. This test pins that the generated DDL
+    is sufficient to bring a pre-meta install up to the new schema:
+    backfilled meta tables, refreshed trigger, working projector.
+    """
+    from depeche_db._aggregated_stream import AggregatedStream
+
+    store = store_factory()
+    stream = stream_factory(store)
+    repo = AccountRepository(store)
+
+    acct = Account.register(id=ACCT_A_ID, owner_id=_uuid.uuid4(), number="1")
+    acct.credit(100)
+    repo.save(acct, expected_version=0)
+    stream.projector.update_full()
+
+    # Drop the meta tables and roll the trigger function back to its
+    # pre-meta body. Schema now matches a < 0.14 install.
+    _drop_meta_tables(
+        db_engine, store_name=store._storage.name, stream_name=stream.name
+    )
+    _install_pre_meta_trigger_function(
+        db_engine,
+        store_name=store._storage.name,
+        notification_channel=Storage.notification_channel_name(store._storage.name),
+    )
+
+    ddl = AggregatedStream.get_migration_ddl_0_14_0(
+        aggregated_stream_name=stream.name,
+        message_store_name=store._storage.name,
+    )
+    with db_engine.begin() as conn:
+        conn.execute(_sa.text(ddl))
+
+    assert _meta_rows(db_engine, store._storage.name)[f"account-{acct.id}"] == (1, 2)
+    assert _omax_rows(db_engine, stream.name)[f"account-{acct.id}"] == 2
+
+    # Re-running the script must be a no-op (idempotency claim in the docstring).
+    with db_engine.begin() as conn:
+        conn.execute(_sa.text(ddl))
+    assert _meta_rows(db_engine, store._storage.name)[f"account-{acct.id}"] == (1, 2)
+    assert _omax_rows(db_engine, stream.name)[f"account-{acct.id}"] == 2
+
+    # New writes after the migration flow through the refreshed trigger and
+    # are picked up by the projector.
+    acct.credit(100)
+    AccountRepository(store).save(acct, expected_version=2)
+    assert _meta_rows(db_engine, store._storage.name)[f"account-{acct.id}"][1] == 3
+
+    result = stream.projector.update_full()
+    assert result.n_updated_messages == 1
+    assert _omax_rows(db_engine, stream.name)[f"account-{acct.id}"] == 3
+
+
 # --- internal helpers used by the tests above -----------------------------
 
 

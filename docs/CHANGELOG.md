@@ -28,7 +28,9 @@
   also miss the backfill snapshot. Streams that already have rows in the
   aggregated stream self-correct on the next projector run, but a *brand-new*
   stream first written during this race window can have its earliest messages
-  skipped. **Pause writers for the upgrade.**
+  skipped. **Pause writers for the upgrade.** A standalone migration script
+  for users who run schema changes out of band can be generated with:
+  `python -m depeche_db generate-migration-script <PREV-VERSION> 0.14 --message-store=<NAME> --aggregated-stream=<STREAM-NAME> --aggregated-stream=<ANOTHER...>`
 
 # 0.13.1
 

@@ -33,6 +33,8 @@ from ._interfaces import (
     TimeBudget,
 )
 from ._message_store import MessageStore
+from ._storage import Storage as _Storage
+from ._storage import _notify_trigger_function
 from ._timings import Timings
 
 if TYPE_CHECKING:
@@ -129,8 +131,6 @@ class AggregatedStream(Generic[E]):
         # trigger. Lets _select_origin_streams identify behind streams with
         # a small lookup keyed by origin_stream instead of a GROUP BY scan
         # over the aggregated stream.
-        # Suffix `_omax` (kept short so test fixtures with UUID-based names
-        # stay within Postgres' 63-char identifier limit).
         self._origin_meta_table = _sa.Table(
             self.stream_table_name(name) + "_omax",
             self._metadata,
@@ -558,6 +558,72 @@ class AggregatedStream(Generic[E]):
         )
 
     @classmethod
+    def get_migration_ddl_0_14_0(
+        cls, aggregated_stream_name: str, message_store_name: str
+    ) -> str:
+        """
+        DDL Script to migrate from < 0.14.0.
+
+        Creates the per-store and per-aggregated-stream meta tables that back
+        the projector's fast-path candidate selection, replaces the
+        message-store INSERT trigger function with the meta-aware body, and
+        backfills both meta tables from the existing rows. The meta-table
+        creates and the backfill INSERTs are guarded so re-running the script
+        is a no-op.
+
+        The message-store half (meta table, trigger function, meta backfill)
+        is identical for every aggregated stream that targets the same store,
+        so when generating one combined script for several streams the
+        store-side block is emitted once per stream and runs idempotently.
+        """
+        message_tablename = _Storage.message_table_name(message_store_name)
+        meta_tablename = _Storage.meta_table_name(message_store_name)
+        aggregated_stream_tablename = cls.stream_table_name(aggregated_stream_name)
+        omax_tablename = aggregated_stream_tablename + "_omax"
+        new_trigger_function = _notify_trigger_function(
+            name=message_store_name,
+            meta_tablename=meta_tablename,
+            notification_channel=_Storage.notification_channel_name(message_store_name),
+        )
+        return _textwrap.dedent(
+            f"""
+            -- Per-stream meta on the message store (idempotent)
+            CREATE TABLE IF NOT EXISTS {meta_tablename} (
+                stream VARCHAR(255) PRIMARY KEY,
+                min_global_position INTEGER NOT NULL,
+                max_global_position INTEGER NOT NULL
+            );
+
+            -- Refresh the message-store INSERT trigger function so future
+            -- writes upsert into the meta table. The trigger itself does not
+            -- need to be re-created — it references the function by name.
+            {new_trigger_function}
+
+            -- Backfill the per-stream meta from existing messages
+            INSERT INTO {meta_tablename}
+                (stream, min_global_position, max_global_position)
+            SELECT stream, MIN(global_position), MAX(global_position)
+            FROM {message_tablename}
+            GROUP BY stream
+            ON CONFLICT (stream) DO NOTHING;
+
+            -- Per-origin-stream omax on the aggregated stream (idempotent)
+            CREATE TABLE IF NOT EXISTS {omax_tablename} (
+                origin_stream VARCHAR(255) PRIMARY KEY,
+                max_aggregated_origin_global_position INTEGER NOT NULL
+            );
+
+            -- Backfill omax from the aggregated stream rows
+            INSERT INTO {omax_tablename}
+                (origin_stream, max_aggregated_origin_global_position)
+            SELECT origin_stream, MAX(origin_stream_global_position)
+            FROM {aggregated_stream_tablename}
+            GROUP BY origin_stream
+            ON CONFLICT (origin_stream) DO NOTHING;
+            """
+        )
+
+    @classmethod
     def migration_script_generators(
         cls,
     ) -> Dict[Tuple[int, int], List[Callable[[str, str], str]]]:
@@ -567,6 +633,9 @@ class AggregatedStream(Generic[E]):
             ],
             (0, 11): [
                 cls.get_migration_ddl_0_11_0,
+            ],
+            (0, 14): [
+                cls.get_migration_ddl_0_14_0,
             ],
         }
 
@@ -713,11 +782,6 @@ class StreamProjector(Generic[E]):
 
                 # Read the per-partition maxpos once and mutate the dict in
                 # memory across batches, writing it back once at the end.
-                # The omax table can't be hoisted the same way:
-                # _select_origin_streams reads it from the DB on every batch
-                # to decide which streams are still behind, so omax has to be
-                # written per batch for the next iteration to see the right
-                # state.
                 with self.timings.span("get_maxpos"):
                     maxpos = self.stream.get_max_aggregated_stream_positions(conn)
                 touched_partitions: Set[int] = set()
@@ -842,14 +906,11 @@ class StreamProjector(Generic[E]):
     def _update_batch(
         self,
         conn: SAConnection,
-        cutoff: Optional[int] = None,
+        cutoff: Optional[int],
         *,
-        maxpos: Optional[Dict[int, int]] = None,
-        touched_partitions: Optional[Set[int]] = None,
+        maxpos: Dict[int, int],
+        touched_partitions: Set[int],
     ) -> int:
-        # When called from update_full we get the shared maxpos/touched state
-        # passed in; when called directly (rare, mostly tests) we fall back
-        # to a per-call maxpos read+write inside _add.
         message_table = self.stream._store._storage.message_table
 
         with self.timings.span("select_origin_streams"):
@@ -913,20 +974,9 @@ class StreamProjector(Generic[E]):
         conn: SAConnection,
         messages: List[SARow],
         *,
-        maxpos: Optional[Dict[int, int]] = None,
-        touched_partitions: Optional[Set[int]] = None,
+        maxpos: Dict[int, int],
+        touched_partitions: Set[int],
     ) -> None:
-        # If the caller (update_full) didn't supply shared maxpos state, we
-        # fall back to per-batch read+write — preserves the older direct-call
-        # API used in some tests.
-        standalone_maxpos = maxpos is None
-        if standalone_maxpos:
-            with self.timings.span("add.get_maxpos"):
-                maxpos = self.stream.get_max_aggregated_stream_positions(conn)
-            touched_partitions = set()
-        assert maxpos is not None
-        assert touched_partitions is not None
-
         # omax is always tracked per batch and written at the end of the
         # batch so the next iteration's _select_origin_streams sees the
         # updated state via the omax table.
@@ -975,10 +1025,3 @@ class StreamProjector(Generic[E]):
             conn.execute(self.stream._table.insert().values(rows))
         with self.timings.span("add.update_origin_meta"):
             self.stream._update_origin_meta(conn=conn, origin_max=origin_max_in_batch)
-
-        if standalone_maxpos:
-            with self.timings.span("add.update_maxpos"):
-                self.stream._update_max_aggregated_stream_positions(
-                    conn=conn,
-                    positions={p: maxpos[p] for p in touched_partitions},
-                )
