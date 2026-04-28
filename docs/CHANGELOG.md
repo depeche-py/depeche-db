@@ -1,3 +1,37 @@
+# 0.14.0rc1
+
+* Speed up `StreamProjector` by replacing the per-batch `GROUP BY` scans over the
+  message store and the aggregated stream with two new meta tables:
+  * `depeche_msgs_<store>_meta` — `(stream, min_global_position,
+    max_global_position)`, maintained by the message-store INSERT trigger.
+  * `depeche_stream_<stream>_omax` — `(origin_stream,
+    max_aggregated_origin_global_position)`, maintained by the projector
+    inside its EXCLUSIVE-locked update transaction.
+  Candidate-stream selection is now a single small join with `LIMIT batch_size`
+  instead of two `GROUP BY` scans over a lookback window.
+* Hoist the per-partition max-position read out of the projector batch loop:
+  `update_full` reads it once, mutates it in memory across batches, and writes
+  it back once at the end of the transaction.
+* **BREAKING CHANGE**: Remove the `lookback_for_gaps_hours` parameter from
+  `AggregatedStream` / `MessageStore.aggregated_stream(...)`. The gap-window
+  scan it controlled is no longer needed: the new meta tables plus the
+  existing `pg_advisory_xact_lock` taken before `nextval` in
+  `_write_message_fn` (which makes per-stream `global_position` monotonic in
+  commit order) cover the gap-correctness case directly. Passing the argument
+  is now an error.
+* **BREAKING CHANGE — migration requires writer downtime.** Both meta tables
+  are created and backfilled the next time `MessageStore` /
+  `AggregatedStream` is constructed, via `metadata.create_all`. The backfill
+  runs `SELECT … GROUP BY stream` over the existing message store inside one
+  deploy transaction; on a large store this scan is slow, and writes that
+  commit during the scan use the *old* trigger body (no meta upsert) and may
+  also miss the backfill snapshot. Streams that already have rows in the
+  aggregated stream self-correct on the next projector run, but a *brand-new*
+  stream first written during this race window can have its earliest messages
+  skipped. **Pause writers for the upgrade.** A standalone migration script
+  for users who run schema changes out of band can be generated with:
+  `python -m depeche_db generate-migration-script <PREV-VERSION> 0.14 --message-store=<NAME> --aggregated-stream=<STREAM-NAME> --aggregated-stream=<ANOTHER...>`
+
 # 0.13.1
 
 * Fix dict size changed error in ThreadedExecutor logging
