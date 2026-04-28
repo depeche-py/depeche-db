@@ -3,8 +3,6 @@ import datetime as _dt
 import logging as _logging
 import re as _re
 import textwrap as _textwrap
-import time as _time
-from collections import defaultdict as _defaultdict
 from collections import namedtuple
 from typing import (
     TYPE_CHECKING,
@@ -35,6 +33,7 @@ from ._interfaces import (
     TimeBudget,
 )
 from ._message_store import MessageStore
+from ._timings import Timings
 
 if TYPE_CHECKING:
     from ._aggregated_stream_reader import (
@@ -619,33 +618,6 @@ FullUpdateResult = namedtuple(
 )
 
 
-class ProjectorTimings:
-    """
-    Opt-in timing for StreamProjector sub-stages. Disabled by default — the
-    span() context manager is a near no-op when ``enabled`` is False.
-
-    When enabled, per-stage wall-clock samples are appended to ``samples``.
-    """
-
-    def __init__(self, enabled: bool = False) -> None:
-        self.enabled = enabled
-        self.samples: Dict[str, List[float]] = _defaultdict(list)
-
-    @_contextlib.contextmanager
-    def span(self, name: str):
-        if not self.enabled:
-            yield
-            return
-        t0 = _time.perf_counter()
-        try:
-            yield
-        finally:
-            self.samples[name].append(_time.perf_counter() - t0)
-
-    def reset(self) -> None:
-        self.samples = _defaultdict(list)
-
-
 class StreamProjector(Generic[E]):
     def __init__(
         self,
@@ -673,7 +645,7 @@ class StreamProjector(Generic[E]):
         self.partitioner = partitioner
         self.batch_size = batch_size or 100
         self._checked_maxpos_table = False
-        self.timings = ProjectorTimings(enabled=False)
+        self.timings = Timings(enabled=False)
 
     def interested_in_notification(self, notification: dict) -> bool:
         # Check if the projector is interested in the notification.
