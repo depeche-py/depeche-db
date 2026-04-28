@@ -55,7 +55,6 @@ class AggregatedStream(Generic[E]):
         partitioner: MessagePartitioner[E],
         stream_wildcards: List[str],
         update_batch_size: Optional[int] = None,
-        lookback_for_gaps_hours: Optional[int] = None,
     ) -> None:
         """
         AggregatedStream aggregates multiple streams into one (partitioned) stream.
@@ -72,7 +71,6 @@ class AggregatedStream(Generic[E]):
             partitioner: Message partitioner
             stream_wildcards: List of stream wildcards
             update_batch_size: Batch size for updating the stream, defaults to 100
-            lookback_for_gaps_hours: How many hours we should look aback for gaps in global positions. (Default is 6 hours, set this to 2-4x the time your longest transaction takes)
 
         Attributes:
             name (str): Stream name
@@ -129,8 +127,9 @@ class AggregatedStream(Generic[E]):
         # Per-origin-stream meta: the highest origin_stream_global_position
         # we've already projected into the aggregated stream. Maintained by
         # the projector under the EXCLUSIVE lock, so it doesn't need a
-        # trigger. Replaces the GROUP BY scan over the aggregated stream
-        # table inside get_aggregate_stream_positions.
+        # trigger. Lets _select_origin_streams identify behind streams with
+        # a small lookup keyed by origin_stream instead of a GROUP BY scan
+        # over the aggregated stream.
         # Suffix `_omax` (kept short so test fixtures with UUID-based names
         # stay within Postgres' 63-char identifier limit).
         self._origin_meta_table = _sa.Table(
@@ -177,7 +176,6 @@ class AggregatedStream(Generic[E]):
             partitioner=partitioner,
             stream_wildcards=stream_wildcards,
             batch_size=update_batch_size,
-            lookback_for_gaps_hours=lookback_for_gaps_hours,
         )
 
     def truncate(self, conn: SAConnection):
@@ -612,39 +610,6 @@ SelectedOriginStream = namedtuple(
     ],
 )
 
-AggregatedStreamPositon = namedtuple(
-    "AggregatedStreamPositon",
-    [
-        "origin_stream",
-        "max_aggregated_stream_global_position",
-    ],
-)
-
-OriginStreamPositon = namedtuple(
-    "OriginStreamPositon",
-    [
-        "origin_stream",
-        "max_global_position",
-        "min_global_position",
-    ],
-)
-
-AggregatedStreamHead = namedtuple(
-    "AggregatedStreamHead",
-    [
-        "global_position",
-        "added_at",
-    ],
-)
-
-LookbackCache = namedtuple(
-    "LookbackCache",
-    [
-        "head_added_at",
-        "value",
-    ],
-)
-
 FullUpdateResult = namedtuple(
     "FullUpdateResult",
     [
@@ -688,7 +653,6 @@ class StreamProjector(Generic[E]):
         partitioner: MessagePartitioner[E],
         stream_wildcards: List[str],
         batch_size: Optional[int] = None,
-        lookback_for_gaps_hours: Optional[int] = None,
     ):
         """
         Stream projector is responsible for updating an aggregated stream.
@@ -708,8 +672,6 @@ class StreamProjector(Generic[E]):
         ]
         self.partitioner = partitioner
         self.batch_size = batch_size or 100
-        self.lookback_for_gaps_hours = lookback_for_gaps_hours or 6
-        self._lookback_cache: Optional[LookbackCache] = None
         self._checked_maxpos_table = False
         self.timings = ProjectorTimings(enabled=False)
 
@@ -841,126 +803,6 @@ class StreamProjector(Generic[E]):
                 conn=conn, positions=positions
             )
         self._checked_maxpos_table = True
-
-    def get_aggregate_stream_positions(
-        self,
-        conn: SAConnection,
-        estimated_gap_look_back_start: int,
-    ) -> Dict[str, AggregatedStreamPositon]:
-        # Reads the per-origin-stream meta table maintained by _add. Replaces
-        # a GROUP BY scan over the aggregated stream with a small lookup
-        # keyed by origin_stream — O(distinct origin streams) instead of
-        # O(rows in lookback window).
-        #
-        # estimated_gap_look_back_start is intentionally unused here:
-        # the meta table is already pre-aggregated to one row per stream,
-        # so streams whose rows are entirely below the lookback are still
-        # returned and _calculate_selected_streams correctly marks them as
-        # caught up.
-        del estimated_gap_look_back_start
-        meta_table = self.stream._origin_meta_table
-        return {
-            row.origin_stream: AggregatedStreamPositon(
-                origin_stream=row.origin_stream,
-                max_aggregated_stream_global_position=row.max_aggregated_origin_global_position,
-            )
-            for row in conn.execute(_sa.select(meta_table))
-        }
-
-    def get_origin_stream_positions(
-        self,
-        conn: SAConnection,
-        min_global_position: int,
-        max_global_position: Optional[int] = None,
-    ) -> Dict[str, OriginStreamPositon]:
-        # Reads the per-stream meta table maintained by the message-store
-        # INSERT trigger. Replaces a GROUP BY scan over the message store with
-        # a small lookup keyed by stream, giving O(distinct streams) instead
-        # of O(rows in lookback window).
-        #
-        # max_global_position (cutoff) is intentionally not applied here —
-        # _update_batch already caps by cutoff when it reads the actual
-        # messages. Worst case is one wasted batch read for a stream whose
-        # only new messages are above the cutoff; the next update_full picks
-        # it up correctly.
-        #
-        # min_global_position is the lookback start, used to filter out
-        # streams whose entire history is below the window (already
-        # projected). The returned per-stream min_global_position is
-        # max(stream's min in meta, lookback_start) so callers that use it as
-        # a start position never go below the safe lookback boundary.
-        meta_table = self.stream._store._storage.meta_table
-        return {
-            stream: OriginStreamPositon(
-                origin_stream=stream,
-                max_global_position=max_global_pos,
-                min_global_position=max(min_pos, min_global_position),
-            )
-            for (stream, min_pos, max_global_pos) in conn.execute(
-                _sa.select(
-                    meta_table.c.stream,
-                    meta_table.c.min_global_position,
-                    meta_table.c.max_global_position,
-                ).where(
-                    _sa.and_(
-                        meta_table.c.max_global_position >= min_global_position,
-                        _sa.or_(
-                            *[
-                                meta_table.c.stream.like(wildcard)
-                                for wildcard in self.stream_wildcards
-                            ]
-                        ),
-                    )
-                )
-            ).fetchall()
-        }
-
-    def _get_aggregated_stream_head(self, conn: SAConnection) -> AggregatedStreamHead:
-        stream_table = self.stream._table.alias()
-        row = conn.execute(
-            _sa.select(
-                stream_table.c.origin_stream_global_position,
-                stream_table.c.origin_stream_added_at,
-            )
-            .order_by(stream_table.c.origin_stream_global_position.desc())
-            .limit(1)
-        ).fetchone()
-        if row:
-            head_global_position, head_added_at = row
-            return AggregatedStreamHead(
-                global_position=head_global_position, added_at=head_added_at
-            )
-        return AggregatedStreamHead(
-            global_position=-1,
-            added_at=_dt.datetime(1980, 1, 1, tzinfo=_dt.timezone.utc),
-        )
-
-    def _estimate_gap_look_back_start(
-        self, conn: SAConnection, head_added_at: _dt.datetime
-    ) -> int:
-        if self._lookback_cache is not None:
-            if (head_added_at - self._lookback_cache.head_added_at) > _dt.timedelta(
-                hours=1
-            ):
-                self._lookback_cache = None
-
-        if self._lookback_cache is None:
-            LOGGER.debug(f"{self.stream.name}: Updating lookback estimation")
-            origin_table = self.stream._store._storage.message_table
-            value = (
-                conn.execute(
-                    _sa.select(_sa.func.max(origin_table.c.global_position)).where(
-                        origin_table.c.added_at
-                        <= head_added_at
-                        - _dt.timedelta(hours=self.lookback_for_gaps_hours)
-                    )
-                ).scalar_one_or_none()
-            ) or 0
-            self._lookback_cache = LookbackCache(
-                head_added_at=head_added_at, value=value
-            )
-
-        return self._lookback_cache.value  # type: ignore
 
     def _select_origin_streams(
         self, conn: SAConnection, cutoff: Optional[int] = None
