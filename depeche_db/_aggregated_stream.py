@@ -644,7 +644,22 @@ class StreamProjector(Generic[E]):
         return False
 
     def take_notification_hint(self, notification: dict):
-        pass
+        stream = notification.get("stream")
+        global_position = notification.get("global_position")
+        if stream is None or global_position is None:
+            return
+        if self._get_origin_stream_positions_cache:
+            cache_entry = self._get_origin_stream_positions_cache.origin_streams.get(
+                stream
+            )
+            if cache_entry and global_position > cache_entry.max_global_position:
+                self._get_origin_stream_positions_cache.origin_streams[
+                    stream
+                ] = OriginStreamPositon(
+                    origin_stream=cache_entry.origin_stream,
+                    min_global_position=cache_entry.min_global_position,
+                    max_global_position=global_position,
+                )
 
     @property
     def notification_channel(self) -> str:
@@ -889,6 +904,9 @@ class StreamProjector(Generic[E]):
                     estimated_gap_look_back_start=estimated_gap_look_back_start,
                 )
                 if candidate_streams:
+                    print(
+                        f"{self.stream.name}: Found {len(candidate_streams)} candidate streams (using cached origin streams)"
+                    )
                     LOGGER.debug(
                         f"{self.stream.name}: Found {len(candidate_streams)} candidate streams (using cached origin streams)"
                     )
@@ -908,6 +926,9 @@ class StreamProjector(Generic[E]):
                 origin_streams=origin_streams,
                 stream_positions=stream_positions,
                 estimated_gap_look_back_start=estimated_gap_look_back_start,
+            )
+            print(
+                f"{self.stream.name}: Found {len(candidate_streams)} candidate streams (using live origin streams)"
             )
             LOGGER.debug(
                 f"{self.stream.name}: Found {len(candidate_streams)} candidate streams (using live origin streams)"

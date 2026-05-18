@@ -6,6 +6,7 @@ import time
 from datetime import datetime
 from uuid import UUID, uuid4
 
+from depeche_db._subscription import CoordinationStrategy
 import pydantic
 from sqlalchemy import create_engine
 
