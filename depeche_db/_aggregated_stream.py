@@ -34,7 +34,7 @@ from ._interfaces import (
 )
 from ._message_store import MessageStore
 from ._storage import Storage as _Storage
-from ._storage import _notify_trigger_function
+from ._storage import _notify_trigger_function, _setup_schema
 from ._timings import Timings
 
 if TYPE_CHECKING:
@@ -152,24 +152,15 @@ class AggregatedStream(Generic[E]):
         _sa.event.listen(
             self._table, "after_create", trigger.execute_if(dialect="postgresql")
         )
-        # Backfill from the existing aggregated stream rows on first creation.
-        # Idempotent thanks to ON CONFLICT DO NOTHING.
-        origin_meta_backfill = _sa.DDL(
-            f"""
-            INSERT INTO {self._origin_meta_table.name}
-                (origin_stream, max_aggregated_origin_global_position)
-            SELECT origin_stream, MAX(origin_stream_global_position)
-            FROM {self._table.name}
-            GROUP BY origin_stream
-            ON CONFLICT (origin_stream) DO NOTHING;
-            """
-        )
-        _sa.event.listen(
-            self._origin_meta_table,
-            "after_create",
-            origin_meta_backfill.execute_if(dialect="postgresql"),
-        )
-        self._metadata.create_all(store.engine, checkfirst=True)
+        # Create the tables under an advisory lock so concurrent processes
+        # (e.g. a rolling deploy) serialize here instead of racing on
+        # CREATE TABLE. The omax meta table is intentionally *not* backfilled
+        # at construction time: the projector reconciles it on its first run
+        # while holding the aggregated-stream EXCLUSIVE lock (see
+        # StreamProjector._ensure_omax_initialized). Reconciling it there
+        # keeps omax provably consistent with the aggregated stream even when
+        # an old-version projector is still draining during an upgrade.
+        _setup_schema(store.engine, self._metadata, lock_name=self._table.name)
         self.projector = StreamProjector(
             stream=self,
             partitioner=partitioner,
@@ -599,13 +590,24 @@ class AggregatedStream(Generic[E]):
             -- need to be re-created — it references the function by name.
             {new_trigger_function}
 
-            -- Backfill the per-stream meta from existing messages
+            -- Backfill the per-stream meta from existing messages. The
+            -- LEAST/GREATEST upsert merges with anything the refreshed
+            -- trigger has already written, so this stays correct even if
+            -- writes land between the two statements above and this one.
             INSERT INTO {meta_tablename}
                 (stream, min_global_position, max_global_position)
             SELECT stream, MIN(global_position), MAX(global_position)
             FROM {message_tablename}
             GROUP BY stream
-            ON CONFLICT (stream) DO NOTHING;
+            ON CONFLICT (stream) DO UPDATE SET
+                min_global_position = LEAST(
+                    {meta_tablename}.min_global_position,
+                    EXCLUDED.min_global_position
+                ),
+                max_global_position = GREATEST(
+                    {meta_tablename}.max_global_position,
+                    EXCLUDED.max_global_position
+                );
 
             -- Per-origin-stream omax on the aggregated stream (idempotent)
             CREATE TABLE IF NOT EXISTS {omax_tablename} (
@@ -613,13 +615,20 @@ class AggregatedStream(Generic[E]):
                 max_aggregated_origin_global_position INTEGER NOT NULL
             );
 
-            -- Backfill omax from the aggregated stream rows
+            -- Backfill omax from the aggregated stream rows. GREATEST keeps
+            -- a re-run idempotent and never moves an entry backwards; the
+            -- projector also reconciles omax on its first run, so this is a
+            -- best-effort head start rather than a correctness requirement.
             INSERT INTO {omax_tablename}
                 (origin_stream, max_aggregated_origin_global_position)
             SELECT origin_stream, MAX(origin_stream_global_position)
             FROM {aggregated_stream_tablename}
             GROUP BY origin_stream
-            ON CONFLICT (origin_stream) DO NOTHING;
+            ON CONFLICT (origin_stream) DO UPDATE SET
+                max_aggregated_origin_global_position = GREATEST(
+                    {omax_tablename}.max_aggregated_origin_global_position,
+                    EXCLUDED.max_aggregated_origin_global_position
+                );
             """
         )
 
@@ -714,6 +723,7 @@ class StreamProjector(Generic[E]):
         self.partitioner = partitioner
         self.batch_size = batch_size or 100
         self._checked_maxpos_table = False
+        self._omax_initialized = False
         self.timings = Timings(enabled=False)
 
     def interested_in_notification(self, notification: dict) -> bool:
@@ -780,6 +790,9 @@ class StreamProjector(Generic[E]):
                 with self.timings.span("check_maxpos_table"):
                     self._check_and_create_maxpos_table(conn)
 
+                with self.timings.span("ensure_omax"):
+                    self._ensure_omax_initialized(conn)
+
                 # Read the per-partition maxpos once and mutate the dict in
                 # memory across batches, writing it back once at the end.
                 with self.timings.span("get_maxpos"):
@@ -839,6 +852,47 @@ class StreamProjector(Generic[E]):
                 conn=conn, positions=positions
             )
         self._checked_maxpos_table = True
+
+    def _ensure_omax_initialized(self, conn: SAConnection) -> None:
+        """
+        Reconcile the omax meta table with the aggregated stream.
+
+        omax caches, per origin stream, the highest origin position already
+        projected. It is normally maintained atomically with the
+        aggregated-stream inserts, but two situations leave it stale-low: a
+        fresh upgrade (omax starts empty), or an old-version projector that
+        advanced the aggregated stream without knowing about omax while a
+        rolling deploy was in progress. A stale-low omax would make the
+        projector re-select already-projected messages and hit the
+        message_id primary-key constraint.
+
+        This runs once per projector instance, from update_full while the
+        aggregated-stream EXCLUSIVE lock is held -- so no other projector can
+        be advancing the stream concurrently. The GREATEST upsert repairs any
+        stale-low entry and never moves an entry backwards, so it is safe to
+        run even when omax is already correct.
+        """
+        if self._omax_initialized:
+            return
+        omax = self.stream._origin_meta_table.name
+        agg = self.stream._table.name
+        conn.execute(
+            _sa.text(
+                f"""
+                INSERT INTO {omax}
+                    (origin_stream, max_aggregated_origin_global_position)
+                SELECT origin_stream, MAX(origin_stream_global_position)
+                FROM {agg}
+                GROUP BY origin_stream
+                ON CONFLICT (origin_stream) DO UPDATE SET
+                    max_aggregated_origin_global_position = GREATEST(
+                        {omax}.max_aggregated_origin_global_position,
+                        EXCLUDED.max_aggregated_origin_global_position
+                    );
+                """
+            )
+        )
+        self._omax_initialized = True
 
     def _select_origin_streams(
         self, conn: SAConnection, cutoff: Optional[int] = None

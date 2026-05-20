@@ -5,7 +5,7 @@ https://github.com/message-db/message-db
 
 import datetime as _dt
 import uuid as _uuid
-from typing import Any, Iterator, Optional, Sequence, Tuple
+from typing import Any, Callable, Iterator, Optional, Sequence, Tuple
 
 import sqlalchemy as _sa
 from sqlalchemy.dialects.postgresql import JSONB as _PostgresJsonb
@@ -74,37 +74,20 @@ class Storage:
         _sa.event.listen(
             self.message_table, "after_create", ddl.execute_if(dialect="postgresql")
         )
-        # When the meta table is being created in this DDL pass, also (re-)
-        # install the trigger function with its meta-aware body and backfill
-        # from existing rows. The event fires only when the meta table is
-        # actually created, so on a fresh install this runs once next to the
-        # main DDL above; on an upgrade from a pre-meta version it runs once
-        # to install the new function body and seed the meta table.
-        #
-        # Note: only the *function* is refreshed, not the trigger itself.
-        # Triggers reference functions by name so an existing trigger picks
-        # up the new body automatically once we CREATE OR REPLACE FUNCTION.
-        meta_create_ddl = _sa.DDL(
-            _notify_trigger_function(
-                name=name,
-                meta_tablename=self.meta_table.name,
-                notification_channel=self.notification_channel,
-            )
-            + f"""
-            INSERT INTO {self.meta_table.name}
-                (stream, min_global_position, max_global_position)
-            SELECT stream, MIN(global_position), MAX(global_position)
-            FROM {self.message_table.name}
-            GROUP BY stream
-            ON CONFLICT (stream) DO NOTHING;
-            """
+        # Create the tables and, when the meta table is added (a fresh
+        # install, or an upgrade from a pre-meta version), run the meta
+        # migration. _setup_schema serializes this across processes with an
+        # advisory lock and runs each migration step in its own committed
+        # transaction -- so the meta-aware trigger function is committed, and
+        # visible to concurrent writers, *before* the backfill scan that
+        # depends on it. That keeps the upgrade safe without pausing writers.
+        _setup_schema(
+            engine,
+            self.metadata,
+            lock_name=self.meta_table.name,
+            needs_migration=lambda conn: self._meta_migration_needed(conn, name),
+            migration_steps=self._meta_migration_steps(name),
         )
-        _sa.event.listen(
-            self.meta_table,
-            "after_create",
-            meta_create_ddl.execute_if(dialect="postgresql"),
-        )
-        self.metadata.create_all(engine, checkfirst=True)
         self._select = _sa.select(
             self.message_table.c.message_id,
             self.message_table.c.stream,
@@ -294,6 +277,79 @@ class Storage:
         """
         conn.execute(cls.get_migration_ddl(name=name))
 
+    @classmethod
+    def _meta_migration_steps(cls, name: str) -> Sequence[str]:
+        """
+        SQL steps that add the meta-table machinery to a message store.
+
+        Run on a fresh install (where they are harmless no-ops) and, more
+        importantly, on an upgrade from a pre-0.14 version. _setup_schema
+        executes each step in its own committed transaction:
+
+          1. Swap the INSERT trigger function for the meta-aware body. Once
+             this commits, every subsequent write maintains the meta table.
+          2. Backfill the meta table from the existing messages. Because the
+             swap is already committed, writes landing during this
+             (potentially slow) scan are captured by the new trigger; the
+             LEAST/GREATEST upsert then merges the backfilled bounds with
+             whatever the trigger has written -- so no writer downtime is
+             needed and a stream first written mid-migration keeps its true
+             min/max.
+        """
+        meta_tablename = cls.meta_table_name(name)
+        message_tablename = cls.message_table_name(name)
+        return [
+            _notify_trigger_function(
+                name=name,
+                meta_tablename=meta_tablename,
+                notification_channel=cls.notification_channel_name(name),
+            ),
+            f"""
+            INSERT INTO {meta_tablename}
+                (stream, min_global_position, max_global_position)
+            SELECT stream, MIN(global_position), MAX(global_position)
+            FROM {message_tablename}
+            GROUP BY stream
+            ON CONFLICT (stream) DO UPDATE SET
+                min_global_position = LEAST(
+                    {meta_tablename}.min_global_position,
+                    EXCLUDED.min_global_position
+                ),
+                max_global_position = GREATEST(
+                    {meta_tablename}.max_global_position,
+                    EXCLUDED.max_global_position
+                );
+            """,
+        ]
+
+    @classmethod
+    def _meta_migration_needed(cls, conn: SAConnection, name: str) -> bool:
+        """
+        Decide whether the meta migration steps should run. Evaluated by
+        _setup_schema before the tables are created, so it observes the
+        pre-upgrade state.
+
+        True when the meta table is absent, or present but empty while the
+        message store already has rows. The latter case means a previous
+        backfill did not finish (e.g. the process died mid-scan): because the
+        steps are idempotent, retrying is safe and the LEAST/GREATEST upsert
+        merges cleanly with anything the trigger has written meanwhile.
+        """
+        meta_tablename = cls.meta_table_name(name)
+        if not _sa.inspect(conn).has_table(meta_tablename):
+            return True
+        meta_has_rows = (
+            conn.execute(_sa.text(f"SELECT 1 FROM {meta_tablename} LIMIT 1")).first()
+            is not None
+        )
+        if meta_has_rows:
+            return False
+        message_tablename = cls.message_table_name(name)
+        return (
+            conn.execute(_sa.text(f"SELECT 1 FROM {message_tablename} LIMIT 1")).first()
+            is not None
+        )
+
 
 def _notify_trigger_function(
     name: str, meta_tablename: str, notification_channel: str
@@ -355,6 +411,66 @@ def _notify_trigger(
         meta_tablename=meta_tablename,
         notification_channel=notification_channel,
     ) + _notify_trigger_create(name=name, tablename=tablename)
+
+
+# Hash an arbitrary name down to the bigint advisory-lock keyspace. Mirrors
+# the stream-hash trick used in _write_message_fn.
+_ADVISORY_LOCK_KEY_SQL = "left('x' || md5(:lock_name), 17)::bit(64)::bigint"
+
+
+def _setup_schema(
+    engine: _sa.engine.Engine,
+    metadata: _sa.MetaData,
+    lock_name: str,
+    *,
+    needs_migration: Optional[Callable[[SAConnection], bool]] = None,
+    migration_steps: Sequence[str] = (),
+) -> None:
+    """
+    Create every table in ``metadata``, serialized across processes by a
+    session-level advisory lock keyed on ``lock_name``.
+
+    Without the lock, every process of a rolling deploy that restarts at once
+    races on ``CREATE TABLE``: the losers block on the winner's uncommitted
+    ``CREATE`` for the full duration of any backfill and then crash with
+    "relation already exists". The advisory lock makes them queue instead --
+    one process creates and migrates, the rest wait and then no-op.
+
+    If ``needs_migration`` is given, it is called *before* the tables are
+    created (so it can observe the pre-upgrade state). When it returns True,
+    each statement in ``migration_steps`` is executed afterwards, each in its
+    own committed transaction. The separate transactions are deliberate: a
+    step that swaps a trigger function commits -- and so becomes visible to
+    concurrent writers -- before a later step that backfills based on it.
+    ``needs_migration`` should keep returning True until the migration has
+    fully completed, so a backfill interrupted partway through is retried on
+    the next construction rather than skipped.
+    """
+    with engine.connect() as conn:
+        is_pg = conn.dialect.name == "postgresql"
+        if is_pg:
+            conn.execute(
+                _sa.text(f"SELECT pg_advisory_lock({_ADVISORY_LOCK_KEY_SQL})"),
+                {"lock_name": lock_name},
+            )
+            conn.commit()
+        try:
+            migrate = bool(
+                is_pg and needs_migration is not None and needs_migration(conn)
+            )
+            metadata.create_all(conn, checkfirst=True)
+            conn.commit()
+            if migrate:
+                for step in migration_steps:
+                    conn.execute(_sa.DDL(step))
+                    conn.commit()
+        finally:
+            if is_pg:
+                conn.execute(
+                    _sa.text(f"SELECT pg_advisory_unlock({_ADVISORY_LOCK_KEY_SQL})"),
+                    {"lock_name": lock_name},
+                )
+                conn.commit()
 
 
 def _write_message_fn(name: str, tablename: str) -> str:

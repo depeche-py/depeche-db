@@ -193,8 +193,10 @@ def test_omax_backfilled_on_upgrade(
     db_engine, identifier, store_factory, stream_factory
 ):
     """
-    Existing aggregated-stream rows must seed the omax meta table when it's
-    first created during an upgrade.
+    Existing aggregated-stream rows must seed the omax meta table. omax is
+    reconciled by the projector on its first run (under the EXCLUSIVE lock),
+    not at construction time — so it stays consistent with the aggregated
+    stream even when an old projector is still draining during an upgrade.
     """
     store = store_factory()
     stream = stream_factory(store)
@@ -213,19 +215,24 @@ def test_omax_backfilled_on_upgrade(
     _drop_meta_tables(db_engine, store_name="ignored", stream_name=stream.name)
     assert not _table_exists(db_engine, f"depeche_stream_{stream.name}_omax")
 
-    # Re-init the AggregatedStream — its meta_create event re-runs and
-    # populates omax from the existing agg rows.
-    AggregatedStream[AccountEvent](
+    # Re-init the AggregatedStream — _setup_schema re-creates the omax table
+    # (empty); it is the projector that reconciles it.
+    stream = AggregatedStream[AccountEvent](
         name=stream.name,
         store=store,
         partitioner=MyPartitioner(),
         stream_wildcards=["account-%"],
     )
+    assert (
+        _omax_rows(db_engine, stream.name) == {}
+    ), "omax is reconciled by the projector, not at construction time"
 
+    # First projector run reconciles omax from the existing agg rows.
+    stream.projector.update_full()
     omax_after = _omax_rows(db_engine, stream.name)
     assert (
         omax_after == omax_before
-    ), "omax must be backfilled to match the agg-stream state on upgrade"
+    ), "omax must be reconciled to match the agg-stream state on upgrade"
 
 
 def test_full_upgrade_round_trip(db_engine, identifier, store_factory, stream_factory):
@@ -272,9 +279,10 @@ def test_full_upgrade_round_trip(db_engine, identifier, store_factory, stream_fa
         stream_wildcards=["account-%"],
     )
 
-    # Both meta tables are backfilled after re-init.
+    # The message-store meta table is backfilled at re-init; omax is left to
+    # the projector's first run, so it is still empty here.
     assert _meta_rows(db_engine, store._storage.name)[f"account-{acct.id}"] == (1, 2)
-    assert _omax_rows(db_engine, stream.name)[f"account-{acct.id}"] == 2
+    assert _omax_rows(db_engine, stream.name) == {}
 
     # Write more messages — trigger updates meta — and project them.
     acct.credit(100)
@@ -345,6 +353,9 @@ def test_backfill_handles_multiple_streams(
         f"account-{acct_b.id}": (3, 5),
         f"account-{acct_c.id}": (6, 6),
     }
+
+    # omax is reconciled by the projector's first run, not at re-init.
+    stream.projector.update_full()
     omax = _omax_rows(db_engine, stream.name)
     assert omax == {
         f"account-{acct_a.id}": 2,
@@ -527,6 +538,168 @@ def test_get_migration_ddl_0_14_0_brings_pre_meta_install_to_current_state(
     result = stream.projector.update_full()
     assert result.n_updated_messages == 1
     assert _omax_rows(db_engine, stream.name)[f"account-{acct.id}"] == 3
+
+
+def test_interrupted_backfill_is_retried(db_engine, identifier):
+    """
+    If a previous migration created the meta table but its backfill did not
+    finish (e.g. the process died mid-scan), the next construction must
+    retry the backfill — not skip it just because the table now exists.
+    """
+    store_name = identifier()
+    store = MessageStore[AccountEvent](
+        name=store_name, engine=db_engine, serializer=AccountEventSerializer()
+    )
+    acct = Account.register(id=ACCT_A_ID, owner_id=_uuid.uuid4(), number="1")
+    acct.credit(100)
+    AccountRepository(store).save(acct, expected_version=0)
+
+    # Simulate a crashed migration: the meta table exists but is empty, as
+    # if the process died after CREATE TABLE but before the backfill ran.
+    with db_engine.begin() as conn:
+        conn.execute(_sa.text(f"DELETE FROM depeche_msgs_{store_name}_meta"))
+    assert _meta_rows(db_engine, store_name) == {}
+
+    # Re-init: _meta_migration_needed sees an empty meta table over a
+    # non-empty store and retries the backfill.
+    MessageStore[AccountEvent](
+        name=store_name, engine=db_engine, serializer=AccountEventSerializer()
+    )
+    assert _meta_rows(db_engine, store_name)[f"account-{acct.id}"] == (1, 2)
+
+
+def test_meta_migration_is_downtime_free(db_engine, store_factory, stream_factory):
+    """
+    The meta migration swaps the trigger function in a committed transaction
+    *before* the backfill runs. A write that lands in that window — to a
+    brand-new stream, or to a pre-existing un-projected stream — is captured
+    with its true min/max, so no writer downtime is needed.
+
+    This pins the exact interleaving by running the two migration steps by
+    hand with writes in between.
+    """
+    store = store_factory()
+    stream = stream_factory(store)
+    repo = AccountRepository(store)
+    store_name = store._storage.name
+
+    # Pre-existing stream A, written under the current schema but *not*
+    # projected — so the projector will later use its meta min as the start
+    # position, which is exactly what a wrong min would corrupt.
+    acct_a = Account.register(id=ACCT_A_ID, owner_id=_uuid.uuid4(), number="1")
+    acct_a.credit(100)
+    repo.save(acct_a, expected_version=0)  # A: global positions 1..2
+
+    # Roll the schema back to a pre-0.14 install.
+    _drop_meta_tables(db_engine, store_name=store_name, stream_name=stream.name)
+    _install_pre_meta_trigger_function(
+        db_engine,
+        store_name=store_name,
+        notification_channel=Storage.notification_channel_name(store_name),
+    )
+
+    steps = Storage._meta_migration_steps(store_name)
+    assert len(steps) == 2, "expected a trigger-swap step and a backfill step"
+
+    # The meta table must exist before the steps run. _setup_schema creates
+    # it; here we create it by hand so we can interleave writes.
+    meta_tablename = f"depeche_msgs_{store_name}_meta"
+    with db_engine.begin() as conn:
+        conn.execute(
+            _sa.text(
+                f'CREATE TABLE "{meta_tablename}" ('
+                "stream VARCHAR(255) PRIMARY KEY, "
+                "min_global_position INTEGER NOT NULL, "
+                "max_global_position INTEGER NOT NULL)"
+            )
+        )
+
+    # Step 1: swap the trigger function — committed on its own.
+    with db_engine.begin() as conn:
+        conn.execute(_sa.DDL(steps[0]))
+
+    # --- the "writer downtime" window: writes land AFTER the trigger swap
+    # but BEFORE the backfill, flowing through the new meta-aware trigger.
+    # A brand-new stream B...
+    acct_b = Account.register(id=ACCT_B_ID, owner_id=_uuid.uuid4(), number="2")
+    acct_b.credit(100)
+    repo.save(acct_b, expected_version=0)  # B: global positions 3..4
+    # ...and a further write to the pre-existing, un-projected stream A. No
+    # meta row exists for A yet, so the trigger inserts one with min == 5.
+    acct_a.credit(100)
+    repo.save(acct_a, expected_version=2)  # A: global position 5
+
+    # Step 2: the backfill.
+    with db_engine.begin() as conn:
+        conn.execute(_sa.DDL(steps[1]))
+
+    meta = _meta_rows(db_engine, store_name)
+    # Stream A: the backfill's LEAST upsert corrects min back down from the
+    # trigger's 5 to A's true first position. With ON CONFLICT DO NOTHING
+    # this would stay (5, 5) and A would project from 5, skipping 1..2.
+    assert meta[f"account-{acct_a.id}"] == (1, 5)
+    # Stream B: brand-new, written entirely inside the window.
+    assert meta[f"account-{acct_b.id}"] == (3, 4)
+
+    # End to end: re-init and project — every message lands, none skipped.
+    store = MessageStore[AccountEvent](
+        name=store_name, engine=db_engine, serializer=AccountEventSerializer()
+    )
+    stream = AggregatedStream[AccountEvent](
+        name=stream.name,
+        store=store,
+        partitioner=MyPartitioner(),
+        stream_wildcards=["account-%"],
+    )
+    stream.projector.update_full()
+    assert _agg_message_count(db_engine, stream.name) == 5
+
+
+def test_projector_repairs_stale_omax(db_engine, store_factory, stream_factory):
+    """
+    A stale-low omax — as left behind when a pre-0.14 projector advances the
+    aggregated stream during a rolling upgrade without maintaining omax —
+    must be repaired by the projector on its next run, under the EXCLUSIVE
+    lock, rather than making it re-project rows and hit the message_id PK.
+    """
+    store = store_factory()
+    stream = stream_factory(store)
+    repo = AccountRepository(store)
+
+    acct = Account.register(id=ACCT_A_ID, owner_id=_uuid.uuid4(), number="1")
+    acct.credit(100)
+    acct.credit(100)
+    repo.save(acct, expected_version=0)  # global positions 1..3
+
+    stream.projector.update_full()
+    pre_count = _agg_message_count(db_engine, stream.name)
+    assert pre_count == 3
+    assert _omax_rows(db_engine, stream.name)[f"account-{acct.id}"] == 3
+
+    # Corrupt omax to a stale-low value, simulating an older projector that
+    # advanced the aggregated stream without knowing about omax.
+    with db_engine.begin() as conn:
+        conn.execute(
+            _sa.text(
+                f"UPDATE depeche_stream_{stream.name}_omax "
+                "SET max_aggregated_origin_global_position = 1"
+            )
+        )
+
+    # A fresh projector instance (i.e. a new process) reconciles omax on its
+    # first run. Without the reconcile it would re-select global positions
+    # 2..3 and raise a primary-key violation.
+    fresh_stream = AggregatedStream[AccountEvent](
+        name=stream.name,
+        store=store,
+        partitioner=MyPartitioner(),
+        stream_wildcards=["account-%"],
+    )
+    result = fresh_stream.projector.update_full()
+
+    assert result.n_updated_messages == 0
+    assert _agg_message_count(db_engine, fresh_stream.name) == pre_count
+    assert _omax_rows(db_engine, fresh_stream.name)[f"account-{acct.id}"] == 3
 
 
 # --- internal helpers used by the tests above -----------------------------

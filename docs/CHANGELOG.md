@@ -19,18 +19,31 @@
   `_write_message_fn` (which makes per-stream `global_position` monotonic in
   commit order) cover the gap-correctness case directly. Passing the argument
   is now an error.
-* **BREAKING CHANGE — migration requires writer downtime.** Both meta tables
-  are created and backfilled the next time `MessageStore` /
-  `AggregatedStream` is constructed, via `metadata.create_all`. The backfill
-  runs `SELECT … GROUP BY stream` over the existing message store inside one
-  deploy transaction; on a large store this scan is slow, and writes that
-  commit during the scan use the *old* trigger body (no meta upsert) and may
-  also miss the backfill snapshot. Streams that already have rows in the
-  aggregated stream self-correct on the next projector run, but a *brand-new*
-  stream first written during this race window can have its earliest messages
-  skipped. **Pause writers for the upgrade.** A standalone migration script
-  for users who run schema changes out of band can be generated with:
+* The two meta tables are created and backfilled the next time `MessageStore`
+  / `AggregatedStream` is constructed against an older schema. **The upgrade
+  is online — no writer or projector downtime is required:**
+  * Schema creation is serialized across processes with a Postgres advisory
+    lock, so a rolling deploy where every process restarts at once no longer
+    races on `CREATE TABLE` (previously the losers of that race could crash
+    on startup with "relation already exists").
+  * The meta-aware message-store INSERT trigger function is swapped in and
+    committed *before* the `SELECT … GROUP BY stream` backfill scan runs, so
+    writes that commit during the (potentially slow) scan are captured by the
+    new trigger. The backfill merges its bounds with `LEAST`/`GREATEST`, so a
+    stream first written mid-migration keeps its true `min`/`max`.
+  * The aggregated stream's `omax` table is reconciled by the projector on
+    its first run, under the `EXCLUSIVE` table lock it already takes. It
+    therefore stays consistent with the aggregated stream even if a
+    pre-`0.14` projector is still draining during the deploy.
+  A standalone migration script for users who run schema changes out of band
+  can still be generated with:
   `python -m depeche_db generate-migration-script <PREV-VERSION> 0.14 --message-store=<NAME> --aggregated-stream=<STREAM-NAME> --aggregated-stream=<ANOTHER...>`
+* Every message-store write now also performs one small upsert into
+  `depeche_msgs_<store>_meta` inside the existing INSERT trigger. There is no
+  added lock contention (same-stream writes are already serialized by the
+  per-stream `pg_advisory_xact_lock`, and different streams touch different
+  meta rows), and the upsert is a HOT update so the meta table does not
+  bloat.
 
 # 0.13.1
 
