@@ -11,7 +11,7 @@ from depeche_db._aggregated_stream import (
     SelectedOriginStream,
 )
 from depeche_db._interfaces import FixedTimeBudget, RunOnNotificationResult
-from tests._account_example import Account, AccountRepository
+from tests._account_example import Account, AccountCreditedEvent, AccountRepository
 
 
 def test_stream_projector(db_engine, store_factory, stream_factory, account_ids):
@@ -87,16 +87,9 @@ def test_stream_projector_origin_selection(
     account2.credit(100)
     account_repo.save(account2, expected_version=0)
 
-    # because of the cached origin streams, the projector will not update
-    # right away...
-    assert get_select_origin_streams() == [
-        SelectedOriginStream(
-            stream=f"account-{account.id}", start_at_global_position=1
-        ),
-    ]
-
-    # ... but only when the cache is cleared
-    subject.projector._get_origin_stream_positions_cache = None
+    # New streams show up immediately — _select_origin_streams reads the
+    # meta tables fresh on every call, so there is no per-call caching that
+    # would hide the new account2 stream.
     assert get_select_origin_streams() == [
         SelectedOriginStream(
             stream=f"account-{account.id}", start_at_global_position=1
@@ -175,11 +168,11 @@ def test_stream_projector_cutoff(db_engine, store_factory, stream_factory, accou
 
     orig_projector_add = subject.projector._add
 
-    def slow_projector_add(conn, messages):
+    def slow_projector_add(conn, messages, **kwargs):
         import time
 
         time.sleep(0.2)
-        orig_projector_add(conn, messages)
+        orig_projector_add(conn, messages, **kwargs)
 
     subject.projector._add = slow_projector_add
 
@@ -316,3 +309,132 @@ def test_stream_projector_creates_maxpos_table(
             1: 2,
             2: 1,
         }
+
+
+def test_select_origin_streams_excludes_caught_up(
+    db_engine, store_factory, stream_factory, account_ids
+):
+    """
+    The msgs_meta.max > omax.max predicate is the heart of the SQL filter.
+    Once a stream is fully projected, it must not appear in the candidate
+    list — otherwise the projector would loop forever or hit unique
+    constraints on re-projection.
+    """
+    ACCOUNT1_ID, ACCOUNT2_ID = account_ids
+    store = store_factory()
+    stream: AggregatedStream = stream_factory(store)
+    repo = AccountRepository(store)
+
+    a = Account.register(id=ACCOUNT1_ID, owner_id=_uuid.uuid4(), number="1")
+    a.credit(100)
+    repo.save(a, expected_version=0)
+    b = Account.register(id=ACCOUNT2_ID, owner_id=_uuid.uuid4(), number="2")
+    b.credit(100)
+    repo.save(b, expected_version=0)
+
+    stream.projector.update_full()
+
+    with db_engine.connect() as conn:
+        assert stream.projector._select_origin_streams(conn=conn) == []
+
+    # Add a new message to one stream; only that stream should now be a
+    # candidate.
+    a.credit(100)
+    repo.save(a, expected_version=2)
+
+    with db_engine.connect() as conn:
+        candidates = stream.projector._select_origin_streams(conn=conn)
+    # start_at = omax(a) + 1 = 2 + 1 = 3, not the position of the new message
+    # itself — the projector then filters per-stream when reading.
+    assert candidates == [
+        SelectedOriginStream(stream=f"account-{a.id}", start_at_global_position=3),
+    ]
+
+
+def test_select_origin_streams_respects_batch_size(
+    db_engine, store_factory, stream_factory, account_ids
+):
+    """
+    The query limits its result to batch_size to keep each projector
+    iteration bounded. A regression that drops the LIMIT would let the
+    projector pull every behind stream into a single batch query.
+    """
+    ACCOUNT1_ID, ACCOUNT2_ID = account_ids
+    store = store_factory()
+    stream: AggregatedStream = stream_factory(store)
+    stream.projector.batch_size = 2
+    repo = AccountRepository(store)
+
+    # 4 fresh streams that are all behind the agg stream.
+    for i, acct_id in enumerate(
+        [
+            ACCOUNT1_ID,
+            ACCOUNT2_ID,
+            _uuid.UUID("3cf31a23-5b95-42f3-b7d8-000000000003"),
+            _uuid.UUID("3cf31a23-5b95-42f3-b7d8-000000000004"),
+        ]
+    ):
+        acct = Account.register(id=acct_id, owner_id=_uuid.uuid4(), number=str(i))
+        repo.save(acct, expected_version=0)
+
+    with db_engine.connect() as conn:
+        candidates = stream.projector._select_origin_streams(conn=conn)
+    assert (
+        len(candidates) == 2
+    ), f"expected at most batch_size (2) candidates, got {len(candidates)}"
+
+
+def test_select_origin_streams_filters_by_wildcard(
+    db_engine, store_factory, stream_factory, account_ids
+):
+    """
+    The query has a LIKE filter against the configured stream wildcards;
+    streams written to the same message store but not matching the
+    wildcard must not appear in the candidate list.
+    """
+    ACCOUNT1_ID, _ = account_ids
+    store = store_factory()
+    stream: AggregatedStream = stream_factory(store)
+    repo = AccountRepository(store)
+
+    # Stream that matches the wildcard.
+    a = Account.register(id=ACCOUNT1_ID, owner_id=_uuid.uuid4(), number="1")
+    repo.save(a, expected_version=0)
+
+    # Stream that does NOT match "account-%". Bypass the Account abstraction
+    # and write directly to a non-matching stream name.
+    store.write(
+        stream="other-thing",
+        message=AccountCreditedEvent(account_id=ACCOUNT1_ID, amount=1, balance=1),
+    )
+
+    with db_engine.connect() as conn:
+        candidates = stream.projector._select_origin_streams(conn=conn)
+    candidate_streams = [c.stream for c in candidates]
+    assert f"account-{a.id}" in candidate_streams
+    assert "other-thing" not in candidate_streams
+
+
+def test_update_origin_meta_is_monotonic(db_engine, store_factory, stream_factory):
+    """
+    _update_origin_meta UPSERT uses GREATEST so a stale or out-of-order
+    write can never lower the recorded max. This is defensive — the
+    projector only ever calls it with growing values — but it's the
+    contract that lets re-runs and concurrent attempts be safe.
+    """
+    stream: AggregatedStream = stream_factory(store_factory())
+
+    with db_engine.connect() as conn:
+        stream._update_origin_meta(conn, {"some-stream": 100})
+        conn.commit()
+    with db_engine.connect() as conn:
+        # A "stale" update with a lower value must not lower the recorded max.
+        stream._update_origin_meta(conn, {"some-stream": 50})
+        conn.commit()
+    with db_engine.connect() as conn:
+        result = conn.execute(
+            _sa.select(
+                stream._origin_meta_table.c.max_aggregated_origin_global_position
+            ).where(stream._origin_meta_table.c.origin_stream == "some-stream")
+        ).scalar()
+    assert result == 100

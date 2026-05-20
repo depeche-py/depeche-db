@@ -1,3 +1,50 @@
+# 0.14.0rc1
+
+* Speed up `StreamProjector` by replacing the per-batch `GROUP BY` scans over the
+  message store and the aggregated stream with two new meta tables:
+  * `depeche_msgs_<store>_meta` — `(stream, min_global_position,
+    max_global_position)`, maintained by the message-store INSERT trigger.
+  * `depeche_stream_<stream>_omax` — `(origin_stream,
+    max_aggregated_origin_global_position)`, maintained by the projector
+    inside its EXCLUSIVE-locked update transaction.
+  Candidate-stream selection is now a single small join with `LIMIT batch_size`
+  instead of two `GROUP BY` scans over a lookback window.
+* Hoist the per-partition max-position read out of the projector batch loop:
+  `update_full` reads it once, mutates it in memory across batches, and writes
+  it back once at the end of the transaction.
+* **BREAKING CHANGE**: Remove the `lookback_for_gaps_hours` parameter from
+  `AggregatedStream` / `MessageStore.aggregated_stream(...)`. The gap-window
+  scan it controlled is no longer needed: the new meta tables plus the
+  existing `pg_advisory_xact_lock` taken before `nextval` in
+  `_write_message_fn` (which makes per-stream `global_position` monotonic in
+  commit order) cover the gap-correctness case directly. Passing the argument
+  is now an error.
+* The two meta tables are created and backfilled the next time `MessageStore`
+  / `AggregatedStream` is constructed against an older schema. **The upgrade
+  is online — no writer or projector downtime is required:**
+  * Schema creation is serialized across processes with a Postgres advisory
+    lock, so a rolling deploy where every process restarts at once no longer
+    races on `CREATE TABLE` (previously the losers of that race could crash
+    on startup with "relation already exists").
+  * The meta-aware message-store INSERT trigger function is swapped in and
+    committed *before* the `SELECT … GROUP BY stream` backfill scan runs, so
+    writes that commit during the (potentially slow) scan are captured by the
+    new trigger. The backfill merges its bounds with `LEAST`/`GREATEST`, so a
+    stream first written mid-migration keeps its true `min`/`max`.
+  * The aggregated stream's `omax` table is reconciled by the projector on
+    its first run, under the `EXCLUSIVE` table lock it already takes. It
+    therefore stays consistent with the aggregated stream even if a
+    pre-`0.14` projector is still draining during the deploy.
+  A standalone migration script for users who run schema changes out of band
+  can still be generated with:
+  `python -m depeche_db generate-migration-script <PREV-VERSION> 0.14 --message-store=<NAME> --aggregated-stream=<STREAM-NAME> --aggregated-stream=<ANOTHER...>`
+* Every message-store write now also performs one small upsert into
+  `depeche_msgs_<store>_meta` inside the existing INSERT trigger. There is no
+  added lock contention (same-stream writes are already serialized by the
+  per-stream `pg_advisory_xact_lock`, and different streams touch different
+  meta rows), and the upsert is a HOT update so the meta table does not
+  bloat.
+
 # 0.13.1
 
 * Fix dict size changed error in ThreadedExecutor logging
