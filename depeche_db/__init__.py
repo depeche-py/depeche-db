@@ -10,6 +10,7 @@ from ._exceptions import (  # noqa: F401
     MessageIdMismatchError,
     MessageNotFound,
     OptimisticConcurrencyError,
+    PartitionRevoked,
 )
 from ._executor import Executor  # noqa: F401
 from ._factories import AggregatedStreamFactory, SubscriptionFactory  # noqa: F401
@@ -24,6 +25,8 @@ from ._interfaces import (  # noqa: F401
     MessagePosition,
     MessageProtocol,
     MessageSerializer,
+    PartitionAssignment,
+    PartitionAssignmentProvider,
     RunOnNotification,
     RunOnNotificationResult,
     StoredMessage,
@@ -42,12 +45,18 @@ from ._message_store import (  # noqa: F401
     MessageStoreReader,
     MessageStoreReaderProtocol,
 )
+from ._partition_assignment import (  # noqa: F401
+    InMemoryPartitionAssignmentProvider,
+    compute_assignment,
+)
 
 # noqa: F401
 from ._storage import Storage  # noqa: F401
 from ._subscription import (  # noqa: F401
     AckStrategy,
+    AssignedSubscriptionRunner,
     BatchedAckSubscriptionRunner,
+    CoordinationStrategy,
     ExitSubscriptionErrorHandler,  # move somewhere else
     LogAndIgnoreSubscriptionErrorHandler,  # move somewhere else
     StartAtNextMessage,

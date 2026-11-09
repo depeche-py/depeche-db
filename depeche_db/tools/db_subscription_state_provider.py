@@ -1,9 +1,11 @@
 import contextlib as _contextlib
-from typing import Iterator, Set
+import uuid as _uuid
+from typing import Iterator, Optional, Set
 
 import sqlalchemy as _sa
 
 from .._compat import SAConnection
+from .._exceptions import PartitionRevoked
 from .._interfaces import SubscriptionState, SubscriptionStateProvider
 
 
@@ -61,12 +63,23 @@ class DbSubscriptionStateProvider(SubscriptionStateProvider):
             self._initialized_subscriptions.add(subscription_name)
         return result
 
-    def store(self, subscription_name: str, partition: int, position: int):
+    def store(
+        self,
+        subscription_name: str,
+        partition: int,
+        position: int,
+        expected_generation: Optional[int] = None,
+        expected_instance_id: Optional[_uuid.UUID] = None,
+        assignment_table: Optional[object] = None,
+    ):
         with self._session() as session:
             session.store(
                 subscription_name=subscription_name,
                 partition=partition,
                 position=position,
+                expected_generation=expected_generation,
+                expected_instance_id=expected_instance_id,
+                assignment_table=assignment_table,
             )
 
     def read(self, subscription_name: str) -> SubscriptionState:
@@ -116,27 +129,86 @@ class _Session:
     def initialized(self, subscription_name: str) -> bool:
         return self._parent.initialized(subscription_name=subscription_name)
 
-    def store(self, subscription_name: str, partition: int, position: int):
+    def store(
+        self,
+        subscription_name: str,
+        partition: int,
+        position: int,
+        expected_generation: Optional[int] = None,
+        expected_instance_id: Optional[_uuid.UUID] = None,
+        assignment_table: Optional[object] = None,
+    ):
         from sqlalchemy.dialects.postgresql import insert
 
         state_table = self._parent.state_table
-        self._conn.execute(
-            insert(state_table)
-            .values(
+
+        if expected_generation is None:
+            result = self._conn.execute(
+                insert(state_table)
+                .values(
+                    subscription_name=subscription_name,
+                    partition=partition,
+                    position=position,
+                )
+                .on_conflict_do_update(
+                    index_elements=[
+                        state_table.c.subscription_name,
+                        state_table.c.partition,
+                    ],
+                    set_={
+                        state_table.c.position: position,
+                    },
+                )
+            )
+            return result
+
+        assert (
+            assignment_table is not None
+        ), "assignment_table is required when expected_generation is set"
+        assert (
+            expected_instance_id is not None
+        ), "expected_instance_id is required when expected_generation is set"
+        assert isinstance(
+            assignment_table, _sa.Table
+        ), "assignment_table must be a SQLAlchemy Table"
+
+        # Fenced UPSERT: only write if the caller still owns the partition at
+        # the expected generation. The SELECT returns 0 rows -> INSERT inserts
+        # no rows -> RETURNING yields nothing -> raise PartitionRevoked.
+        select_fence = (
+            _sa.select(
+                _sa.literal(subscription_name).label("subscription_name"),
+                _sa.literal(partition).label("partition"),
+                _sa.literal(position).label("position"),
+            )
+            .where(
+                _sa.and_(
+                    assignment_table.c.partition == partition,
+                    assignment_table.c.instance_id == expected_instance_id,
+                    assignment_table.c.generation == expected_generation,
+                )
+            )
+            .select_from(assignment_table)
+        )
+
+        insert_stmt = insert(state_table).from_select(
+            ["subscription_name", "partition", "position"], select_fence
+        )
+        fenced_stmt = insert_stmt.on_conflict_do_update(
+            index_elements=[
+                state_table.c.subscription_name,
+                state_table.c.partition,
+            ],
+            set_={state_table.c.position: insert_stmt.excluded.position},
+        ).returning(state_table.c.partition)
+        rows = self._conn.execute(fenced_stmt).fetchall()
+        if not rows:
+            raise PartitionRevoked(
                 subscription_name=subscription_name,
                 partition=partition,
-                position=position,
+                expected_generation=expected_generation,
             )
-            .on_conflict_do_update(
-                index_elements=[
-                    state_table.c.subscription_name,
-                    state_table.c.partition,
-                ],
-                set_={
-                    state_table.c.position: position,
-                },
-            )
-        )
+        return None
 
     def read(self, subscription_name: str) -> SubscriptionState:
         state_table = self._parent.state_table

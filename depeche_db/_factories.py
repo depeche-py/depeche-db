@@ -1,5 +1,7 @@
 from typing import (
     TYPE_CHECKING,
+    Any,
+    Dict,
     Generic,
     List,
     Optional,
@@ -12,6 +14,7 @@ from ._interfaces import (
     MessageHandlerRegisterProtocol,
     MessagePartitioner,
     MessageProtocol,
+    PartitionAssignmentProvider,
     SubscriptionErrorHandler,
     SubscriptionStartPoint,
     SubscriptionStateProvider,
@@ -20,7 +23,7 @@ from ._interfaces import (
 if TYPE_CHECKING:
     from ._aggregated_stream import AggregatedStream
     from ._message_store import MessageStore
-    from ._subscription import AckStrategy, Subscription
+    from ._subscription import AckStrategy, CoordinationStrategy, Subscription
 
 E = TypeVar("E", bound=MessageProtocol)
 
@@ -97,6 +100,11 @@ class SubscriptionFactory(Generic[E]):
         lock_provider: Optional[LockProvider] = None,
         start_point: Optional[SubscriptionStartPoint] = None,
         ack_strategy: Optional["AckStrategy"] = None,
+        coordination_strategy: Optional["CoordinationStrategy"] = None,
+        assignment_provider: Optional[PartitionAssignmentProvider] = None,
+        assignment_table: Optional[Any] = None,
+        runner_class: Optional[type] = None,
+        runner_options: Optional[Dict[str, Any]] = None,
     ) -> "Subscription[E]":
         """
         Create a subscription.
@@ -111,9 +119,26 @@ class SubscriptionFactory(Generic[E]):
             lock_provider: Provider for the locks, defaults to a PostgreSQL provider
             start_point: The start point for the subscription, defaults to beginning of the stream
             ack_strategy: Strategy for acknowledging messages, defaults to AckStrategy.SINGLE
+            coordination_strategy: How multiple instances coordinate, defaults to ADVISORY_LOCK.
+                Set to INSTANCE_ASSIGNMENT to use the fixed-assignment path.
+            assignment_provider: Partition assignment provider (used when
+                coordination_strategy=INSTANCE_ASSIGNMENT). Defaults to a
+                Postgres-backed provider sharing the stream's engine.
+            assignment_table: SQLAlchemy assignment table (used for fencing).
+                Defaults to the one on ``assignment_provider``.
+            runner_class: Override the runner class (e.g.
+                ``ThreadedSubscriptionRunner`` from
+                ``depeche_db.experimental``).
+            runner_options: Keyword arguments for the runner constructor,
+                e.g. ``{"max_workers": 16}``.
         """
         from ._message_handler import MessageHandlerRegister
-        from ._subscription import AckStrategy, Subscription, SubscriptionMessageHandler
+        from ._subscription import (
+            AckStrategy,
+            CoordinationStrategy,
+            Subscription,
+            SubscriptionMessageHandler,
+        )
 
         if handlers is None:
             # allow constructing a subscription without handlers
@@ -132,4 +157,11 @@ class SubscriptionFactory(Generic[E]):
             start_point=start_point,
             batch_size=batch_size,
             ack_strategy=ack_strategy or AckStrategy.SINGLE,
+            coordination_strategy=(
+                coordination_strategy or CoordinationStrategy.ADVISORY_LOCK
+            ),
+            assignment_provider=assignment_provider,
+            assignment_table=assignment_table,
+            runner_class=runner_class,
+            runner_options=runner_options,
         )

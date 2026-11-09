@@ -1,3 +1,6 @@
+import uuid as _uuid
+from typing import Optional
+
 from .._interfaces import LockProvider, SubscriptionState, SubscriptionStateProvider
 
 
@@ -5,7 +8,15 @@ class InMemorySubscriptionState(SubscriptionStateProvider):
     def __init__(self):
         self._state = {}
 
-    def store(self, subscription_name: str, partition: int, position: int):
+    def store(
+        self,
+        subscription_name: str,
+        partition: int,
+        position: int,
+        expected_generation: Optional[int] = None,
+        expected_instance_id: Optional[_uuid.UUID] = None,
+        assignment_table: Optional[object] = None,
+    ):
         if subscription_name not in self._state:
             self._state[subscription_name] = {}
 

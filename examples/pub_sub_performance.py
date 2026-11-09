@@ -20,7 +20,12 @@ from depeche_db import (
     SubscriptionRunner,
     MessageHandlerRegister,
 )
-from depeche_db._subscription import AckStrategy, StartAtPointInTime
+from depeche_db._subscription import (
+    AckStrategy,
+    CoordinationStrategy,
+    StartAtNextMessage,
+    StartAtPointInTime,
+)
 from depeche_db.tools import (
     DbLockProvider,
     DbSubscriptionStateProvider,
@@ -63,9 +68,19 @@ message_store = MessageStore[MyMessage](
     serializer=PydanticMessageSerializer(MyMessage),
 )
 
+PARTITIONED = 0
+PARTITION_LATENCY = timedelta(seconds=0)
+
 
 class NumMessagePartitioner:
     def get_partition(self, message: StoredMessage[MyMessage]) -> int:
+        global PARTITION_LATENCY, PARTITIONED
+        latency = datetime.now(timezone.utc) - message.added_at.replace(
+            tzinfo=timezone.utc
+        )
+        # print(f"Partition latency: {latency.total_seconds() * 1000:.2f}")
+        PARTITION_LATENCY += latency
+        PARTITIONED += 1
         return message.message.content % 10
 
 
@@ -76,14 +91,20 @@ stream = message_store.aggregated_stream(
 )
 
 HANDLED = 0
+LATENCY = timedelta(seconds=0)
 HANDLER_DELAY = 0.001
 handlers = MessageHandlerRegister[MyMessage]()
 
 
 @handlers.register
 def handle_event_a(message: SubscriptionMessage[MyMessage]):
-    global HANDLED
+    global HANDLED, LATENCY
     HANDLED += 1
+    latency = datetime.now(timezone.utc) - message.stored_message.added_at.replace(
+        tzinfo=timezone.utc
+    )
+    LATENCY += latency
+    # print(latency.total_seconds() * 1000)
     real_message = message.stored_message.message
     # print(
     #    f"Got message #{real_message.content} at {message.partition}:{message.position}"
@@ -96,16 +117,23 @@ subscription = stream.subscription(
     handlers=handlers,
     batch_size=100,
     ack_strategy=AckStrategy.BATCHED,
-    start_point=StartAtPointInTime(datetime.now(timezone.utc) - timedelta(days=1)),
+    start_point=StartAtNextMessage(),
+    # start_point=StartAtPointInTime(datetime.now(timezone.utc) - timedelta(days=1)),
+    # coordination_strategy=CoordinationStrategy.INSTANCE_ASSIGNMENT,
 )
+
+RUNTIME = 5
+PUB_DELAY = 0.01
 
 
 def pub():
     start = time.time()
     n = 0
-    while time.time() - start < 30:
+    while time.time() - start < RUNTIME:
         n += 1
-        stream = random.choice(["aggregate-me-1", "aggregate-me-2"])
+        stream = random.choice([f"aggregate-me-{n}" for n in range(10000)])
+        # if PUB_DELAY > 0:
+        #    time.sleep(PUB_DELAY)
         message_store.write(
             stream=stream,
             message=MyMessage(content=random.randint(1, 100)),
@@ -121,6 +149,9 @@ def projector():
     executor = Executor(db_dsn=DB_DSN, stimulation_interval=STIMULATION_INTERVAL)
     executor.register(stream.projector)
     executor.run()
+    print(
+        f"partitioner {PARTITIONED}msgs, Avg latency {PARTITION_LATENCY.total_seconds() / PARTITIONED * 1000:.2f}ms"
+    )
 
 
 def sub():
@@ -130,17 +161,21 @@ def sub():
     start = time.time()
     executor.run()
     duration = time.time() - start
+    if HANDLED == 0:
+        print("Did not handle any events")
+        return
     min_run_time = HANDLER_DELAY * HANDLED
     overhead = duration - min_run_time
     print(
-        f"Subscriber handled {HANDLED / duration:.2f} mgs/s "
+        f"Subscriber handled {HANDLED}msgs {HANDLED / duration:.2f} mgs/s "
         f"(Time overhead: {overhead:.2f}s ({overhead / duration * 100:.1f}% {overhead / HANDLED * 1000:.2f}ms per message)) "
-        f"(Used {CONNECTIONS / HANDLED:.2f} connections per message)"
+        f"(Used {CONNECTIONS / HANDLED:.2f} connections per message) "
+        f"(Avg latency: {(LATENCY / HANDLED).total_seconds() * 1000:.2f}ms)"
     )
 
 
-PUBLISHER_COUNT = 2
-SUBSCRIBER_COUNT = 1
+PUBLISHER_COUNT = 1
+SUBSCRIBER_COUNT = 5
 
 
 def run_test():

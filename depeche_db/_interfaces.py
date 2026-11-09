@@ -9,6 +9,7 @@ from typing import (
     Callable,
     Dict,
     Generic,
+    Iterable,
     Iterator,
     Optional,
     Protocol,
@@ -233,14 +234,125 @@ class LockProvider(Protocol):
         raise NotImplementedError
 
 
+@_dc.dataclass(frozen=True)
+class PartitionAssignment:
+    """
+    A single partition assignment handed out to an instance.
+
+    Attributes:
+        partition: The partition number.
+        generation: A monotonic fencing token. The instance must include this
+            when writing the position for the partition. If the leader
+            reassigns the partition, the generation is bumped and the previous
+            owner's write will be rejected.
+    """
+
+    partition: int
+    generation: int
+
+
+class PartitionAssignmentProvider(Protocol):
+    """
+    Coordinates which instance processes which partition of a subscription.
+
+    Implementations track a set of live instances (via register / heartbeat /
+    deregister) and a sticky mapping of partition -> instance. A leader runs
+    `rebalance` periodically to redistribute partitions when the set of alive
+    instances or partitions changes.
+
+    Used by
+    [`AssignedSubscriptionRunner`][depeche_db.AssignedSubscriptionRunner]
+    as an alternative to per-batch advisory-lock coordination.
+    """
+
+    def register(
+        self,
+        instance_id: _uuid.UUID,
+        host: Optional[str] = None,
+        pid: Optional[int] = None,
+        label: Optional[str] = None,
+    ) -> None:
+        """
+        Register an instance. Must be called before `heartbeat` or
+        `get_my_assignments`.
+        """
+        raise NotImplementedError
+
+    def heartbeat(self, instance_id: _uuid.UUID) -> bool:
+        """
+        Refresh the instance's liveness timestamp.
+
+        Returns:
+            `True` if the instance is still registered, `False` if the
+            provider has evicted this instance (e.g. by TTL) and the caller
+            should stop processing and re-register.
+        """
+        raise NotImplementedError
+
+    def deregister(self, instance_id: _uuid.UUID) -> None:
+        """
+        Remove the instance and release its assignments. Safe to call after
+        the instance has already been evicted.
+        """
+        raise NotImplementedError
+
+    def get_my_assignments(self, instance_id: _uuid.UUID) -> Dict[int, int]:
+        """
+        Return the partitions currently assigned to the instance as a mapping
+        of partition number -> generation.
+        """
+        raise NotImplementedError
+
+    def rebalance(
+        self,
+        known_partitions: "Iterable[int]",
+    ) -> bool:
+        """
+        Attempt to run a rebalance. Implementations should use leader election
+        (e.g. a single advisory lock) so only one caller actually runs the
+        algorithm per cycle; others return quickly.
+
+        Args:
+            known_partitions: The partitions that currently exist and should
+                be covered by an assignment.
+
+        Returns:
+            `True` if this call actually performed a rebalance,
+            `False` if another instance is currently leader.
+        """
+        raise NotImplementedError
+
+    def active_instances(self) -> Iterator[_uuid.UUID]:
+        """
+        Return the currently-registered instance ids. Stale instances may be
+        included if a rebalance hasn't reaped them yet.
+        """
+        raise NotImplementedError
+
+
 class SubscriptionStateProvider(Protocol):
     """
     Subscription state provider is a protocol that is used to store and read subscription state.
     """
 
-    def store(self, subscription_name: str, partition: int, position: int):
+    def store(
+        self,
+        subscription_name: str,
+        partition: int,
+        position: int,
+        expected_generation: Optional[int] = None,
+        expected_instance_id: Optional[_uuid.UUID] = None,
+        assignment_table: Optional[object] = None,
+    ):
         """
         Stores subscription state for a given partition.
+
+        When ``expected_generation`` is provided, the write is fenced against
+        the assignment table: if the caller no longer owns the partition at
+        that generation, the implementation raises
+        [PartitionRevoked][depeche_db.PartitionRevoked]. The other two
+        arguments (``expected_instance_id`` and ``assignment_table``) must
+        also be supplied in that case.
         """
         raise NotImplementedError
 
