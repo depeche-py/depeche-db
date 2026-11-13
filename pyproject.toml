@@ -30,6 +30,9 @@ dependencies = [
 [project.optional-dependencies]
 psycopg2 = ["psycopg2~=2.9"]
 psycopg = ["psycopg>=3.2.1"]
+redis = [
+    "redis>=7.0.1",
+]
 
 [project.urls]
 Homepage = "https://github.com/depeche-py/depeche-db"
