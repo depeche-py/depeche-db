@@ -1,7 +1,7 @@
 import dataclasses
 import json
 import uuid as _uuid
-from typing import Generic, Iterable, TypeVar, Union
+from typing import Generic, Iterable, Optional, TypeVar, Union
 
 import redis as _redis
 
@@ -25,7 +25,10 @@ class DeadLetter:
 
 class RedisDeadLetterQueue(DeadLetterQueue[E], Generic[E]):
     def __init__(
-        self, subscription_key: str, redis: _redis.Redis, key_prefix: str | None = None
+        self,
+        subscription_key: str,
+        redis: _redis.Redis,
+        key_prefix: Optional[str] = None,
     ):
         self.subscription_key = subscription_key
         self.key_prefix = key_prefix
