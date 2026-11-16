@@ -62,7 +62,7 @@ class RedisDeadLetterQueue(DeadLetterQueue[E], Generic[E]):
         for item in self._redis.lrange(self._write_key, 0, limit - 1):
             yield self._parse(item)
 
-    def pop(self) -> DeadLetter | None:
+    def pop(self) -> Optional[DeadLetter]:
         item = self._redis.lpop(self._write_key)
         if item is None:
             return None
