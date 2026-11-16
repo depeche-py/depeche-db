@@ -39,16 +39,19 @@ def connected_redis():
     return redis.Redis(host="localhost", port=4999, db=0)
 
 
-def test_foo(connected_redis):
+def test_redis_queue(connected_redis):
     key = str(_uuid.uuid4()).replace("-", "")
-    subject = RedisDeadLetterQueue(subscription_key=key, redis=connected_redis)
+    subject = RedisDeadLetterQueue[AccountCreditedEvent](
+        subscription_key=key, redis=connected_redis
+    )
+
     subject.append(error=ValueError("foo"), message=SUB_MSG)
 
     assert subject.length() == 1
     letters = list(subject.read())
     assert len(letters) == 1
     letter = letters[0]
-    print(letter)
+
     assert letter.subscription_key == key
     assert letter.partition == SUB_MSG.partition
     assert letter.position == SUB_MSG.position

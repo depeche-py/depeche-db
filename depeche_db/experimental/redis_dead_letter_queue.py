@@ -1,7 +1,7 @@
 import dataclasses
 import json
 import uuid as _uuid
-from typing import Generic, Iterable, TypeVar
+from typing import Generic, Iterable, TypeVar, Union
 
 import redis as _redis
 
@@ -63,9 +63,11 @@ class RedisDeadLetterQueue(DeadLetterQueue[E], Generic[E]):
         item = self._redis.lpop(self._write_key)
         if item is None:
             return None
+        # list only gets here if we query more than one
+        assert not isinstance(item, list)
         return self._parse(item)
 
-    def _parse(self, item: str):
+    def _parse(self, item: Union[str, bytes]) -> DeadLetter:
         parsed = json.loads(item)
         message_id = parsed.pop("message_id")
         return DeadLetter(
