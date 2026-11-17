@@ -1,7 +1,7 @@
 import dataclasses
 import json
 import uuid as _uuid
-from typing import Generic, Iterable, Optional, TypeVar, Union
+from typing import Awaitable, Generic, Iterable, Optional, TypeVar, Union
 
 import redis as _redis
 
@@ -59,11 +59,14 @@ class RedisDeadLetterQueue(DeadLetterQueue[E], Generic[E]):
 
     def read(self, limit: int = 10) -> Iterable[DeadLetter]:
         assert limit > 0
-        for item in self._redis.lrange(self._write_key, 0, limit - 1):
+        result = self._redis.lrange(self._write_key, 0, limit - 1)
+        assert not isinstance(result, Awaitable)
+        for item in result:
             yield self._parse(item)
 
     def pop(self) -> Optional[DeadLetter]:
         item = self._redis.lpop(self._write_key)
+        assert not isinstance(item, Awaitable)
         if item is None:
             return None
         # list only gets here if we query more than one
