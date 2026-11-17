@@ -10,3 +10,8 @@ services:
     ports:
       - 4888:5432
     restart: unless-stopped
+  redis_dev:
+    image: redis
+    ports:
+      - 4999:6379
+    restart: unless-stopped
