@@ -9,7 +9,7 @@ jobs:
   tests-python-versions:
     strategy:
       matrix:
-        python: ["3.9", "3.10", "3.11", "3.12"]
+        python: ["3.10", "3.11", "3.12"]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -24,8 +24,7 @@ jobs:
         run: |
           pipx install uv
           uv venv --python ${{ matrix.python }}
-          uv sync --group dev
-          uv add psycopg2-binary
+          uv sync --group dev --extra psycopg2 --extra redis
           uv pip list
       - name: Run tests
         run: uv run pytest -vv
@@ -40,6 +39,9 @@ jobs:
             "psycopg[binary]==3.2.1",
           ]
     runs-on: ubuntu-latest
+    env:
+      # pin: runner system python (3.14) is too new for some locked deps
+      UV_PYTHON: "3.12"
     steps:
       - uses: actions/checkout@v3
       - name: Run dependencies
@@ -48,7 +50,7 @@ jobs:
       - name: Install
         run: |
           pipx install uv
-          uv sync --group dev
+          uv sync --group dev --extra redis
           uv add '${{ matrix.psycopg }}'
           uv pip list
       - name: Run tests
@@ -58,6 +60,9 @@ jobs:
       matrix:
         sqlalchemy: [">=1.4,<2.0", ">=2.0,<3.0"]
     runs-on: ubuntu-latest
+    env:
+      # pin: runner system python (3.14) is too new for some locked deps
+      UV_PYTHON: "3.12"
     steps:
       - uses: actions/checkout@v3
       - name: Run dependencies
@@ -66,8 +71,7 @@ jobs:
       - name: Install
         run: |
           pipx install uv
-          uv sync --group dev
-          uv add psycopg2-binary
+          uv sync --group dev --extra psycopg2 --extra redis
           uv add 'sqlalchemy${{ matrix.sqlalchemy }}'
           uv pip list
       - name: Run tests
@@ -77,6 +81,9 @@ jobs:
       matrix:
         postgres: ["12", "13", "14", "15", "16", "17"]
     runs-on: ubuntu-latest
+    env:
+      # pin: runner system python (3.14) is too new for some locked deps
+      UV_PYTHON: "3.12"
     steps:
       - uses: actions/checkout@v3
       - name: Run dependencies
@@ -85,8 +92,7 @@ jobs:
       - name: Install
         run: |
           pipx install uv
-          uv sync --group dev
-          uv add psycopg2-binary
+          uv sync --group dev --extra psycopg2 --extra redis
           uv pip list
       - name: Run tests
         run: uv run pytest -vv
@@ -95,6 +101,9 @@ jobs:
       matrix:
         pydantic: [">=1.10,<2.0", ">=2.4,<3.0"]
     runs-on: ubuntu-latest
+    env:
+      # pin: runner system python (3.14) is too new for some locked deps
+      UV_PYTHON: "3.12"
     steps:
       - uses: actions/checkout@v3
       - name: Run dependencies
@@ -103,8 +112,7 @@ jobs:
       - name: Install
         run: |
           pipx install uv
-          uv sync --group dev
-          uv add psycopg2-binary
+          uv sync --group dev --extra psycopg2 --extra redis
           uv add --group dev 'pydantic${{ matrix.pydantic }}'
           uv pip list
       - name: Run tests
