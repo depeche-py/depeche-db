@@ -40,6 +40,9 @@ jobs:
             "psycopg[binary]==3.2.1",
           ]
     runs-on: ubuntu-latest
+    env:
+      # pin: runner system python (3.14) is too new for some locked deps
+      UV_PYTHON: "3.12"
     steps:
       - uses: actions/checkout@v3
       - name: Run dependencies
@@ -58,6 +61,9 @@ jobs:
       matrix:
         sqlalchemy: [">=1.4,<2.0", ">=2.0,<3.0"]
     runs-on: ubuntu-latest
+    env:
+      # pin: runner system python (3.14) is too new for some locked deps
+      UV_PYTHON: "3.12"
     steps:
       - uses: actions/checkout@v3
       - name: Run dependencies
@@ -76,6 +82,9 @@ jobs:
       matrix:
         postgres: ["12", "13", "14", "15", "16", "17"]
     runs-on: ubuntu-latest
+    env:
+      # pin: runner system python (3.14) is too new for some locked deps
+      UV_PYTHON: "3.12"
     steps:
       - uses: actions/checkout@v3
       - name: Run dependencies
@@ -93,6 +102,9 @@ jobs:
       matrix:
         pydantic: [">=1.10,<2.0", ">=2.4,<3.0"]
     runs-on: ubuntu-latest
+    env:
+      # pin: runner system python (3.14) is too new for some locked deps
+      UV_PYTHON: "3.12"
     steps:
       - uses: actions/checkout@v3
       - name: Run dependencies
