@@ -1,7 +1,7 @@
 import dataclasses
 import json
 import uuid as _uuid
-from typing import Awaitable, Generic, Iterable, Optional, TypeVar, Union
+from typing import Awaitable, Generic, List, Optional, TypeVar, Union
 
 import redis as _redis
 
@@ -9,6 +9,10 @@ from depeche_db._interfaces import MessageProtocol, SubscriptionMessage
 from depeche_db.experimental.dead_letter_box import DeadLetterQueue
 
 E = TypeVar("E", bound=MessageProtocol)
+
+# Version of the JSON payload stored in Redis. Readers ignore unknown keys,
+# so adding fields is backwards compatible; bump this only for breaking changes.
+_SCHEMA_VERSION = 1
 
 
 @dataclasses.dataclass
@@ -43,6 +47,7 @@ class RedisDeadLetterQueue(DeadLetterQueue[E], Generic[E]):
             self._write_key,
             json.dumps(
                 {
+                    "v": _SCHEMA_VERSION,
                     "partition": message.partition,
                     "position": message.position,
                     "stream": message.stored_message.stream,
@@ -57,12 +62,12 @@ class RedisDeadLetterQueue(DeadLetterQueue[E], Generic[E]):
     def length(self) -> int:
         return self._redis.llen(self._write_key)
 
-    def read(self, limit: int = 10) -> Iterable[DeadLetter]:
-        assert limit > 0
+    def read(self, limit: int = 10) -> List[DeadLetter]:
+        if limit <= 0:
+            raise ValueError(f"limit must be positive, got {limit}")
         result = self._redis.lrange(self._write_key, 0, limit - 1)
         assert not isinstance(result, Awaitable)
-        for item in result:
-            yield self._parse(item)
+        return [self._parse(item) for item in result]
 
     def pop(self) -> Optional[DeadLetter]:
         item = self._redis.lpop(self._write_key)
@@ -74,10 +79,16 @@ class RedisDeadLetterQueue(DeadLetterQueue[E], Generic[E]):
         return self._parse(item)
 
     def _parse(self, item: Union[str, bytes]) -> DeadLetter:
+        # Read known keys explicitly so that entries written by a newer
+        # version (with additional keys) can still be read.
         parsed = json.loads(item)
-        message_id = parsed.pop("message_id")
         return DeadLetter(
             subscription_key=self.subscription_key,
-            message_id=_uuid.UUID(message_id),
-            **parsed,
+            partition=parsed["partition"],
+            position=parsed["position"],
+            stream=parsed["stream"],
+            stream_version=parsed["stream_version"],
+            message_type=parsed["message_type"],
+            message_id=_uuid.UUID(parsed["message_id"]),
+            error=parsed["error"],
         )

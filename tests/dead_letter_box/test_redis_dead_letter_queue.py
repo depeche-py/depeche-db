@@ -1,16 +1,21 @@
 import datetime as _dt
+import json
 import uuid as _uuid
 
 import pytest
-import redis
 
 from depeche_db import (
     StoredMessage,
     SubscriptionMessage,
 )
-from depeche_db.experimental.redis_dead_letter_queue import RedisDeadLetterQueue
 from tests._account_example import (
     AccountCreditedEvent,
+)
+
+redis = pytest.importorskip("redis")
+
+from depeche_db.experimental.redis_dead_letter_queue import (  # noqa: E402
+    RedisDeadLetterQueue,
 )
 
 MSG_ID = _uuid.uuid4()
@@ -36,7 +41,19 @@ SUB_MSG = SubscriptionMessage(
 
 @pytest.fixture
 def connected_redis():
-    return redis.Redis(host="localhost", port=4999, db=0)
+    client = redis.Redis(host="localhost", port=4999, db=0)
+    try:
+        client.ping()
+    except redis.ConnectionError:
+        pytest.skip("Redis not reachable on localhost:4999")
+    return client
+
+
+def _make_queue(connected_redis):
+    key = str(_uuid.uuid4()).replace("-", "")
+    return RedisDeadLetterQueue[AccountCreditedEvent](
+        subscription_key=key, redis=connected_redis
+    )
 
 
 def test_redis_queue(connected_redis):
@@ -66,3 +83,24 @@ def test_redis_queue(connected_redis):
 
     assert subject.length() == 0
     assert subject.pop() is None
+
+
+def test_read_rejects_non_positive_limit(connected_redis):
+    subject = _make_queue(connected_redis)
+    subject.append(error=ValueError("foo"), message=SUB_MSG)
+
+    with pytest.raises(ValueError):
+        subject.read(limit=0)
+
+
+def test_read_ignores_unknown_keys(connected_redis):
+    subject = _make_queue(connected_redis)
+    subject.append(error=ValueError("foo"), message=SUB_MSG)
+    raw = json.loads(connected_redis.lpop(subject._write_key))
+    raw["some_future_field"] = 42
+    connected_redis.rpush(subject._write_key, json.dumps(raw))
+
+    letter = subject.pop()
+
+    assert letter is not None
+    assert letter.message_id == MSG_ID

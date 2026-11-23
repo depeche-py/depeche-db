@@ -78,7 +78,7 @@ build-backend = "hatchling.build"
 
 [tool.ruff]
 line-length = 88
-target-version = "py39"
+target-version = "py310"
 fix = true
 select = [
     # pycodestyle checks.
